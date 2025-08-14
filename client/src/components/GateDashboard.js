@@ -24,7 +24,7 @@ const GateDashboard = () => {
 
   useEffect(() => {
     if (globalPassword) {
-      fetchTwilioBalance();
+      fetchTwilioBalance(globalPassword);
     }
   }, [globalPassword]);
 
@@ -41,10 +41,12 @@ const GateDashboard = () => {
     }
   };
 
-  const fetchTwilioBalance = async () => {
+  const fetchTwilioBalance = async (password = globalPassword) => {
+    if (!password) return;
+    
     try {
       const response = await axios.get('/api/twilio/balance', {
-        headers: { 'x-admin-password': globalPassword }
+        headers: { 'x-admin-password': password }
       });
       setTwilioBalance(response.data);
     } catch (error) {
@@ -59,6 +61,7 @@ const GateDashboard = () => {
         headers: { 'x-admin-password': password }
       });
       setGlobalPassword(password);
+      fetchTwilioBalance(password); // Pass the password to fetch balance
       return true;
     } catch {
       alert('Invalid admin password. Please try again.');
@@ -418,10 +421,21 @@ const GateDashboard = () => {
             <div className="gate-authorized">
               <h4><Users className="icon-small" /> Authorized Number</h4>
               <div className="authorized-numbers">
-                <span className="authorized-number">
-                  {gate.authorizedNumber}
-                </span>
+                {globalPassword ? (
+                  <span className="authorized-number">
+                    {gate.authorizedNumber}
+                  </span>
+                ) : (
+                  <span className="authorized-number hidden">
+                    ••••••••••
+                  </span>
+                )}
               </div>
+              {!globalPassword && (
+                <small className="password-notice">
+                  Enter admin password to view authorized numbers
+                </small>
+              )}
             </div>
             
             <div className="gate-actions">
