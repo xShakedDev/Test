@@ -7,10 +7,15 @@ echo "🚀 Starting build process..."
 echo "📦 Installing server dependencies..."
 npm ci --only=production
 
-# Install and build client
-echo "🔨 Building React client..."
+# Install client dependencies
+echo "📦 Installing client dependencies..."
 cd client
 npm ci --only=production
+cd ..
+
+# Build React client
+echo "🔨 Building React client..."
+cd client
 npm run build
 cd ..
 
@@ -20,6 +25,9 @@ mkdir -p public
 # Copy built client to public directory
 echo "📁 Copying built client..."
 cp -r client/build/* public/
+
+# Set production environment
+export NODE_ENV=production
 
 echo "✅ Build completed successfully!"
 echo "🎯 Application ready to run with: npm start"

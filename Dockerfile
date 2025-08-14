@@ -22,17 +22,22 @@ FROM node:18-alpine AS production
 # Create app directory
 WORKDIR /app
 
-# Copy server package files
+# Copy package files
 COPY package*.json ./
 
-# Install server dependencies
+# Install dependencies (including client dependencies)
 RUN npm ci --only=production
+RUN cd client && npm ci --only=production && cd ..
 
-# Copy server source code
+# Copy source code
 COPY server/ ./server/
+COPY client/ ./client/
 
 # Copy built client from builder stage
 COPY --from=client-builder /app/client/build ./public
+
+# Set production environment
+ENV NODE_ENV=production
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs

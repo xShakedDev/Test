@@ -1,0 +1,17 @@
+# Google Cloud Buildpacks configuration
+# This tells the buildpack how to build your application
+
+# Use Node.js buildpack
+[[buildpacks]]
+id = "gcr.io/buildpacks/nodejs"
+
+# Build configuration
+[build]
+# Install all dependencies first
+install = ["npm install", "cd client && npm install"]
+
+# Build the application
+build = ["npm run build"]
+
+# Start the application
+start = ["npm start"]
