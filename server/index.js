@@ -35,7 +35,7 @@ app.get('/health', (req, res) => {
 // System status endpoint
 app.get('/api/status', (req, res) => {
   try {
-    const buildPath = path.join(__dirname, '../client/build');
+    const buildPath = path.join(__dirname, '../public');
     const indexPath = path.join(buildPath, 'index.html');
     
     const status = {
@@ -68,7 +68,7 @@ app.get('/api/status', (req, res) => {
 // File status endpoint
 app.get('/api/files', (req, res) => {
   try {
-    const buildPath = path.join(__dirname, '../client/build');
+    const buildPath = path.join(__dirname, '../public');
     const indexPath = path.join(buildPath, 'index.html');
     
     const fileStatus = {
@@ -87,12 +87,40 @@ app.get('/api/files', (req, res) => {
   }
 });
 
+// Debug endpoint to show file paths
+app.get('/api/debug', (req, res) => {
+  try {
+    const possiblePaths = [
+      path.join(__dirname, '../public'),
+      path.join(__dirname, '../client/build'),
+      path.join(__dirname, './public'),
+      path.join(__dirname, './client/build')
+    ];
+    
+    const pathStatus = possiblePaths.map(p => ({
+      path: p,
+      exists: fs.existsSync(p),
+      contents: fs.existsSync(p) ? fs.readdirSync(p) : []
+    }));
+    
+    res.json({
+      currentDir: __dirname,
+      possiblePaths: pathStatus,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    res.status(500).json({ error: 'Failed to debug paths' });
+  }
+});
+
 // API Routes
 app.use('/api', gateRoutes);
 
 // Serve static files from React build (only in production)
 if (process.env.NODE_ENV === 'production') {
-  const buildPath = path.join(__dirname, '../client/build');
+  // In Docker, React build files are copied to ./public
+  const buildPath = path.join(__dirname, '../public');
   const indexPath = path.join(buildPath, 'index.html');
   
   // Check if build files exist
