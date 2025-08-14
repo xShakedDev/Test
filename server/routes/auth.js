@@ -17,13 +17,23 @@ if (!fs.existsSync(dataDir)) {
 // Twilio client
 let twilioClient = null;
 function getTwilioClient() {
-  if (!twilioClient) {
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-      throw new Error('Twilio credentials not configured');
+  try {
+    if (!twilioClient) {
+      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+        console.error('Twilio credentials missing:', {
+          hasSid: !!process.env.TWILIO_ACCOUNT_SID,
+          hasToken: !!process.env.TWILIO_AUTH_TOKEN
+        });
+        throw new Error('Twilio credentials not configured');
+      }
+      twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+      console.log('Twilio client initialized successfully');
     }
-    twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    return twilioClient;
+  } catch (error) {
+    console.error('Error initializing Twilio client:', error);
+    throw error;
   }
-  return twilioClient;
 }
 
 // Data functions
@@ -71,15 +81,20 @@ router.get('/gates', (req, res) => {
 router.post('/gates/:id/open', async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`Attempting to open gate ${id}`);
+    
     const gates = loadGates();
     const gate = gates[id];
     
     if (!gate) {
+      console.log(`Gate ${id} not found`);
       return res.status(404).json({ error: 'Gate not found' });
     }
     
+    console.log(`Opening gate: ${gate.name} (${gate.phoneNumber})`);
+    
     const client = getTwilioClient();
-    await client.calls.create({
+    const call = await client.calls.create({
       url: 'http://demo.twilio.com/docs/voice.xml',
       to: gate.phoneNumber,
       from: process.env.TWILIO_PHONE_NUMBER,
@@ -88,18 +103,31 @@ router.post('/gates/:id/open', async (req, res) => {
       statusCallbackMethod: 'POST'
     });
     
+    console.log(`Twilio call initiated: ${call.sid}`);
+    
     gate.lastOpenedAt = new Date();
     gates[id] = gate;
     saveGates(gates);
     
     res.json({ 
       success: true, 
-      message: `Opening gate "${gate.name}" via phone call to ${gate.phoneNumber}` 
+      message: `Opening gate "${gate.name}" via phone call to ${gate.phoneNumber}`,
+      callSid: call.sid
     });
     
   } catch (error) {
     console.error('Error opening gate:', error);
-    res.status(500).json({ error: 'Failed to open gate' });
+    
+    // Provide more specific error messages
+    if (error.message.includes('credentials not configured')) {
+      res.status(500).json({ error: 'Twilio not configured - check environment variables' });
+    } else if (error.code === 'ENOTFOUND') {
+      res.status(500).json({ error: 'Network error - unable to reach Twilio' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'Twilio authentication failed - check credentials' });
+    } else {
+      res.status(500).json({ error: 'Failed to open gate', details: error.message });
+    }
   }
 });
 
@@ -209,8 +237,12 @@ router.delete('/gates/:id', requireAdmin, (req, res) => {
 
 router.get('/twilio/balance', requireAdmin, async (req, res) => {
   try {
+    console.log('Fetching Twilio balance...');
+    
     const client = getTwilioClient();
     const balanceData = await client.balance.fetch();
+    
+    console.log(`Twilio balance fetched: ${balanceData.balance} ${balanceData.currency}`);
     
     res.json({ 
       balance: balanceData.balance,
@@ -219,7 +251,17 @@ router.get('/twilio/balance', requireAdmin, async (req, res) => {
     
   } catch (error) {
     console.error('Error fetching Twilio balance:', error);
-    res.status(500).json({ error: 'Failed to fetch Twilio balance' });
+    
+    // Provide more specific error messages
+    if (error.message.includes('credentials not configured')) {
+      res.status(500).json({ error: 'Twilio not configured - check environment variables' });
+    } else if (error.code === 'ENOTFOUND') {
+      res.status(500).json({ error: 'Network error - unable to reach Twilio' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'Twilio authentication failed - check credentials' });
+    } else {
+      res.status(500).json({ error: 'Failed to fetch Twilio balance', details: error.message });
+    }
   }
 });
 

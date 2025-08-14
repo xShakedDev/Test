@@ -31,6 +31,30 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// System status endpoint
+app.get('/api/status', (req, res) => {
+  try {
+    const status = {
+      server: 'OK',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      twilio: {
+        hasSid: !!process.env.TWILIO_ACCOUNT_SID,
+        hasToken: !!process.env.TWILIO_AUTH_TOKEN,
+        hasPhone: !!process.env.TWILIO_PHONE_NUMBER
+      },
+      admin: {
+        hasPassword: !!process.env.ADMIN_PASSWORD
+      }
+    };
+    
+    res.json(status);
+  } catch (error) {
+    console.error('Error in status endpoint:', error);
+    res.status(500).json({ error: 'Failed to get system status' });
+  }
+});
+
 // API Routes
 app.use('/api', gateRoutes);
 
@@ -46,8 +70,26 @@ if (process.env.NODE_ENV === 'production') {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('Global error handler:', {
+    error: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    body: req.body,
+    headers: req.headers,
+    timestamp: new Date().toISOString()
+  });
+  
+  // Don't expose internal error details in production
+  if (process.env.NODE_ENV === 'production') {
+    res.status(500).json({ error: 'Something went wrong!' });
+  } else {
+    res.status(500).json({ 
+      error: 'Something went wrong!',
+      message: err.message,
+      stack: err.stack
+    });
+  }
 });
 
 const server = app.listen(PORT, () => {

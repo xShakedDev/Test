@@ -20,6 +20,7 @@ const GateDashboard = () => {
   // Effects
   useEffect(() => {
     fetchGates();
+    checkSystemStatus(); // Check system configuration
   }, []);
 
   useEffect(() => {
@@ -41,6 +42,23 @@ const GateDashboard = () => {
     }
   };
 
+  const checkSystemStatus = async () => {
+    try {
+      const response = await axios.get('/api/status');
+      console.log('System status:', response.data);
+      
+      // Check if Twilio is configured
+      if (!response.data.twilio.hasSid || !response.data.twilio.hasToken) {
+        setError('⚠️ Twilio not configured - check environment variables');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error checking system status:', error);
+      setError('⚠️ Unable to check system status');
+    }
+  };
+
   const fetchTwilioBalance = async (password = globalPassword) => {
     if (!password) return;
     
@@ -51,6 +69,10 @@ const GateDashboard = () => {
       setTwilioBalance(response.data);
     } catch (error) {
       console.error('Failed to fetch Twilio balance:', error);
+      // Show specific error message
+      if (error.response?.data?.error) {
+        setError(`⚠️ ${error.response.data.error}`);
+      }
     }
   };
 
