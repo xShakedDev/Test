@@ -1,0 +1,6 @@
+@echo off
+echo Starting Gate Control App...
+echo.
+echo Starting both server and client...
+npm run dev
+pause
