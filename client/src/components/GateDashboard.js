@@ -3,6 +3,7 @@ import { DoorOpen, Users, Edit, Trash2 } from 'lucide-react';
 import axios from 'axios';
 
 const GateDashboard = () => {
+  // State
   const [gates, setGates] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -13,35 +14,95 @@ const GateDashboard = () => {
     phoneNumber: '',
     authorizedNumber: ''
   });
-  const [adminPassword, setAdminPassword] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
+  const [globalPassword, setGlobalPassword] = useState('');
+  const [twilioBalance, setTwilioBalance] = useState(null);
 
+  // Effects
   useEffect(() => {
     fetchGates();
+    checkSystemStatus(); // Check system configuration
   }, []);
 
+  useEffect(() => {
+    if (globalPassword) {
+      fetchTwilioBalance(globalPassword);
+    }
+  }, [globalPassword]);
+
+  // API Functions
   const fetchGates = async () => {
     try {
       const response = await axios.get('/api/gates');
       setGates(response.data.gates);
+      setError('');
     } catch (error) {
-      setError('Failed to fetch gates');
+      console.error('Error fetching gates:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const checkSystemStatus = async () => {
+    try {
+      const response = await axios.get('/api/status');
+      console.log('System status:', response.data);
+      
+      // Check if React build files exist
+      if (response.data.files && !response.data.files.buildExists) {
+        setError('⚠️ React app not built - missing build files');
+        return;
+      }
+      
+      // Check if Twilio is configured
+      if (!response.data.twilio.hasSid || !response.data.twilio.hasToken) {
+        setError('⚠️ Twilio not configured - check environment variables');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error checking system status:', error);
+      setError('⚠️ Unable to check system status');
+    }
+  };
+
+  const fetchTwilioBalance = async (password = globalPassword) => {
+    if (!password) return;
+    
+    try {
+      const response = await axios.get('/api/twilio/balance', {
+        headers: { 'x-admin-password': password }
+      });
+      setTwilioBalance(response.data);
+    } catch (error) {
+      console.error('Failed to fetch Twilio balance:', error);
+      // Show specific error message
+      if (error.response?.data?.error) {
+        setError(`⚠️ ${error.response.data.error}`);
+      }
+    }
+  };
+
+  // Password validation
+  const validatePassword = async (password) => {
+    try {
+      await axios.get('/api/twilio/balance', {
+        headers: { 'x-admin-password': password }
+      });
+      setGlobalPassword(password);
+      fetchTwilioBalance(password); // Pass the password to fetch balance
+      return true;
+    } catch {
+      alert('Invalid admin password. Please try again.');
+      return false;
+    }
+  };
+
+  // Gate operations
   const handleOpenGate = async (gate) => {
     try {
-      const response = await axios.post(`/api/gates/${gate.id}/open`);
-      
-      // Refresh gates to get updated information
+      await axios.post(`/api/gates/${gate.id}/open`);
       fetchGates();
-      setError('');
-      
-      // Show success message
       alert(`Opening gate "${gate.name}" via phone call to ${gate.phoneNumber}`);
-      
     } catch (error) {
       setError('Failed to open gate');
     }
@@ -58,26 +119,17 @@ const GateDashboard = () => {
 
   const handleUpdateGate = async (e) => {
     e.preventDefault();
-    
     try {
-      const response = await axios.put(`/api/gates/${editingGate.id}`, {
-        name: newGateData.name,
-        phoneNumber: newGateData.phoneNumber,
-        authorizedNumber: newGateData.authorizedNumber,
-        adminPassword: adminPassword
+      await axios.put(`/api/gates/${editingGate.id}`, newGateData, {
+        headers: { 'x-admin-password': globalPassword }
       });
       
-      // Reset form and hide it
       setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
-      setAdminPassword('');
       setEditingGate(null);
       setError('');
-      
-      // Refresh gates list
-      fetchGates();
-      
       alert('Gate updated successfully!');
       
+      setTimeout(fetchGates, 500);
     } catch (error) {
       setError(error.response?.data?.error || 'Failed to update gate');
     }
@@ -87,15 +139,12 @@ const GateDashboard = () => {
     if (window.confirm(`Are you sure you want to delete "${gate.name}"?`)) {
       try {
         await axios.delete(`/api/gates/${gate.id}`, {
-          data: { adminPassword: deletePassword }
+          headers: { 'x-admin-password': globalPassword }
         });
         
-        // Refresh gates list
-        fetchGates();
-        setError('');
-        
         alert('Gate deleted successfully!');
-        
+        setTimeout(fetchGates, 500);
+        setError('');
       } catch (error) {
         setError(error.response?.data?.error || 'Failed to delete gate');
       }
@@ -104,43 +153,67 @@ const GateDashboard = () => {
 
   const handleAddGate = async (e) => {
     e.preventDefault();
-    
     try {
-      const response = await axios.post('/api/gates', {
-        name: newGateData.name,
-        phoneNumber: newGateData.phoneNumber,
-        authorizedNumber: newGateData.authorizedNumber,
-        adminPassword: adminPassword
+      await axios.post('/api/gates', newGateData, {
+        headers: { 'x-admin-password': globalPassword }
       });
       
-      // Reset form and hide it
       setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
-      setAdminPassword('');
       setShowAddGate(false);
       setError('');
-      
-      // Refresh gates list
-      fetchGates();
-      
       alert('Gate created successfully!');
       
+      setTimeout(fetchGates, 500);
     } catch (error) {
       setError(error.response?.data?.error || 'Failed to create gate');
     }
   };
 
+  // Form handlers
   const handleCancelAddGate = () => {
     setShowAddGate(false);
     setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
-    setAdminPassword('');
     setError('');
   };
 
   const handleCancelEdit = () => {
     setEditingGate(null);
     setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
-    setAdminPassword('');
     setError('');
+  };
+
+  // Button click handlers
+  const handleAddButtonClick = async () => {
+    if (!globalPassword) {
+      const password = prompt('Enter admin password to add new gates:');
+      if (password && await validatePassword(password)) {
+        setShowAddGate(true);
+      }
+    } else {
+      setShowAddGate(true);
+    }
+  };
+
+  const handleEditButtonClick = async (gate) => {
+    if (!globalPassword) {
+      const password = prompt(`Enter admin password to edit "${gate.name}":`);
+      if (password && await validatePassword(password)) {
+        handleEditGate(gate);
+      }
+    } else {
+      handleEditGate(gate);
+    }
+  };
+
+  const handleDeleteButtonClick = async (gate) => {
+    if (!globalPassword) {
+      const password = prompt(`Enter admin password to delete "${gate.name}":`);
+      if (password && await validatePassword(password)) {
+        handleDeleteGate(gate);
+      }
+    } else {
+      handleDeleteGate(gate);
+    }
   };
 
   if (isLoading) {
@@ -153,21 +226,34 @@ const GateDashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header">
+             <div className="dashboard-header">
         <div>
           <h2>Gate Control Dashboard</h2>
           <p>Control your gates via phone calls</p>
           <p className="admin-notice">🔒 Admin access required to add, edit, or delete gates</p>
+          
+          {/* Show Twilio Balance only if password is verified */}
+          {globalPassword && (
+            <div className="admin-status-section">
+              <p className="password-status">✅ Admin password verified - you can now manage gates</p>
+              
+              {twilioBalance && (
+                <div className="twilio-balance">
+                  <div className="balance-card">
+                    <div className="balance-icon">💰</div>
+                    <div className="balance-details">
+                      <span className="balance-label">Twilio Account Balance </span>
+                      <span className="balance-amount">{twilioBalance.balance} {twilioBalance.currency}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <button 
           className="btn btn-primary"
-          onClick={() => {
-            const password = prompt('Enter admin password to add new gates:');
-            if (password) {
-              setAdminPassword(password);
-              setShowAddGate(true);
-            }
-          }}
+          onClick={handleAddButtonClick}
         >
           <DoorOpen className="btn-icon" />
           Add New Gate
@@ -219,19 +305,18 @@ const GateDashboard = () => {
               <small>Phone number that can open this gate</small>
             </div>
             
-            <div className="form-group">
-              <label htmlFor="adminPassword">Admin Password</label>
-              <input
-                type="password"
-                id="adminPassword"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Password already entered"
-                required
-                disabled
-              />
-              <small>Password already verified</small>
-            </div>
+                         <div className="form-group">
+               <label htmlFor="adminPassword">Admin Password</label>
+               <input
+                 type="password"
+                 id="adminPassword"
+                 value="••••••••••"
+                 placeholder="Password already verified"
+                 required
+                 disabled
+               />
+               <small>Password already verified</small>
+             </div>
             
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
@@ -294,19 +379,18 @@ const GateDashboard = () => {
               <small>Phone number that can open this gate</small>
             </div>
             
-            <div className="form-group">
-              <label htmlFor="editAdminPassword">Admin Password</label>
-              <input
-                type="password"
-                id="editAdminPassword"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Password already entered"
-                required
-                disabled
-              />
-              <small>Password already verified</small>
-            </div>
+                         <div className="form-group">
+               <label htmlFor="editAdminPassword">Admin Password</label>
+               <input
+                 type="password"
+                 id="editAdminPassword"
+                 value="••••••••••"
+                 placeholder="Password already verified"
+                 required
+                 disabled
+               />
+               <small>Password already verified</small>
+             </div>
             
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
@@ -339,26 +423,14 @@ const GateDashboard = () => {
               <div className="gate-actions-header">
                 <button 
                   className="btn btn-small btn-secondary"
-                  onClick={() => {
-                    const password = prompt(`Enter admin password to edit "${gate.name}":`);
-                    if (password) {
-                      setAdminPassword(password);
-                      handleEditGate(gate);
-                    }
-                  }}
+                  onClick={() => handleEditButtonClick(gate)}
                   title="Edit Gate"
                 >
                   <Edit className="btn-icon" />
                 </button>
                 <button 
                   className="btn btn-small btn-danger"
-                  onClick={() => {
-                    const password = prompt(`Enter admin password to delete "${gate.name}":`);
-                    if (password) {
-                      setDeletePassword(password);
-                      handleDeleteGate(gate);
-                    }
-                  }}
+                  onClick={() => handleDeleteButtonClick(gate)}
                   title="Delete Gate"
                 >
                   <Trash2 className="btn-icon" />
@@ -377,10 +449,21 @@ const GateDashboard = () => {
             <div className="gate-authorized">
               <h4><Users className="icon-small" /> Authorized Number</h4>
               <div className="authorized-numbers">
-                <span className="authorized-number">
-                  {gate.authorizedNumber}
-                </span>
+                {globalPassword ? (
+                  <span className="authorized-number">
+                    {gate.authorizedNumber}
+                  </span>
+                ) : (
+                  <span className="authorized-number hidden">
+                    ••••••••••
+                  </span>
+                )}
               </div>
+              {!globalPassword && (
+                <small className="password-notice">
+                  Enter admin password to view authorized numbers
+                </small>
+              )}
             </div>
             
             <div className="gate-actions">
