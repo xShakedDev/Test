@@ -25,13 +25,15 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including client dependencies)
-RUN npm ci --only=production
-RUN cd client && npm ci --only=production && cd ..
+# Install server dependencies only (postinstall will handle client later)
+RUN npm ci --only=production --ignore-scripts
 
 # Copy source code
 COPY server/ ./server/
 COPY client/ ./client/
+
+# Install client dependencies
+RUN cd client && npm ci --only=production && cd ..
 
 # Copy built client from builder stage
 COPY --from=client-builder /app/client/build ./public

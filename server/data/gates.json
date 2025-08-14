@@ -10,5 +10,11 @@
     "name": "Test Gate",
     "phoneNumber": "+1234567890",
     "authorizedNumber": "+972542070400"
+  },
+  "3": {
+    "id": "3",
+    "name": "Test Gate 2",
+    "phoneNumber": "+1234567890",
+    "authorizedNumber": "+972542070400"
   }
 }
