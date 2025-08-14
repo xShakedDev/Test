@@ -1,64 +1,56 @@
-# Dependencies
-node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Multi-stage build for React client + Node.js server
+FROM node:18-alpine AS client-builder
 
-# Build outputs
-client/build
-client/dist
-build
-dist
+# Set working directory
+WORKDIR /app/client
 
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Copy client package files
+COPY client/package*.json ./
 
-# IDE files
-.vscode
-.idea
-*.swp
-*.swo
+# Install client dependencies
+RUN npm ci
 
-# OS files
-.DS_Store
-Thumbs.db
+# Copy client source code
+COPY client/ ./
 
-# Git
-.git
-.gitignore
+# Build the React app
+RUN npm run build
 
-# Logs
-logs
-*.log
+# Production stage
+FROM node:18-alpine AS production
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# Create app directory
+WORKDIR /app
 
-# Coverage directory used by tools like istanbul
-coverage
+# Copy package files
+COPY package*.json ./
 
-# Temporary folders
-tmp
-temp
+# Install server dependencies
+RUN npm ci --only=production
 
-# Documentation
-README.md
-docs
+# Copy server source code
+COPY server/ ./server/
 
-# Test files
-test
-tests
-*.test.js
-*.spec.js
+# Copy built client from builder stage
+COPY --from=client-builder /app/client/build ./public
 
-# Docker
-Dockerfile
-.dockerignore
-docker-compose.yml
+# Set production environment
+ENV NODE_ENV=production
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Change ownership of the app directory
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# Expose port
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
+
+# Start the application
+CMD ["npm", "start"]
