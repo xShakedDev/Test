@@ -183,8 +183,18 @@ router.get('/gates/:id/authorized', (req, res) => {
   });
 });
 
-// Create a new gate
-router.post('/gates', (req, res) => {
+// Create a new gate (Admin only)
+router.post('/gates', (req, res, next) => {
+  // Check if admin password is provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(401).json({ error: 'Unauthorized: Admin access required to create gates' });
+  }
+  
+  next();
+}, (req, res) => {
   try {
     const { name, phoneNumber, authorizedNumber } = req.body;
     
@@ -221,8 +231,18 @@ router.post('/gates', (req, res) => {
   }
 });
 
-// Update a gate
-router.put('/gates/:id', (req, res) => {
+// Update a gate (Admin only)
+router.put('/gates/:id', (req, res, next) => {
+  // Check if admin password is provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(401).json({ error: 'Unauthorized: Admin access required to update gates' });
+  }
+  
+  next();
+}, (req, res) => {
   try {
     const { id } = req.params;
     const { name, phoneNumber, authorizedNumber } = req.body;
@@ -257,8 +277,18 @@ router.put('/gates/:id', (req, res) => {
   }
 });
 
-// Delete a gate
-router.delete('/gates/:id', (req, res) => {
+// Delete a gate (Admin only)
+router.delete('/gates/:id', (req, res, next) => {
+  // Check if admin password is provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(401).json({ error: 'Unauthorized: Admin access required to delete gates' });
+  }
+  
+  next();
+}, (req, res) => {
   try {
     const { id } = req.params;
     const gates = loadGates();

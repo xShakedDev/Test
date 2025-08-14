@@ -14,6 +14,18 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Basic authentication middleware for admin routes
+const authenticateAdmin = (req, res, next) => {
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword === adminPassword) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized: Admin access required' });
+  }
+};
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });

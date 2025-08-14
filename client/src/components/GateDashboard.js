@@ -13,6 +13,8 @@ const GateDashboard = () => {
     phoneNumber: '',
     authorizedNumber: ''
   });
+  const [adminPassword, setAdminPassword] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
 
   useEffect(() => {
     fetchGates();
@@ -61,11 +63,13 @@ const GateDashboard = () => {
       const response = await axios.put(`/api/gates/${editingGate.id}`, {
         name: newGateData.name,
         phoneNumber: newGateData.phoneNumber,
-        authorizedNumber: newGateData.authorizedNumber
+        authorizedNumber: newGateData.authorizedNumber,
+        adminPassword: adminPassword
       });
       
       // Reset form and hide it
       setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
+      setAdminPassword('');
       setEditingGate(null);
       setError('');
       
@@ -82,7 +86,9 @@ const GateDashboard = () => {
   const handleDeleteGate = async (gate) => {
     if (window.confirm(`Are you sure you want to delete "${gate.name}"?`)) {
       try {
-        await axios.delete(`/api/gates/${gate.id}`);
+        await axios.delete(`/api/gates/${gate.id}`, {
+          data: { adminPassword: deletePassword }
+        });
         
         // Refresh gates list
         fetchGates();
@@ -103,11 +109,13 @@ const GateDashboard = () => {
       const response = await axios.post('/api/gates', {
         name: newGateData.name,
         phoneNumber: newGateData.phoneNumber,
-        authorizedNumber: newGateData.authorizedNumber
+        authorizedNumber: newGateData.authorizedNumber,
+        adminPassword: adminPassword
       });
       
       // Reset form and hide it
       setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
+      setAdminPassword('');
       setShowAddGate(false);
       setError('');
       
@@ -124,12 +132,14 @@ const GateDashboard = () => {
   const handleCancelAddGate = () => {
     setShowAddGate(false);
     setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
+    setAdminPassword('');
     setError('');
   };
 
   const handleCancelEdit = () => {
     setEditingGate(null);
     setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
+    setAdminPassword('');
     setError('');
   };
 
@@ -147,10 +157,17 @@ const GateDashboard = () => {
         <div>
           <h2>Gate Control Dashboard</h2>
           <p>Control your gates via phone calls</p>
+          <p className="admin-notice">🔒 Admin access required to add, edit, or delete gates</p>
         </div>
         <button 
           className="btn btn-primary"
-          onClick={() => setShowAddGate(true)}
+          onClick={() => {
+            const password = prompt('Enter admin password to add new gates:');
+            if (password) {
+              setAdminPassword(password);
+              setShowAddGate(true);
+            }
+          }}
         >
           <DoorOpen className="btn-icon" />
           Add New Gate
@@ -200,6 +217,20 @@ const GateDashboard = () => {
                 required
               />
               <small>Phone number that can open this gate</small>
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="adminPassword">Admin Password</label>
+              <input
+                type="password"
+                id="adminPassword"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Password already entered"
+                required
+                disabled
+              />
+              <small>Password already verified</small>
             </div>
             
             <div className="form-actions">
@@ -263,6 +294,20 @@ const GateDashboard = () => {
               <small>Phone number that can open this gate</small>
             </div>
             
+            <div className="form-group">
+              <label htmlFor="editAdminPassword">Admin Password</label>
+              <input
+                type="password"
+                id="editAdminPassword"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Password already entered"
+                required
+                disabled
+              />
+              <small>Password already verified</small>
+            </div>
+            
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
                 Update Gate
@@ -294,14 +339,26 @@ const GateDashboard = () => {
               <div className="gate-actions-header">
                 <button 
                   className="btn btn-small btn-secondary"
-                  onClick={() => handleEditGate(gate)}
+                  onClick={() => {
+                    const password = prompt(`Enter admin password to edit "${gate.name}":`);
+                    if (password) {
+                      setAdminPassword(password);
+                      handleEditGate(gate);
+                    }
+                  }}
                   title="Edit Gate"
                 >
                   <Edit className="btn-icon" />
                 </button>
                 <button 
                   className="btn btn-small btn-danger"
-                  onClick={() => handleDeleteGate(gate)}
+                  onClick={() => {
+                    const password = prompt(`Enter admin password to delete "${gate.name}":`);
+                    if (password) {
+                      setDeletePassword(password);
+                      handleDeleteGate(gate);
+                    }
+                  }}
                   title="Delete Gate"
                 >
                   <Trash2 className="btn-icon" />
