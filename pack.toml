@@ -1,0 +1,9 @@
+[build]
+# Use the standard Node.js buildpack
+[[build.buildpacks]]
+id = "paketo-buildpacks/nodejs"
+version = "latest"
+
+# Build environment variables
+[build.env]
+NODE_ENV = "production"
