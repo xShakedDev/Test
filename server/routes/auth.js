@@ -4,8 +4,23 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 
-// Configuration
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'your-secret-password';
+// Initialize Twilio client
+let twilioClient = null;
+
+function getTwilioClient() {
+  if (!twilioClient) {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+      throw new Error('Twilio credentials not configured. Please check your .env file.');
+    }
+    twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+  }
+  return twilioClient;
+}
+
+// File path for storing gates
 const gatesFilePath = path.join(__dirname, '../data/gates.json');
 
 // Ensure data directory exists
@@ -14,123 +29,103 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Twilio client
-let twilioClient = null;
-function getTwilioClient() {
-  try {
-    if (!twilioClient) {
-      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-        console.error('Twilio credentials missing:', {
-          hasSid: !!process.env.TWILIO_ACCOUNT_SID,
-          hasToken: !!process.env.TWILIO_AUTH_TOKEN
-        });
-        throw new Error('Twilio credentials not configured');
-      }
-      twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      console.log('Twilio client initialized successfully');
-    }
-    return twilioClient;
-  } catch (error) {
-    console.error('Error initializing Twilio client:', error);
-    throw error;
-  }
-}
-
-// Data functions
+// Load gates from file
 function loadGates() {
   try {
     if (fs.existsSync(gatesFilePath)) {
-      return JSON.parse(fs.readFileSync(gatesFilePath, 'utf8'));
+      const data = fs.readFileSync(gatesFilePath, 'utf8');
+      return JSON.parse(data);
     }
   } catch (error) {
     console.error('Error loading gates:', error);
   }
   
-  // Default gates
+  // Return default gates if file doesn't exist or is corrupted
   return {
-    '1': { id: '1', name: 'Main Gate', phoneNumber: '+1234567890', authorizedNumber: '+972542070400' },
-    '2': { id: '2', name: 'Side Gate', phoneNumber: '+0987654321', authorizedNumber: '+972542070400' },
-    '3': { id: '3', name: 'Back Gate', phoneNumber: '+1122334455', authorizedNumber: '+972501234567' }
+    '1': {
+      id: '1',
+      name: 'Main Gate',
+      phoneNumber: '+1234567890', // Gate's phone number
+      authorizedNumber: '+972542070400' // Number that can open this gate
+    },
+    '2': {
+      id: '2', 
+      name: 'Side Gate',
+      phoneNumber: '+0987654321', // Gate's phone number
+      authorizedNumber: '+972542070400' // Number that can open this gate
+    },
+    '3': {
+      id: '3',
+      name: 'Back Gate', 
+      phoneNumber: '+1122334455', // Gate's phone number
+      authorizedNumber: '+972501234567' // Number that can open this gate
+    }
   };
 }
 
+// Save gates to file
 function saveGates(gates) {
   try {
     fs.writeFileSync(gatesFilePath, JSON.stringify(gates, null, 2));
-    console.log('Gates saved successfully');
+    console.log('Gates saved to file successfully');
   } catch (error) {
     console.error('Error saving gates:', error);
   }
 }
 
-// Middleware for admin authentication
-function requireAdmin(req, res, next) {
-  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
-  if (providedPassword !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized: Admin access required' });
-  }
-  next();
-}
-
-// Routes
+// Get all gates
 router.get('/gates', (req, res) => {
   const gates = loadGates();
-  res.json({ gates: Object.values(gates) });
+  const gatesList = Object.values(gates);
+  res.json({ gates: gatesList });
 });
 
+// Open a gate (this will make a phone call)
 router.post('/gates/:id/open', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`Attempting to open gate ${id}`);
     
     const gates = loadGates();
     const gate = gates[id];
     
     if (!gate) {
-      console.log(`Gate ${id} not found`);
       return res.status(404).json({ error: 'Gate not found' });
     }
     
-    console.log(`Opening gate: ${gate.name} (${gate.phoneNumber})`);
-    
+    // Make a phone call to open the gate
     const client = getTwilioClient();
+    
     const call = await client.calls.create({
-      url: 'http://demo.twilio.com/docs/voice.xml',
-      to: gate.phoneNumber,
-      from: process.env.TWILIO_PHONE_NUMBER,
+      url: 'http://demo.twilio.com/docs/voice.xml', // Simple TwiML for demo
+      to: gate.phoneNumber, // Call the gate's phone number
+      from: gate.authorizedNumber, // Call from your Twilio number
       statusCallback: `${req.protocol}://${req.get('host')}/api/gates/${id}/call-status`,
       statusCallbackEvent: ['completed'],
       statusCallbackMethod: 'POST'
     });
     
-    console.log(`Twilio call initiated: ${call.sid}`);
-    
+    // Update gate with call information
     gate.lastOpenedAt = new Date();
     gates[id] = gate;
+    
+    // Save updated gates to file
     saveGates(gates);
     
     res.json({ 
       success: true, 
-      message: `Opening gate "${gate.name}" via phone call to ${gate.phoneNumber}`,
-      callSid: call.sid
+      gate: gate,
+      message: `Opening gate "${gate.name}" via phone call to ${gate.phoneNumber}`
     });
     
   } catch (error) {
     console.error('Error opening gate:', error);
-    
-    // Provide more specific error messages
-    if (error.message.includes('credentials not configured')) {
-      res.status(500).json({ error: 'Twilio not configured - check environment variables' });
-    } else if (error.code === 'ENOTFOUND') {
-      res.status(500).json({ error: 'Network error - unable to reach Twilio' });
-    } else if (error.code === 'UNAUTHORIZED') {
-      res.status(500).json({ error: 'Twilio authentication failed - check credentials' });
-    } else {
-      res.status(500).json({ error: 'Failed to open gate', details: error.message });
-    }
+    res.status(500).json({ error: 'Failed to open gate' });
   }
 });
 
+
+
+// Call status callback (Twilio will call this when call completes)
 router.post('/gates/:id/call-status', (req, res) => {
   const { id } = req.params;
   const { CallStatus, CallDuration } = req.body;
@@ -139,16 +134,26 @@ router.post('/gates/:id/call-status', (req, res) => {
   const gate = gates[id];
   
   if (gate) {
+    console.log(`📞 Call to gate "${gate.name}" completed with status: ${CallStatus}`);
+    console.log(`⏱️ Call duration: ${CallDuration} seconds`);
+    
+    // Update gate with call result
     gate.lastCallStatus = CallStatus;
     gate.lastCallDuration = CallDuration;
     gates[id] = gate;
+    
+    // Save updated gates to file
     saveGates(gates);
-    console.log(`Call to gate "${gate.name}" completed: ${CallStatus}`);
+    
+    if (CallStatus === 'completed') {
+      console.log(`✅ Gate "${gate.name}" call completed successfully!`);
+    }
   }
   
   res.sendStatus(200);
 });
 
+// Get gate details
 router.get('/gates/:id', (req, res) => {
   const { id } = req.params;
   const gates = loadGates();
@@ -158,26 +163,67 @@ router.get('/gates/:id', (req, res) => {
     return res.status(404).json({ error: 'Gate not found' });
   }
   
-  res.json({ gate });
+  res.json({ gate: gate });
 });
 
-router.post('/gates', requireAdmin, (req, res) => {
+// Get authorized number for a gate
+router.get('/gates/:id/authorized', (req, res) => {
+  const { id } = req.params;
+  const gates = loadGates();
+  const gate = gates[id];
+  
+  if (!gate) {
+    return res.status(404).json({ error: 'Gate not found' });
+  }
+  
+  res.json({ 
+    gateId: id,
+    gateName: gate.name,
+    authorizedNumber: gate.authorizedNumber
+  });
+});
+
+// Create a new gate (Admin only)
+router.post('/gates', (req, res, next) => {
+  // Check if admin password is provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(401).json({ error: 'Unauthorized: Admin access required to create gates' });
+  }
+  
+  next();
+}, (req, res) => {
   try {
     const { name, phoneNumber, authorizedNumber } = req.body;
     
     if (!name || !phoneNumber || !authorizedNumber) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ 
+        error: 'Missing required fields: name, phoneNumber, and authorizedNumber' 
+      });
     }
     
     const gates = loadGates();
     const newId = (Object.keys(gates).length + 1).toString();
     
-    const newGate = { id: newId, name, phoneNumber, authorizedNumber };
+    const newGate = {
+      id: newId,
+      name,
+      phoneNumber,
+      authorizedNumber
+    };
+    
     gates[newId] = newGate;
     saveGates(gates);
     
-    console.log(`New gate created: "${name}"`);
-    res.status(201).json({ success: true, gate: newGate });
+    console.log(`🚪 New gate created: "${name}" with phone ${phoneNumber}`);
+    
+    res.status(201).json({ 
+      success: true, 
+      gate: newGate,
+      message: `Gate "${name}" created successfully!`
+    });
     
   } catch (error) {
     console.error('Error creating gate:', error);
@@ -185,7 +231,18 @@ router.post('/gates', requireAdmin, (req, res) => {
   }
 });
 
-router.put('/gates/:id', requireAdmin, (req, res) => {
+// Update a gate (Admin only)
+router.put('/gates/:id', (req, res, next) => {
+  // Check if admin password is provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(401).json({ error: 'Unauthorized: Admin access required to update gates' });
+  }
+  
+  next();
+}, (req, res) => {
   try {
     const { id } = req.params;
     const { name, phoneNumber, authorizedNumber } = req.body;
@@ -199,13 +256,20 @@ router.put('/gates/:id', requireAdmin, (req, res) => {
     
     if (name) gate.name = name;
     if (phoneNumber) gate.phoneNumber = phoneNumber;
-    if (authorizedNumber) gate.authorizedNumber = authorizedNumber;
+    if (authorizedNumber) {
+      gate.authorizedNumber = authorizedNumber;
+    }
     
     gates[id] = gate;
     saveGates(gates);
     
-    console.log(`Gate updated: "${gate.name}"`);
-    res.json({ success: true, gate });
+    console.log(`🚪 Gate updated: "${gate.name}"`);
+    
+    res.json({ 
+      success: true, 
+      gate: gate,
+      message: `Gate "${gate.name}" updated successfully!`
+    });
     
   } catch (error) {
     console.error('Error updating gate:', error);
@@ -213,7 +277,18 @@ router.put('/gates/:id', requireAdmin, (req, res) => {
   }
 });
 
-router.delete('/gates/:id', requireAdmin, (req, res) => {
+// Delete a gate (Admin only)
+router.delete('/gates/:id', (req, res, next) => {
+  // Check if admin password is provided
+  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
+  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
+  
+  if (providedPassword !== adminPassword) {
+    return res.status(401).json({ error: 'Unauthorized: Admin access required to delete gates' });
+  }
+  
+  next();
+}, (req, res) => {
   try {
     const { id } = req.params;
     const gates = loadGates();
@@ -226,42 +301,16 @@ router.delete('/gates/:id', requireAdmin, (req, res) => {
     delete gates[id];
     saveGates(gates);
     
-    console.log(`Gate deleted: "${gate.name}"`);
-    res.json({ success: true, message: `Gate "${gate.name}" deleted successfully` });
+    console.log(`🚪 Gate deleted: "${gate.name}"`);
+    
+    res.json({ 
+      success: true, 
+      message: `Gate "${gate.name}" deleted successfully!`
+    });
     
   } catch (error) {
     console.error('Error deleting gate:', error);
     res.status(500).json({ error: 'Failed to delete gate' });
-  }
-});
-
-router.get('/twilio/balance', requireAdmin, async (req, res) => {
-  try {
-    console.log('Fetching Twilio balance...');
-    
-    const client = getTwilioClient();
-    const balanceData = await client.balance.fetch();
-    
-    console.log(`Twilio balance fetched: ${balanceData.balance} ${balanceData.currency}`);
-    
-    res.json({ 
-      balance: balanceData.balance,
-      currency: balanceData.currency
-    });
-    
-  } catch (error) {
-    console.error('Error fetching Twilio balance:', error);
-    
-    // Provide more specific error messages
-    if (error.message.includes('credentials not configured')) {
-      res.status(500).json({ error: 'Twilio not configured - check environment variables' });
-    } else if (error.code === 'ENOTFOUND') {
-      res.status(500).json({ error: 'Network error - unable to reach Twilio' });
-    } else if (error.code === 'UNAUTHORIZED') {
-      res.status(500).json({ error: 'Twilio authentication failed - check credentials' });
-    } else {
-      res.status(500).json({ error: 'Failed to fetch Twilio balance', details: error.message });
-    }
   }
 });
 

@@ -1,5 +1,0 @@
-[33m3b43827[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Add build speed optimizations - Multi-stage Docker build, .dockerignore, Cloud Build config, fast build scripts for 3-5x faster builds
-[33m5485095[m Fix Docker build path mismatch - Update server to look for React files in /public instead of /client/build, improve Dockerfile, add debug endpoint
-[33m906706f[m Fix React build file serving issue - Add file existence checks, better error handling, and file status endpoints for debugging missing build files
-[33m7b23355[m Improve error handling and add system status endpoint - Better error messages, system status checking, improved logging for debugging Google Cloud issues
-[33m8f97a5d[m Fix authorized number visibility and Twilio balance display - Hide authorized numbers for unauthenticated users, show balance for authenticated users

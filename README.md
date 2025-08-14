@@ -1,95 +1,108 @@
 # Gate Control App
 
-A simple web application for controlling gates via phone calls using Twilio.
+A modern gate control application that uses Twilio for phone verification and gate opening through phone calls.
 
 ## Features
 
-- 🚪 Control multiple gates remotely
-- 📞 Make phone calls to open gates
-- 👑 Admin panel for managing gates
-- 💰 View Twilio account balance
-- 🔒 Secure admin authentication
+- **Phone Number Verification**: Users must verify their phone number through Twilio before accessing the app
+- **Gate Management**: Add, edit, and delete gates with custom names and phone numbers
+- **Secure Access**: Only verified phone numbers can control gates
+- **Phone Call Integration**: Open gates by making Twilio calls from verified numbers to gate numbers
+- **Modern UI**: Clean, responsive React frontend with intuitive controls
 
-## Quick Start
+## Prerequisites
 
-### Prerequisites
+- Node.js (v16 or higher)
+- Twilio account with:
+  - Account SID
+  - Auth Token
+  - Verified phone number
+- npm or yarn package manager
 
-- Node.js (v14 or higher)
-- Twilio account with credentials
-- Environment variables configured
+## Installation
 
-### Installation
-
-1. **Clone the repository**
+1. Clone or download this repository
+2. Install server dependencies:
    ```bash
-   git clone <repository-url>
-   cd Gates
+   npm install
    ```
 
-2. **Install dependencies**
+3. Install client dependencies:
    ```bash
-   npm run install-all
+   cd client
+   npm install
+   cd ..
    ```
 
-3. **Configure environment variables**
-   Create a `.env` file in the root directory:
-   ```env
-   ADMIN_PASSWORD=your-secret-password
-   TWILIO_ACCOUNT_SID=your-twilio-sid
-   TWILIO_AUTH_TOKEN=your-twilio-token
-   TWILIO_PHONE_NUMBER=your-twilio-number
-   ```
-
-4. **Start the application**
+4. Copy the environment file and configure your Twilio credentials:
    ```bash
-   npm run dev
+   cp env.example .env
    ```
-
-   The app will be available at `http://localhost:3000`
+   
+   Edit `.env` and add your Twilio credentials:
+   - `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
+   - `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
+   - `TWILIO_PHONE_NUMBER`: Your verified Twilio phone number
 
 ## Usage
 
-### Opening Gates
-- Click the "Open Gate" button on any gate card
-- The system will make a phone call to the gate's phone number
-
-### Admin Functions
-- **Add Gate**: Create new gates with phone numbers
-- **Edit Gate**: Modify existing gate information
-- **Delete Gate**: Remove gates from the system
-- **View Balance**: Check Twilio account balance
-
-### Security
-- Admin password required for all management operations
-- Password is validated against the server
-- No persistent authentication - password required for each session
-
-## Project Structure
-
+### Development Mode
+Run both server and client in development mode:
+```bash
+npm run dev
 ```
-Gates/
-├── client/          # React frontend
-├── server/          # Express backend
-├── data/            # Gate data storage
-└── package.json     # Dependencies and scripts
+
+### Production Mode
+Build the client and start the server:
+```bash
+npm run build
+npm start
 ```
+
+## How It Works
+
+1. **Phone Verification**: Users enter their phone number and receive a verification call from Twilio
+2. **Gate Management**: Verified users can add gates with names and phone numbers
+3. **Gate Control**: Users can trigger gate opening by making Twilio calls from their verified number to the gate number
 
 ## API Endpoints
 
-- `GET /api/gates` - Get all gates
-- `POST /api/gates/:id/open` - Open a gate
-- `POST /api/gates` - Create new gate (admin)
-- `PUT /api/gates/:id` - Update gate (admin)
-- `DELETE /api/gates/:id` - Delete gate (admin)
-- `GET /api/twilio/balance` - Get Twilio balance (admin)
+- `POST /api/verify-phone` - Initiate phone verification
+- `POST /api/verify-code` - Complete phone verification with code
+- `GET /api/gates` - Get all gates for verified user
+- `POST /api/gates` - Add new gate
+- `PUT /api/gates/:id` - Update gate
+- `DELETE /api/gates/:id` - Delete gate
+- `POST /api/gates/:id/open` - Open specific gate
 
-## Technologies Used
+## Security Features
 
-- **Frontend**: React, CSS3
-- **Backend**: Node.js, Express
-- **Communication**: Twilio API
-- **Storage**: JSON file system
+- Phone number verification through Twilio
+- Session-based authentication
+- Authorized access control for gate management
+
+## File Structure
+
+```
+├── server/           # Backend Express server
+│   ├── index.js     # Main server file
+│   ├── routes/      # API route handlers
+│   └── middleware/  # Custom middleware
+├── client/          # React frontend
+│   ├── src/         # Source code
+│   ├── public/      # Static assets
+│   └── package.json # Frontend dependencies
+├── package.json     # Backend dependencies
+└── README.md        # This file
+```
+
+## Troubleshooting
+
+- Ensure your Twilio credentials are correct in the `.env` file
+- Check that your Twilio phone number is verified
+- Verify that your Twilio account has sufficient credits for making calls
+- Check the console for any error messages
 
 ## License
 
-MIT License
+MIT License - feel free to use this project for your own purposes.
