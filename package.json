@@ -4,7 +4,7 @@
   "description": "A simple gate control application without authentication",
   "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js",
+    "start": "PORT=8080 node server/index.js",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "nodemon server/index.js",
     "client": "cd client && npm start",

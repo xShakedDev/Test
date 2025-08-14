@@ -30,4 +30,4 @@ echo "🐳 Building Docker image..."
 docker build -t gates-app:latest .
 
 echo "✅ Build completed successfully!"
-echo "🚀 Run with: docker run -p 3001:3001 gates-app:latest"
+echo "🚀 Run with: docker run -p 8080:8080 gates-app:latest"
