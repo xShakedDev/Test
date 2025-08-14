@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const gateRoutes = require('./routes/auth');
@@ -34,10 +35,19 @@ app.get('/health', (req, res) => {
 // System status endpoint
 app.get('/api/status', (req, res) => {
   try {
+    const buildPath = path.join(__dirname, '../client/build');
+    const indexPath = path.join(buildPath, 'index.html');
+    
     const status = {
       server: 'OK',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
+      files: {
+        buildPath,
+        indexPath,
+        buildExists: fs.existsSync(buildPath),
+        indexExists: fs.existsSync(indexPath)
+      },
       twilio: {
         hasSid: !!process.env.TWILIO_ACCOUNT_SID,
         hasToken: !!process.env.TWILIO_AUTH_TOKEN,
@@ -55,17 +65,58 @@ app.get('/api/status', (req, res) => {
   }
 });
 
+// File status endpoint
+app.get('/api/files', (req, res) => {
+  try {
+    const buildPath = path.join(__dirname, '../client/build');
+    const indexPath = path.join(buildPath, 'index.html');
+    
+    const fileStatus = {
+      buildPath,
+      indexPath,
+      buildExists: fs.existsSync(buildPath),
+      indexExists: fs.existsSync(indexPath),
+      buildContents: fs.existsSync(buildPath) ? fs.readdirSync(buildPath) : [],
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json(fileStatus);
+  } catch (error) {
+    console.error('Error checking files:', error);
+    res.status(500).json({ error: 'Failed to check files' });
+  }
+});
+
 // API Routes
 app.use('/api', gateRoutes);
 
 // Serve static files from React build (only in production)
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
+  const buildPath = path.join(__dirname, '../client/build');
+  const indexPath = path.join(buildPath, 'index.html');
+  
+  // Check if build files exist
+  if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
+    app.use(express.static(buildPath));
 
-  // Serve React app for any non-API routes
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-  });
+    // Serve React app for any non-API routes
+    app.get('*', (req, res) => {
+      res.sendFile(indexPath);
+    });
+    
+    console.log('React build files found and will be served');
+  } else {
+    console.warn('React build files not found. Make sure to run "npm run build" in the client directory');
+    
+    // Fallback for missing build files
+    app.get('*', (req, res) => {
+      res.status(404).json({ 
+        error: 'React app not built. Please build the client first.',
+        path: buildPath,
+        exists: fs.existsSync(buildPath)
+      });
+    });
+  }
 }
 
 // Error handling middleware

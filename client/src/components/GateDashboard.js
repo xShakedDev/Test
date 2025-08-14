@@ -47,6 +47,12 @@ const GateDashboard = () => {
       const response = await axios.get('/api/status');
       console.log('System status:', response.data);
       
+      // Check if React build files exist
+      if (response.data.files && !response.data.files.buildExists) {
+        setError('⚠️ React app not built - missing build files');
+        return;
+      }
+      
       // Check if Twilio is configured
       if (!response.data.twilio.hasSid || !response.data.twilio.hasToken) {
         setError('⚠️ Twilio not configured - check environment variables');
