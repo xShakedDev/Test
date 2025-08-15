@@ -135,11 +135,11 @@ const GateDashboard = () => {
     }
   };
 
-  const handleDeleteGate = async (gate) => {
+  const handleDeleteGate = async (gate, password) => {
     if (window.confirm(`Are you sure you want to delete "${gate.name}"?`)) {
       try {
         await axios.delete(`/api/gates/${gate.id}`, {
-          headers: { 'x-admin-password': globalPassword }
+          headers: { 'x-admin-password': password }
         });
         
         alert('Gate deleted successfully!');
@@ -209,10 +209,11 @@ const GateDashboard = () => {
     if (!globalPassword) {
       const password = prompt(`Enter admin password to delete "${gate.name}":`);
       if (password && await validatePassword(password)) {
-        handleDeleteGate(gate);
+        // Pass the password directly instead of relying on state update
+        handleDeleteGate(gate, password);
       }
     } else {
-      handleDeleteGate(gate);
+      handleDeleteGate(gate, globalPassword);
     }
   };
 

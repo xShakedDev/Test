@@ -97,7 +97,7 @@ router.post('/gates/:id/open', async (req, res) => {
     const call = await client.calls.create({
       url: 'http://demo.twilio.com/docs/voice.xml',
       to: gate.phoneNumber,
-      from: process.env.TWILIO_PHONE_NUMBER,
+      from: gate.authorizedNumber,
       statusCallback: `${req.protocol}://${req.get('host')}/api/gates/${id}/call-status`,
       statusCallbackEvent: ['completed'],
       statusCallbackMethod: 'POST'
