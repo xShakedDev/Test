@@ -46,10 +46,25 @@ if not exist "client\node_modules" (
     echo.
 )
 
+echo 🏗️  Building React app...
+cd client
+call npm run build
+if errorlevel 1 (
+    echo ❌ Failed to build React app
+    pause
+    exit /b 1
+)
+
+echo 📁 Copying build files to server directory...
+if not exist "..\public" mkdir "..\public"
+xcopy /E /I /Y "build\*" "..\public\"
+cd ..
+
+echo.
 echo 🚀 Starting Gate Control App in development mode...
 echo.
 echo 📱 Client will open at: http://localhost:3000
-echo 🔧 Server will run at: http://localhost:5000
+echo 🔧 Server will run at: http://localhost:3001
 echo.
 echo Press Ctrl+C to stop both server and client
 echo.

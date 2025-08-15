@@ -40,6 +40,9 @@ WORKDIR /app
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
+# Copy package.json for npm scripts
+COPY package.json ./
+
 # Copy server source
 COPY server/ ./server/
 

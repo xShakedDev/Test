@@ -1,4 +1,4 @@
-const express = require('express');
+ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -117,34 +117,31 @@ app.get('/api/debug', (req, res) => {
 // API Routes
 app.use('/api', gateRoutes);
 
-// Serve static files from React build (only in production)
-if (process.env.NODE_ENV === 'production') {
-  // In Docker, React build files are copied to ./public
-  const buildPath = path.join(__dirname, '../public');
-  const indexPath = path.join(buildPath, 'index.html');
-  
-  // Check if build files exist
-  if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
-    app.use(express.static(buildPath));
+// Serve static files from React build (in both development and production)
+const buildPath = path.join(__dirname, '../public');
+const indexPath = path.join(buildPath, 'index.html');
 
-    // Serve React app for any non-API routes
-    app.get('*', (req, res) => {
-      res.sendFile(indexPath);
+// Check if build files exist
+if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
+  app.use(express.static(buildPath));
+
+  // Serve React app for any non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(indexPath);
+  });
+  
+  console.log('React build files found and will be served');
+} else {
+  console.warn('React build files not found. Make sure to run "npm run build" in the client directory');
+  
+  // Fallback for missing build files
+  app.get('*', (req, res) => {
+    res.status(404).json({ 
+      error: 'React app not built. Please build the client first.',
+      path: buildPath,
+      exists: fs.existsSync(buildPath)
     });
-    
-    console.log('React build files found and will be served');
-  } else {
-    console.warn('React build files not found. Make sure to run "npm run build" in the client directory');
-    
-    // Fallback for missing build files
-    app.get('*', (req, res) => {
-      res.status(404).json({ 
-        error: 'React app not built. Please build the client first.',
-        path: buildPath,
-        exists: fs.existsSync(buildPath)
-      });
-    });
-  }
+  });
 }
 
 // Error handling middleware

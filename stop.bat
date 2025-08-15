@@ -13,8 +13,8 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000') do (
     taskkill /f /pid %%a >nul 2>&1
 )
 
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5000') do (
-    echo Stopping process on port 5000 (PID: %%a)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3001') do (
+    echo Stopping process on port 3001 (PID: %%a)
     taskkill /f /pid %%a >nul 2>&1
 )
 
