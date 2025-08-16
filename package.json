@@ -1,7 +1,7 @@
 {
-  "name": "gate-control-app",
+  "name": "ShakedGates",
   "version": "1.0.0",
-  "description": "A simple gate control application without authentication",
+  "description": "Shaked Simple Gates App",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",

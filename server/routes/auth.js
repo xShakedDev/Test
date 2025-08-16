@@ -7,7 +7,6 @@ const router = express.Router();
 // Configuration
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'your-secret-password';
 const gatesFilePath = path.join(__dirname, '../data/gates.json');
-
 // Ensure data directory exists
 const dataDir = path.dirname(gatesFilePath);
 if (!fs.existsSync(dataDir)) {
@@ -20,18 +19,18 @@ function getTwilioClient() {
   try {
     if (!twilioClient) {
       if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-        console.error('Twilio credentials missing:', {
+        console.error('חסרים פרטי התחברות ל-Twilio:', {
           hasSid: !!process.env.TWILIO_ACCOUNT_SID,
           hasToken: !!process.env.TWILIO_AUTH_TOKEN
         });
-        throw new Error('Twilio credentials not configured');
+        throw new Error('פרטי התחברות ל-Twilio לא מוגדרים');
       }
       twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      console.log('Twilio client initialized successfully');
+      console.log('לקוח Twilio אותחל בהצלחה');
     }
     return twilioClient;
   } catch (error) {
-    console.error('Error initializing Twilio client:', error);
+    console.error('שגיאה באתחול לקוח Twilio:', error);
     throw error;
   }
 }
@@ -43,23 +42,23 @@ function loadGates() {
       return JSON.parse(fs.readFileSync(gatesFilePath, 'utf8'));
     }
   } catch (error) {
-    console.error('Error loading gates:', error);
+    console.error('שגיאה בטעינת שערים:', error);
   }
   
   // Default gates
   return {
-    '1': { id: '1', name: 'Main Gate', phoneNumber: '+1234567890', authorizedNumber: '+972542070400' },
-    '2': { id: '2', name: 'Side Gate', phoneNumber: '+0987654321', authorizedNumber: '+972542070400' },
-    '3': { id: '3', name: 'Back Gate', phoneNumber: '+1122334455', authorizedNumber: '+972501234567' }
+    '1': { id: '1', name: 'שער ראשי', phoneNumber: '+1234567890', authorizedNumber: '+972542070400' },
+    '2': { id: '2', name: 'שער צדדי', phoneNumber: '+0987654321', authorizedNumber: '+972542070400' },
+    '3': { id: '3', name: 'שער אחורי', phoneNumber: '+1122334455', authorizedNumber: '+972501234567' }
   };
 }
 
 function saveGates(gates) {
   try {
     fs.writeFileSync(gatesFilePath, JSON.stringify(gates, null, 2));
-    console.log('Gates saved successfully');
+    console.log('השערים נשמרו בהצלחה');
   } catch (error) {
-    console.error('Error saving gates:', error);
+    console.error('שגיאה בשמירת שערים:', error);
   }
 }
 
@@ -67,7 +66,8 @@ function saveGates(gates) {
 function requireAdmin(req, res, next) {
   const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
   if (providedPassword !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized: Admin access required' });
+    console.log(ADMIN_PASSWORD)
+    return res.status(401).json({ error: 'לא מורשה: נדרשת גישת מנהל' });
   }
   next();
 }
@@ -81,17 +81,17 @@ router.get('/gates', (req, res) => {
 router.post('/gates/:id/open', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`Attempting to open gate ${id}`);
+    console.log(`מנסה לפתוח שער ${id}`);
     
     const gates = loadGates();
     const gate = gates[id];
     
     if (!gate) {
-      console.log(`Gate ${id} not found`);
-      return res.status(404).json({ error: 'Gate not found' });
+      console.log(`שער ${id} לא נמצא`);
+      return res.status(404).json({ error: 'השער לא נמצא' });
     }
     
-    console.log(`Opening gate: ${gate.name} (${gate.phoneNumber})`);
+    console.log(`פותח שער: ${gate.name} (${gate.phoneNumber})`);
     
     const client = getTwilioClient();
     const call = await client.calls.create({
@@ -103,7 +103,7 @@ router.post('/gates/:id/open', async (req, res) => {
       statusCallbackMethod: 'POST'
     });
     
-    console.log(`Twilio call initiated: ${call.sid}`);
+    console.log(`שיחת Twilio החלה: ${call.sid}`);
     
     gate.lastOpenedAt = new Date();
     gates[id] = gate;
@@ -111,22 +111,22 @@ router.post('/gates/:id/open', async (req, res) => {
     
     res.json({ 
       success: true, 
-      message: `Opening gate "${gate.name}" via phone call to ${gate.phoneNumber}`,
+      message: `פותח שער "${gate.name}" באמצעות שיחת טלפון ל-${gate.phoneNumber}`,
       callSid: call.sid
     });
     
   } catch (error) {
-    console.error('Error opening gate:', error);
+    console.error('שגיאה בפתיחת השער:', error);
     
     // Provide more specific error messages
-    if (error.message.includes('credentials not configured')) {
-      res.status(500).json({ error: 'Twilio not configured - check environment variables' });
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
     } else if (error.code === 'ENOTFOUND') {
-      res.status(500).json({ error: 'Network error - unable to reach Twilio' });
+      res.status(500).json({ error: 'שגיאת רשת - לא ניתן להגיע ל-Twilio' });
     } else if (error.code === 'UNAUTHORIZED') {
-      res.status(500).json({ error: 'Twilio authentication failed - check credentials' });
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
     } else {
-      res.status(500).json({ error: 'Failed to open gate', details: error.message });
+      res.status(500).json({ error: 'נכשל בפתיחת השער', details: error.message });
     }
   }
 });
@@ -143,7 +143,7 @@ router.post('/gates/:id/call-status', (req, res) => {
     gate.lastCallDuration = CallDuration;
     gates[id] = gate;
     saveGates(gates);
-    console.log(`Call to gate "${gate.name}" completed: ${CallStatus}`);
+    console.log(`שיחה לשער "${gate.name}" הושלמה: ${CallStatus}`);
   }
   
   res.sendStatus(200);
@@ -155,7 +155,7 @@ router.get('/gates/:id', (req, res) => {
   const gate = gates[id];
   
   if (!gate) {
-    return res.status(404).json({ error: 'Gate not found' });
+    return res.status(404).json({ error: 'השער לא נמצא' });
   }
   
   res.json({ gate });
@@ -166,7 +166,7 @@ router.post('/gates', requireAdmin, (req, res) => {
     const { name, phoneNumber, authorizedNumber } = req.body;
     
     if (!name || !phoneNumber || !authorizedNumber) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'חסרים שדות נדרשים' });
     }
     
     const gates = loadGates();
@@ -176,12 +176,12 @@ router.post('/gates', requireAdmin, (req, res) => {
     gates[newId] = newGate;
     saveGates(gates);
     
-    console.log(`New gate created: "${name}"`);
+    console.log(`שער חדש נוצר: "${name}"`);
     res.status(201).json({ success: true, gate: newGate });
     
   } catch (error) {
-    console.error('Error creating gate:', error);
-    res.status(500).json({ error: 'Failed to create gate' });
+    console.error('שגיאה ביצירת שער:', error);
+    res.status(500).json({ error: 'נכשל ביצירת השער' });
   }
 });
 
@@ -194,7 +194,7 @@ router.put('/gates/:id', requireAdmin, (req, res) => {
     const gate = gates[id];
     
     if (!gate) {
-      return res.status(404).json({ error: 'Gate not found' });
+      return res.status(404).json({ error: 'השער לא נמצא' });
     }
     
     if (name) gate.name = name;
@@ -204,12 +204,12 @@ router.put('/gates/:id', requireAdmin, (req, res) => {
     gates[id] = gate;
     saveGates(gates);
     
-    console.log(`Gate updated: "${gate.name}"`);
+    console.log(`שער עודכן: "${gate.name}"`);
     res.json({ success: true, gate });
     
   } catch (error) {
-    console.error('Error updating gate:', error);
-    res.status(500).json({ error: 'Failed to update gate' });
+    console.error('שגיאה בעדכון שער:', error);
+    res.status(500).json({ error: 'נכשל בעדכון השער' });
   }
 });
 
@@ -220,29 +220,29 @@ router.delete('/gates/:id', requireAdmin, (req, res) => {
     const gate = gates[id];
     
     if (!gate) {
-      return res.status(404).json({ error: 'Gate not found' });
+      return res.status(404).json({ error: 'השער לא נמצא' });
     }
     
     delete gates[id];
     saveGates(gates);
     
-    console.log(`Gate deleted: "${gate.name}"`);
-    res.json({ success: true, message: `Gate "${gate.name}" deleted successfully` });
+    console.log(`שער נמחק: "${gate.name}"`);
+    res.json({ success: true, message: `השער "${gate.name}" נמחק בהצלחה` });
     
   } catch (error) {
-    console.error('Error deleting gate:', error);
-    res.status(500).json({ error: 'Failed to delete gate' });
+    console.error('שגיאה במחיקת שער:', error);
+    res.status(500).json({ error: 'נכשל במחיקת השער' });
   }
 });
 
 router.get('/twilio/balance', requireAdmin, async (req, res) => {
   try {
-    console.log('Fetching Twilio balance...');
+    console.log('מביא יתרת Twilio...');
     
     const client = getTwilioClient();
     const balanceData = await client.balance.fetch();
     
-    console.log(`Twilio balance fetched: ${balanceData.balance} ${balanceData.currency}`);
+    console.log(`יתרת Twilio הובאה: ${balanceData.balance} ${balanceData.currency}`);
     
     res.json({ 
       balance: balanceData.balance,
@@ -250,17 +250,17 @@ router.get('/twilio/balance', requireAdmin, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching Twilio balance:', error);
+    console.error('שגיאה בהבאת יתרת Twilio:', error);
     
     // Provide more specific error messages
-    if (error.message.includes('credentials not configured')) {
-      res.status(500).json({ error: 'Twilio not configured - check environment variables' });
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
     } else if (error.code === 'ENOTFOUND') {
-      res.status(500).json({ error: 'Network error - unable to reach Twilio' });
+      res.status(500).json({ error: 'שגיאת רשת - לא ניתן להגיע ל-Twilio' });
     } else if (error.code === 'UNAUTHORIZED') {
-      res.status(500).json({ error: 'Twilio authentication failed - check credentials' });
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
     } else {
-      res.status(500).json({ error: 'Failed to fetch Twilio balance', details: error.message });
+      res.status(500).json({ error: 'נכשל בהבאת יתרת Twilio', details: error.message });
     }
   }
 });
