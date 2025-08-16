@@ -58,18 +58,18 @@ const GateDashboard = () => {
     try {
       const response = await axios.get('/api/status');
       console.log('System status:', response.data);
-      
+
       // Check if React build files exist
       if (response.data.files && !response.data.files.buildExists) {
         setError('⚠️ אפליקציית React לא נבנתה - חסרים קבצי build');
         return;
       }
-      
+
       // Check if Twilio is configured
       if (!response.data.twilio.hasSid || !response.data.twilio.hasToken) {
         setError('⚠️ Twilio לא מוגדר - בדוק את משתני הסביבה');
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Error checking system status:', error);
@@ -79,7 +79,7 @@ const GateDashboard = () => {
 
   const fetchTwilioBalance = async (password = globalPassword) => {
     if (!password) return;
-    
+
     try {
       const response = await axios.get('/api/twilio/balance', {
         headers: { 'x-admin-password': password }
@@ -96,7 +96,7 @@ const GateDashboard = () => {
 
   const fetchVerifiedCallers = async (password = globalPassword) => {
     if (!password) return;
-    
+
     try {
       const response = await axios.get('/api/twilio/verified-callers', {
         headers: { 'x-admin-password': password }
@@ -156,12 +156,12 @@ const GateDashboard = () => {
       await axios.put(`/api/gates/${editingGate.id}`, newGateData, {
         headers: { 'x-admin-password': globalPassword }
       });
-      
+
       setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
       setEditingGate(null);
       setError('');
       setSuccessMessage('✅ השער עודכן בהצלחה!');
-      
+
       setTimeout(fetchGates, 500);
     } catch (error) {
       setError(error.response?.data?.error || 'נכשל בעדכון השער');
@@ -177,7 +177,7 @@ const GateDashboard = () => {
         await axios.delete(`/api/gates/${gate.id}`, {
           headers: { 'x-admin-password': password }
         });
-        
+
         setSuccessMessage('🗑️ השער נמחק בהצלחה!');
         setTimeout(fetchGates, 500);
         setError('');
@@ -196,12 +196,12 @@ const GateDashboard = () => {
       await axios.post('/api/gates', newGateData, {
         headers: { 'x-admin-password': globalPassword }
       });
-      
+
       setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '' });
       setShowAddGate(false);
       setError('');
       setSuccessMessage('✅ השער נוצר בהצלחה!');
-      
+
       setTimeout(fetchGates, 500);
     } catch (error) {
       setError(error.response?.data?.error || 'נכשל ביצירת השער');
@@ -265,11 +265,11 @@ const GateDashboard = () => {
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) return 'היום';
     if (diffDays === 2) return 'אתמול';
     if (diffDays <= 7) return `לפני ${diffDays - 1} ימים`;
-    
+
     return date.toLocaleDateString('he-IL');
   };
 
@@ -297,21 +297,21 @@ const GateDashboard = () => {
       <div className="dashboard-header">
         <div>
           <h1>
-            <DoorOpen className="icon-big" />  
+            <DoorOpen className="icon-big" />
             לוח בקרת שערים</h1>
           <span className="admin-notice">
             <Shield className="icon-small" />
             נדרש גישת מנהל כדי להוסיף, לערוך או למחוק שערים
           </span>
-          
+
           {/* Show Twilio Balance only if password is verified */}
           {globalPassword && (
             <div className="admin-status-section">
               <span className="password-status">
                 <Shield className="icon-small" />
-                סיסמת מנהל אומתה - כעת תוכל לנהל שערים 
+                סיסמת מנהל אומתה - כעת תוכל לנהל שערים
               </span>
-              
+
               {twilioBalance && (
                 <div className="twilio-balance">
                   <div className="balance-card">
@@ -324,25 +324,10 @@ const GateDashboard = () => {
                   </div>
                 </div>
               )}
-              
-              <div className="verified-callers-info">
-                <span className="callers-label">
-                  <Users className="icon-small" />
-                  מספרים מורשים: {verifiedCallers.length}
-                </span>
-                <button 
-                  className="btn btn-small btn-secondary"
-                  onClick={() => fetchVerifiedCallers()}
-                  title="רענן רשימת מספרים מורשים"
-                >
-                  <Activity className="btn-icon" />
-                  רענן
-                </button>
-              </div>
             </div>
           )}
         </div>
-        <button 
+        <button
           className="btn btn-primary"
           onClick={handleAddButtonClick}
           disabled={isSubmitting}
@@ -357,41 +342,41 @@ const GateDashboard = () => {
         <div className="form-container">
           <form onSubmit={handleAddGate} className="phone-input-form">
             <h3><Plus className="icon-small" /> הוסף שער חדש</h3>
-                        
+
             <div className="form-group">
               <label htmlFor="gateName">שם השער</label>
               <input
                 type="text"
                 id="gateName"
                 value={newGateData.name}
-                onChange={(e) => setNewGateData({...newGateData, name: e.target.value})}
+                onChange={(e) => setNewGateData({ ...newGateData, name: e.target.value })}
                 placeholder="שער ראשי"
                 required
                 disabled={isSubmitting}
               />
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="gatePhone">מספר טלפון השער</label>
               <input
                 type="tel"
                 id="gatePhone"
                 value={newGateData.phoneNumber}
-                onChange={(e) => setNewGateData({...newGateData, phoneNumber: e.target.value})}
+                onChange={(e) => setNewGateData({ ...newGateData, phoneNumber: e.target.value })}
                 placeholder="+1234567890"
                 required
                 disabled={isSubmitting}
               />
               <small><Phone className="icon-small" /> מספר הטלפון של מכשיר השער</small>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="authorizedNumber">מספר טלפון מורשה</label>
               {verifiedCallers.length > 0 ? (
                 <select
                   id="authorizedNumber"
                   value={newGateData.authorizedNumber}
-                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  onChange={(e) => setNewGateData({ ...newGateData, authorizedNumber: e.target.value })}
                   required
                   disabled={isSubmitting}
                 >
@@ -407,21 +392,21 @@ const GateDashboard = () => {
                   type="tel"
                   id="authorizedNumber"
                   value={newGateData.authorizedNumber}
-                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  onChange={(e) => setNewGateData({ ...newGateData, authorizedNumber: e.target.value })}
                   placeholder="+972542070400"
                   required
                   disabled={isSubmitting}
                 />
               )}
               <small>
-                <Users className="icon-small" /> 
-                {verifiedCallers.length > 0 
+                <Users className="icon-small" />
+                {verifiedCallers.length > 0
                   ? 'מספר הטלפון שיכול לפתוח שער זה (נבחר מרשימת המספרים המורשים ב-Twilio)'
                   : 'מספר הטלפון שיכול לפתוח שער זה'
                 }
               </small>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="adminPassword">סיסמת מנהל</label>
               <input
@@ -434,13 +419,13 @@ const GateDashboard = () => {
               />
               <small><Shield className="icon-small" /> הסיסמה כבר אומתה</small>
             </div>
-            
+
             <div className="form-actions">
               <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? 'יוצר...' : 'צור שער'}
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-secondary"
                 onClick={handleCancelAddGate}
                 disabled={isSubmitting}
@@ -458,41 +443,41 @@ const GateDashboard = () => {
           <form onSubmit={handleUpdateGate} className="phone-input-form">
             <h3><Edit className="icon-small" /> ערוך שער: {editingGate.name}</h3>
             <p>עדכן את פרטי השער</p>
-            
+
             <div className="form-group">
               <label htmlFor="editGateName">שם השער</label>
               <input
                 type="text"
                 id="editGateName"
                 value={newGateData.name}
-                onChange={(e) => setNewGateData({...newGateData, name: e.target.value})}
+                onChange={(e) => setNewGateData({ ...newGateData, name: e.target.value })}
                 placeholder="שער ראשי"
                 required
                 disabled={isSubmitting}
               />
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="editGatePhone">מספר טלפון השער</label>
               <input
                 type="tel"
                 id="editGatePhone"
                 value={newGateData.phoneNumber}
-                onChange={(e) => setNewGateData({...newGateData, phoneNumber: e.target.value})}
+                onChange={(e) => setNewGateData({ ...newGateData, phoneNumber: e.target.value })}
                 placeholder="+1234567890"
                 required
                 disabled={isSubmitting}
               />
               <small><Phone className="icon-small" /> מספר הטלפון של מכשיר השער</small>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="editAuthorizedNumber">מספר טלפון מורשה</label>
               {verifiedCallers.length > 0 ? (
                 <select
                   id="editAuthorizedNumber"
                   value={newGateData.authorizedNumber}
-                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  onChange={(e) => setNewGateData({ ...newGateData, authorizedNumber: e.target.value })}
                   required
                   disabled={isSubmitting}
                 >
@@ -508,21 +493,21 @@ const GateDashboard = () => {
                   type="tel"
                   id="editAuthorizedNumber"
                   value={newGateData.authorizedNumber}
-                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  onChange={(e) => setNewGateData({ ...newGateData, authorizedNumber: e.target.value })}
                   placeholder="+972542070400"
                   required
                   disabled={isSubmitting}
                 />
               )}
               <small>
-                <Users className="icon-small" /> 
-                {verifiedCallers.length > 0 
+                <Users className="icon-small" />
+                {verifiedCallers.length > 0
                   ? 'מספר הטלפון שיכול לפתוח שער זה (נבחר מרשימת המספרים המורשים ב-Twilio)'
                   : 'מספר הטלפון שיכול לפתוח שער זה'
                 }
               </small>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="editAdminPassword">סיסמת מנהל</label>
               <input
@@ -535,13 +520,13 @@ const GateDashboard = () => {
               />
               <small><Shield className="icon-small" /> הסיסמה כבר אומתה</small>
             </div>
-            
+
             <div className="form-actions">
               <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? 'מעדכן...' : 'עדכן שער'}
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-secondary"
                 onClick={handleCancelEdit}
                 disabled={isSubmitting}
@@ -566,7 +551,7 @@ const GateDashboard = () => {
             <div className="gate-header">
               <h3>{gate.name}</h3>
               <div className="gate-actions-header">
-                <button 
+                <button
                   className="btn btn-small btn-secondary"
                   onClick={() => handleEditButtonClick(gate)}
                   title="ערוך שער"
@@ -574,7 +559,7 @@ const GateDashboard = () => {
                 >
                   <Edit className="btn-icon" />
                 </button>
-                <button 
+                <button
                   className="btn btn-small btn-danger"
                   onClick={() => handleDeleteButtonClick(gate)}
                   title="מחק שער"
@@ -584,7 +569,7 @@ const GateDashboard = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="gate-info">
               <p><Phone className="icon-small" /> <strong>מספר השער:</strong> {gate.phoneNumber}</p>
               <p><Clock className="icon-small" /> <strong>נפתח לאחרונה:</strong> {formatDate(gate.lastOpenedAt)}</p>
@@ -612,9 +597,9 @@ const GateDashboard = () => {
                 </small>
               )}
             </div>
-            
+
             <div className="gate-actions">
-              <button 
+              <button
                 className="btn btn-primary gate-open-btn"
                 onClick={() => handleOpenGate(gate)}
                 disabled={isSubmitting}
@@ -632,7 +617,7 @@ const GateDashboard = () => {
           <div className="no-gates-icon">🚪</div>
           <h3>לא נמצאו שערים</h3>
           <p>התחל על ידי הוספת השער הראשון למערכת</p>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={handleAddButtonClick}
             disabled={isSubmitting}
