@@ -147,174 +147,6 @@ body::before {
   align-items: center;
 }
 
-/* Validation Result Display */
-.validation-result {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 2rem;
-  margin: 2rem 0;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-}
-
-.validation-result-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.validation-result-header h3 {
-  color: #000000;
-  margin: 0;
-  font-size: 1.5rem;
-  text-align: center;
-  flex: 1;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #6c757d;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.close-btn:hover {
-  background: rgba(108, 117, 125, 0.1);
-  color: #495057;
-}
-
-.validation-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-}
-
-.validation-info p {
-  margin-bottom: 0.75rem;
-  color: #666;
-}
-
-.validation-info strong {
-  color: #333;
-}
-
-.verification-code-section h4 {
-  color: #333;
-  margin-bottom: 1rem;
-  font-size: 1.2rem;
-}
-
-.verification-code {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.code-display {
-  background: rgba(40, 167, 69, 0.1);
-  color: #28a745;
-  font-family: 'Courier New', monospace;
-  font-size: 1.5rem;
-  font-weight: 700;
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  border: 2px solid rgba(40, 167, 69, 0.3);
-  letter-spacing: 2px;
-}
-
-
-
-.verification-instructions {
-  color: #666;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 1rem;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
-  grid-column: 1 / -1;
-  margin-top: 1rem;
-}
-
-/* Status Badges */
-.status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin-right: 0.5rem;
-}
-
-.status-pending {
-  background: rgba(255, 193, 7, 0.15);
-  color: #ffc107;
-  border: 1px solid rgba(255, 193, 7, 0.25);
-}
-
-.status-completed,
-.status-verified {
-  background: rgba(40, 167, 69, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(40, 167, 69, 0.25);
-}
-
-.status-failed {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-.status-cancelled {
-  background: rgba(107, 114, 128, 0.15);
-  color: #6b7280;
-  border: 1px solid rgba(107, 114, 128, 0.25);
-}
-
-.status-in-progress {
-  background: rgba(102, 126, 234, 0.15);
-  color: #667eea;
-  border: 1px solid rgba(102, 126, 234, 0.25);
-}
-
-/* Cooldown Indicator */
-.cooldown-indicator {
-  background: rgba(245, 158, 11, 0.2);
-  color: #000000;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  margin-top: 1rem;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.cooldown-text {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
 /* Dashboard Container */
 .dashboard-container {
   max-width: 1400px;
@@ -521,11 +353,6 @@ body::before {
   margin-bottom: 1rem;
 }
 
-.password-status .icon-small {
-  width: 18px;
-  height: 18px;
-}
-
 /* Twilio Balance */
 .twilio-balance {
   margin-top: 0.5rem;
@@ -570,30 +397,6 @@ body::before {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.balance-icon {
-  font-size: 1rem;
-  color: #667eea;
-  filter: drop-shadow(0 1px 2px rgba(102, 126, 234, 0.4));
-  flex-shrink: 0;
-  animation: pulse 2s infinite;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.05);
-  }
-}
-
 .balance-details {
   display: flex;
   flex-direction: row;
@@ -624,6 +427,37 @@ body::before {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+/* Cooldown Indicator */
+.cooldown-indicator {
+  background: rgba(245, 158, 11, 0.2);
+  color: #000000;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  margin-top: 1rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.cooldown-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Buttons */
@@ -876,6 +710,100 @@ body::before {
   justify-content: flex-end;
 }
 
+/* Validation Result Display */
+.validation-result {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 2rem;
+  margin: 2rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.validation-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.validation-result-header h3 {
+  color: #000000;
+  margin: 0;
+  font-size: 1.5rem;
+  text-align: center;
+  flex: 1;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(108, 117, 125, 0.1);
+  color: #495057;
+}
+
+.validation-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.validation-info p {
+  margin-bottom: 0.75rem;
+  color: #666;
+}
+
+.validation-info strong {
+  color: #333;
+}
+
+.verification-code-section h4 {
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+}
+
+.verification-code {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.code-display {
+  background: rgba(40, 167, 69, 0.1);
+  color: #28a745;
+  font-family: 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid rgba(40, 167, 69, 0.3);
+  letter-spacing: 2px;
+}
+
+.verification-instructions {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+}
+
 /* Gates Grid */
 .gates-grid {
   display: grid;
@@ -982,23 +910,8 @@ body::before {
   font-weight: 600;
 }
 
-.icon-small {
-  width: 18px;
-  height: 18px;
-  color: #28a745;
-  display: inline-block;
-  vertical-align: middle;
-  margin-left: 0.5rem;
-  flex-shrink: 0;
-}
-
-.icon-big {
-  width: 64px;
-  height: 64px;
-  color: #28a745;
-  display: inline-block;
-  vertical-align: middle;
-  margin-left: 0.5rem;
+.authorized-numbers {
+  margin-bottom: 1rem;
 }
 
 .authorized-number {
@@ -1022,10 +935,6 @@ body::before {
   border: 1px solid rgba(108, 117, 125, 0.3);
 }
 
-.authorized-numbers {
-  margin-bottom: 1rem;
-}
-
 .password-notice {
   color: #6c757d;
   font-style: italic;
@@ -1043,72 +952,17 @@ body::before {
   gap: 1rem;
 }
 
-/* Gate Open Section with Password */
-.gate-open-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
-}
-
-.password-input-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.gate-password-input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 2px solid rgba(102, 126, 234, 0.3);
-  border-radius: 8px;
-  font-size: 1rem;
-  font-family: 'Courier New', monospace;
-  background: rgba(255, 255, 255, 0.9);
-  color: #333;
-  transition: all 0.3s ease;
-  direction: ltr;
-  text-align: center;
-}
-
-.gate-password-input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  background: white;
-}
-
-.gate-password-input:disabled {
-  background: rgba(108, 117, 125, 0.1);
-  color: #6c757d;
-  cursor: not-allowed;
-}
-
-.gate-password-input::placeholder {
-  color: #999;
-  font-family: inherit;
-}
-
 /* Security Status Indicators */
-.security-status {
+.security-status.protected {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-}
-
-.security-status.protected {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
-  border: 1px solid rgba(220, 53, 69, 0.3);
-}
-
-.security-status.unprotected {
-  background: rgba(40, 167, 69, 0.1);
-  color: #28a745;
-  border: 1px solid rgba(40, 167, 69, 0.3);
 }
 
 /* Gate Open Button Special Styling */
@@ -1322,17 +1176,24 @@ body::before {
   line-height: 1.6;
 }
 
-/* Form Enhancements */
-.form-group input:disabled+small {
-  opacity: 0.7;
+/* Icons */
+.icon-small {
+  width: 18px;
+  height: 18px;
+  color: #28a745;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
 }
 
-/* Enhanced Card Hover Effects */
-.gate-card:hover .gate-header h3 {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.icon-big {
+  width: 64px;
+  height: 64px;
+  color: #28a745;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.5rem;
 }
 
 /* RTL Text Selection */
