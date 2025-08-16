@@ -7,6 +7,10 @@ const fs = require('fs');
 // Load environment variables from .env for temporary testing
 require('dotenv').config({ path: '.env' });
 
+// Import database initialization
+const { initializeDatabase, closeDatabase } = require('./config/init-db');
+const { testConnection } = require('./config/database');
+
 // Debug: Log environment variables loading
 console.log('🔧 טוען משתני סביבה מ-.env...');
 console.log('📁 תיקיית עבודה נוכחית:', process.cwd());
@@ -15,6 +19,8 @@ console.log('📄 קובץ .env קיים:', fs.existsSync('.env'));
 console.log('🔑 TWILIO_ACCOUNT_SID:', process.env.TWILIO_ACCOUNT_SID ? '✅ נטען' : '❌ לא נטען');
 console.log('🔑 TWILIO_AUTH_TOKEN:', process.env.TWILIO_AUTH_TOKEN ? '✅ נטען' : '❌ לא נטען');
 console.log('🔑 ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD ? '✅ נטען' : '❌ לא נטען');
+console.log('🗄️ DB_NAME:', process.env.DB_NAME || 'gates_db');
+console.log('🗄️ DB_HOST:', process.env.DB_HOST || 'localhost');
 console.log('🌍 NODE_ENV:', process.env.NODE_ENV || 'development');
 console.log('');
 
@@ -66,6 +72,11 @@ app.get('/api/status', (req, res) => {
       },
       admin: {
         hasPassword: !!process.env.ADMIN_PASSWORD
+      },
+      database: {
+        name: process.env.DB_NAME || 'gates_db',
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 3306
       }
     };
     
@@ -179,26 +190,49 @@ app.use((err, req, res, next) => {
   }
 });
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`השרת פועל על פורט ${PORT}`);
   console.log(`סביבה: ${process.env.NODE_ENV || 'development'}`);
+  
+  try {
+    // Test database connection
+    await testConnection();
+    
+    // Initialize database (create tables and seed data if needed)
+    await initializeDatabase();
+    
+    console.log('🚀 השרת מוכן ופועל עם מסד נתונים MySQL!');
+  } catch (error) {
+    console.error('❌ שגיאה באתחול מסד הנתונים:', error);
+    console.log('⚠️ השרת פועל ללא מסד נתונים - בדוק את הגדרות החיבור');
+  }
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('\nקיבלתי SIGINT. סוגר בצורה מסודרת...');
   
-  server.close(() => {
-    console.log('השרת נסגר. להתראות!');
+  server.close(async () => {
+    try {
+      await closeDatabase();
+      console.log('השרת נסגר. להתראות!');
+    } catch (error) {
+      console.error('שגיאה בסגירת מסד הנתונים:', error);
+    }
     process.exit(0);
   });
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('\nקיבלתי SIGTERM. סוגר בצורה מסודרת...');
   
-  server.close(() => {
-    console.log('השרת נסגר. להתראות!');
+  server.close(async () => {
+    try {
+      await closeDatabase();
+      console.log('השרת נסגר. להתראות!');
+    } catch (error) {
+      console.error('שגיאה בסגירת מסד הנתונים:', error);
+    }
     process.exit(0);
   });
 });
