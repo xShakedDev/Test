@@ -265,4 +265,38 @@ router.get('/twilio/balance', requireAdmin, async (req, res) => {
   }
 });
 
+// Get verified caller IDs from Twilio
+router.get('/twilio/verified-callers', async (req, res) => {
+  try {
+    const adminPassword = req.headers['x-admin-password'];
+    
+    if (!adminPassword || adminPassword !== process.env.ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'סיסמת מנהל לא תקינה' });
+    }
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (!accountSid || !authToken) {
+      return res.status(500).json({ error: 'Twilio לא מוגדר' });
+    }
+
+    const client = require('twilio')(accountSid, authToken);
+    
+    // Get verified caller IDs
+    const verifiedCallers = await client.outgoingCallerIds.list();
+    
+    const callerIds = verifiedCallers.map(caller => ({
+      id: caller.sid,
+      phoneNumber: caller.phoneNumber,
+      friendlyName: caller.friendlyName || caller.phoneNumber
+    }));
+
+    res.json({ callerIds });
+  } catch (error) {
+    console.error('Error fetching verified caller IDs:', error);
+    res.status(500).json({ error: 'שגיאה בקבלת מספרי טלפון מורשים' });
+  }
+});
+
 module.exports = router;

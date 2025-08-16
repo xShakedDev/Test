@@ -16,6 +16,7 @@ const GateDashboard = () => {
   });
   const [globalPassword, setGlobalPassword] = useState('');
   const [twilioBalance, setTwilioBalance] = useState(null);
+  const [verifiedCallers, setVerifiedCallers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -28,6 +29,7 @@ const GateDashboard = () => {
   useEffect(() => {
     if (globalPassword) {
       fetchTwilioBalance(globalPassword);
+      fetchVerifiedCallers(globalPassword); // Fetch verified callers when password is set
     }
   }, [globalPassword]);
 
@@ -92,6 +94,22 @@ const GateDashboard = () => {
     }
   };
 
+  const fetchVerifiedCallers = async (password = globalPassword) => {
+    if (!password) return;
+    
+    try {
+      const response = await axios.get('/api/twilio/verified-callers', {
+        headers: { 'x-admin-password': password }
+      });
+      setVerifiedCallers(response.data.callerIds);
+    } catch (error) {
+      console.error('Failed to fetch verified callers:', error);
+      if (error.response?.data?.error) {
+        setError(`⚠️ ${error.response.data.error}`);
+      }
+    }
+  };
+
   // Password validation
   const validatePassword = async (password) => {
     try {
@@ -100,6 +118,7 @@ const GateDashboard = () => {
       });
       setGlobalPassword(password);
       fetchTwilioBalance(password); // Pass the password to fetch balance
+      fetchVerifiedCallers(password); // Also fetch verified callers
       return true;
     } catch {
       alert('סיסמת מנהל לא תקינה. אנא נסה שוב.');
@@ -305,6 +324,21 @@ const GateDashboard = () => {
                   </div>
                 </div>
               )}
+              
+              <div className="verified-callers-info">
+                <span className="callers-label">
+                  <Users className="icon-small" />
+                  מספרים מורשים: {verifiedCallers.length}
+                </span>
+                <button 
+                  className="btn btn-small btn-secondary"
+                  onClick={() => fetchVerifiedCallers()}
+                  title="רענן רשימת מספרים מורשים"
+                >
+                  <Activity className="btn-icon" />
+                  רענן
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -353,16 +387,39 @@ const GateDashboard = () => {
             
             <div className="form-group">
               <label htmlFor="authorizedNumber">מספר טלפון מורשה</label>
-              <input
-                type="tel"
-                id="authorizedNumber"
-                value={newGateData.authorizedNumber}
-                onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
-                placeholder="+972542070400"
-                required
-                disabled={isSubmitting}
-              />
-              <small><Users className="icon-small" /> מספר הטלפון שיכול לפתוח שער זה</small>
+              {verifiedCallers.length > 0 ? (
+                <select
+                  id="authorizedNumber"
+                  value={newGateData.authorizedNumber}
+                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  required
+                  disabled={isSubmitting}
+                >
+                  <option value="">בחר מספר טלפון מורשה</option>
+                  {verifiedCallers.map(caller => (
+                    <option key={caller.id} value={caller.phoneNumber}>
+                      {caller.friendlyName} ({caller.phoneNumber})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="tel"
+                  id="authorizedNumber"
+                  value={newGateData.authorizedNumber}
+                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  placeholder="+972542070400"
+                  required
+                  disabled={isSubmitting}
+                />
+              )}
+              <small>
+                <Users className="icon-small" /> 
+                {verifiedCallers.length > 0 
+                  ? 'מספר הטלפון שיכול לפתוח שער זה (נבחר מרשימת המספרים המורשים ב-Twilio)'
+                  : 'מספר הטלפון שיכול לפתוח שער זה'
+                }
+              </small>
             </div>
             
             <div className="form-group">
@@ -431,16 +488,39 @@ const GateDashboard = () => {
             
             <div className="form-group">
               <label htmlFor="editAuthorizedNumber">מספר טלפון מורשה</label>
-              <input
-                type="tel"
-                id="editAuthorizedNumber"
-                value={newGateData.authorizedNumber}
-                onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
-                placeholder="+972542070400"
-                required
-                disabled={isSubmitting}
-              />
-              <small><Users className="icon-small" /> מספר הטלפון שיכול לפתוח שער זה</small>
+              {verifiedCallers.length > 0 ? (
+                <select
+                  id="editAuthorizedNumber"
+                  value={newGateData.authorizedNumber}
+                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  required
+                  disabled={isSubmitting}
+                >
+                  <option value="">בחר מספר טלפון מורשה</option>
+                  {verifiedCallers.map(caller => (
+                    <option key={caller.id} value={caller.phoneNumber}>
+                      {caller.friendlyName} ({caller.phoneNumber})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="tel"
+                  id="editAuthorizedNumber"
+                  value={newGateData.authorizedNumber}
+                  onChange={(e) => setNewGateData({...newGateData, authorizedNumber: e.target.value})}
+                  placeholder="+972542070400"
+                  required
+                  disabled={isSubmitting}
+                />
+              )}
+              <small>
+                <Users className="icon-small" /> 
+                {verifiedCallers.length > 0 
+                  ? 'מספר הטלפון שיכול לפתוח שער זה (נבחר מרשימת המספרים המורשים ב-Twilio)'
+                  : 'מספר הטלפון שיכול לפתוח שער זה'
+                }
+              </small>
             </div>
             
             <div className="form-group">
