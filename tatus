@@ -1,0 +1,88 @@
+warning: in the working copy of '.dockerignore', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/.dockerignore b/.dockerignore[m
+[1mindex d914fb9..5a4b1bd 100644[m
+[1m--- a/.dockerignore[m
+[1m+++ b/.dockerignore[m
+[36m@@ -1,23 +1,64 @@[m
+[32m+[m[32m# Dependencies[m
+ node_modules[m
+[31m-npm-debug.log[m
+[31m-.git[m
+[31m-.gitignore[m
+[31m-README.md[m
+[32m+[m[32mnpm-debug.log*[m
+[32m+[m[32myarn-debug.log*[m
+[32m+[m[32myarn-error.log*[m
+[32m+[m
+[32m+[m[32m# Build outputs[m
+[32m+[m[32mclient/build[m
+[32m+[m[32mclient/dist[m
+[32m+[m[32mbuild[m
+[32m+[m[32mdist[m
+[32m+[m
+[32m+[m[32m# Environment files[m
+ .env[m
+ .env.local[m
+ .env.development.local[m
+ .env.test.local[m
+ .env.production.local[m
+[31m-.nyc_output[m
+[31m-coverage[m
+[31m-.DS_Store[m
+[32m+[m
+[32m+[m[32m# IDE files[m
+ .vscode[m
+ .idea[m
+ *.swp[m
+ *.swo[m
+[31m-client/node_modules[m
+[31m-client/build[m
+[31m-client/coverage[m
+[31m-client/.nyc_output[m
+[31m-install.bat[m
+[31m-start.bat[m
+[32m+[m
+[32m+[m[32m# OS files[m
+[32m+[m[32m.DS_Store[m
+[32m+[m[32mThumbs.db[m
+[32m+[m
+[32m+[m[32m# Git[m
+[32m+[m[32m.git[m
+[32m+[m[32m.gitignore[m
+[32m+[m
+[32m+[m[32m# Logs[m
+[32m+[m[32mlogs[m
+[32m+[m[32m*.log[m
+[32m+[m
+[32m+[m[32m# Runtime data[m
+[32m+[m[32mpids[m
+[32m+[m[32m*.pid[m
+[32m+[m[32m*.seed[m
+[32m+[m[32m*.pid.lock[m
+[32m+[m
+[32m+[m[32m# Coverage directory used by tools like istanbul[m
+[32m+[m[32mcoverage[m
+[32m+[m
+[32m+[m[32m# Temporary folders[m
+[32m+[m[32mtmp[m
+[32m+[m[32mtemp[m
+[32m+[m
+[32m+[m[32m# Documentation[m
+[32m+[m[32mREADME.md[m
+[32m+[m[32mdocs[m
+[32m+[m
+[32m+[m[32m# Test files[m
+[32m+[m[32mtest[m
+[32m+[m[32mtests[m
+[32m+[m[32m*.test.js[m
+[32m+[m[32m*.spec.js[m
+[32m+[m
+[32m+[m[32m# Docker[m
+[32m+[m[32mDockerfile[m
+[32m+[m[32m.dockerignore[m
+[32m+[m[32mdocker-compose.yml[m
+[33m9fb4a3d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Enhanced UI design: improved header readability, consistent button styling, compact message layout, and balance card redesign
+[33m3d53e22[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update GateDashboard and auth routes
+[33m62d2644[m Fix React app build and server configuration issues
+[33mc526d54[m Add Dockerfile with multi-stage build and fix .dockerignore
+[33m43ed67e[m Add Dockerfile with multi-stage build and fix .dockerignore
