@@ -393,7 +393,7 @@ const GateDashboard = () => {
                   id="authorizedNumber"
                   value={newGateData.authorizedNumber}
                   onChange={(e) => setNewGateData({ ...newGateData, authorizedNumber: e.target.value })}
-                  placeholder="+972542070400"
+                  placeholder="+972541231231"
                   required
                   disabled={isSubmitting}
                 />
@@ -494,7 +494,7 @@ const GateDashboard = () => {
                   id="editAuthorizedNumber"
                   value={newGateData.authorizedNumber}
                   onChange={(e) => setNewGateData({ ...newGateData, authorizedNumber: e.target.value })}
-                  placeholder="+972542070400"
+                  placeholder="+972541231231"
                   required
                   disabled={isSubmitting}
                 />

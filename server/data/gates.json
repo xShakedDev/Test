@@ -1,16 +1,14 @@
 {
-  "gates": [
-    {
-      "id": "1",
-      "name": "שער סירקין שטח",
-      "phoneNumber": "+972505364453",
-      "authorizedNumber": "+972548827828"
-    },
-    {
-      "id": "2",
-      "name": "שער סירקין ראשי",
-      "phoneNumber": "+972509127873",
-      "authorizedNumber": "+972548827828"
-    }
-  ]
+  "1": {
+    "id": "1",
+    "name": "שער סירקין שטח",
+    "phoneNumber": "+972505364453",
+    "authorizedNumber": "+972548827828"
+  },
+  "2": {
+    "id": "2", 
+    "name": "שער סירקין ראשי",
+    "phoneNumber": "+972509127873",
+    "authorizedNumber": "+972548827828"
+  }
 } 

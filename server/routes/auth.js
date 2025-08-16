@@ -47,9 +47,8 @@ function loadGates() {
   
   // Default gates
   return {
-    '1': { id: '1', name: 'שער ראשי', phoneNumber: '+1234567890', authorizedNumber: '+972542070400' },
-    '2': { id: '2', name: 'שער צדדי', phoneNumber: '+0987654321', authorizedNumber: '+972542070400' },
-    '3': { id: '3', name: 'שער אחורי', phoneNumber: '+1122334455', authorizedNumber: '+972501234567' }
+    '1': { id: '1', name: 'שער סירקין שטח', phoneNumber: '+972505364453', authorizedNumber: '+972548827828' },
+    '2': { id: '2', name: 'שער סירקין ראשי', phoneNumber: '+972509127873', authorizedNumber: '+972548827828' },
   };
 }
 
