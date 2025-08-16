@@ -81,3 +81,8 @@ warning: in the working copy of '.dockerignore', LF will be replaced by CRLF the
 [32m+[m[32mDockerfile[m
 [32m+[m[32m.dockerignore[m
 [32m+[m[32mdocker-compose.yml[m
+[33m9fb4a3d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Enhanced UI design: improved header readability, consistent button styling, compact message layout, and balance card redesign
+[33m3d53e22[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Update GateDashboard and auth routes
+[33m62d2644[m Fix React app build and server configuration issues
+[33mc526d54[m Add Dockerfile with multi-stage build and fix .dockerignore
+[33m43ed67e[m Add Dockerfile with multi-stage build and fix .dockerignore

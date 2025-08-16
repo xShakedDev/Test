@@ -4,13 +4,13 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
 
-// Load environment variables from test.env for temporary testing
+// Load environment variables from .env for temporary testing
 require('dotenv').config({ path: '.env' });
 
 // Debug: Log environment variables loading
 console.log('🔧 טוען משתני סביבה מ-.env...');
 console.log('📁 תיקיית עבודה נוכחית:', process.cwd());
-console.log('📄 נתיב קובץ test.env:', path.resolve('.env'));
+console.log('📄 נתיב קובץ .env:', path.resolve('.env'));
 console.log('📄 קובץ .env קיים:', fs.existsSync('.env'));
 console.log('🔑 TWILIO_ACCOUNT_SID:', process.env.TWILIO_ACCOUNT_SID ? '✅ נטען' : '❌ לא נטען');
 console.log('🔑 TWILIO_AUTH_TOKEN:', process.env.TWILIO_AUTH_TOKEN ? '✅ נטען' : '❌ לא נטען');

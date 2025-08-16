@@ -37,7 +37,6 @@ A simple web application for controlling gates via phone calls using Twilio.
    ADMIN_PASSWORD=your-secret-password
    TWILIO_ACCOUNT_SID=your-twilio-sid
    TWILIO_AUTH_TOKEN=your-twilio-token
-   TWILIO_PHONE_NUMBER=your-twilio-number
    ```
 
 4. **Start the application**
