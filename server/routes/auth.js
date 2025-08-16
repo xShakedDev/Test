@@ -26,7 +26,6 @@ function getTwilioClient() {
         throw new Error('פרטי התחברות ל-Twilio לא מוגדרים');
       }
       twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      console.log('לקוח Twilio אותחל בהצלחה');
     }
     return twilioClient;
   } catch (error) {
@@ -47,15 +46,14 @@ function loadGates() {
   
   // Default gates
   return {
-    '1': { id: '1', name: 'שער סירקין שטח', phoneNumber: '+972505364453', authorizedNumber: '+972548827828' },
-    '2': { id: '2', name: 'שער סירקין ראשי', phoneNumber: '+972509127873', authorizedNumber: '+972548827828' },
+    '1': { id: '1', name: 'שער סירקין שטח', phoneNumber: '+972505364453', authorizedNumber: '+972548827828', password: null },
+    '2': { id: '2', name: 'שער סירקין ראשי', phoneNumber: '+972509127873', authorizedNumber: '+972548827828', password: null },
   };
 }
 
 function saveGates(gates) {
   try {
     fs.writeFileSync(gatesFilePath, JSON.stringify(gates, null, 2));
-    console.log('השערים נשמרו בהצלחה');
   } catch (error) {
     console.error('שגיאה בשמירת שערים:', error);
   }
@@ -65,7 +63,6 @@ function saveGates(gates) {
 function requireAdmin(req, res, next) {
   const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
   if (providedPassword !== ADMIN_PASSWORD) {
-    console.log(ADMIN_PASSWORD)
     return res.status(401).json({ error: 'לא מורשה: נדרשת גישת מנהל' });
   }
   next();
@@ -80,17 +77,19 @@ router.get('/gates', (req, res) => {
 router.post('/gates/:id/open', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`מנסה לפתוח שער ${id}`);
+    const { password } = req.body;
     
     const gates = loadGates();
     const gate = gates[id];
     
     if (!gate) {
-      console.log(`שער ${id} לא נמצא`);
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
     
-    console.log(`פותח שער: ${gate.name} (${gate.phoneNumber})`);
+    // Check if gate requires password
+    if (gate.password && gate.password !== password) {
+      return res.status(401).json({ error: 'סיסמה שגויה' });
+    }
     
     const client = getTwilioClient();
     const call = await client.calls.create({
@@ -101,8 +100,6 @@ router.post('/gates/:id/open', async (req, res) => {
       statusCallbackEvent: ['completed'],
       statusCallbackMethod: 'POST'
     });
-    
-    console.log(`שיחת Twilio החלה: ${call.sid}`);
     
     gate.lastOpenedAt = new Date();
     gates[id] = gate;
@@ -142,7 +139,6 @@ router.post('/gates/:id/call-status', (req, res) => {
     gate.lastCallDuration = CallDuration;
     gates[id] = gate;
     saveGates(gates);
-    console.log(`שיחה לשער "${gate.name}" הושלמה: ${CallStatus}`);
   }
   
   res.sendStatus(200);
@@ -162,7 +158,7 @@ router.get('/gates/:id', (req, res) => {
 
 router.post('/gates', requireAdmin, (req, res) => {
   try {
-    const { name, phoneNumber, authorizedNumber } = req.body;
+    const { name, phoneNumber, authorizedNumber, password } = req.body;
     
     if (!name || !phoneNumber || !authorizedNumber) {
       return res.status(400).json({ error: 'חסרים שדות נדרשים' });
@@ -171,11 +167,16 @@ router.post('/gates', requireAdmin, (req, res) => {
     const gates = loadGates();
     const newId = (Object.keys(gates).length + 1).toString();
     
-    const newGate = { id: newId, name, phoneNumber, authorizedNumber };
+    const newGate = { 
+      id: newId, 
+      name, 
+      phoneNumber, 
+      authorizedNumber, 
+      password: password || null 
+    };
     gates[newId] = newGate;
     saveGates(gates);
     
-    console.log(`שער חדש נוצר: "${name}"`);
     res.status(201).json({ success: true, gate: newGate });
     
   } catch (error) {
@@ -187,7 +188,7 @@ router.post('/gates', requireAdmin, (req, res) => {
 router.put('/gates/:id', requireAdmin, (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phoneNumber, authorizedNumber } = req.body;
+    const { name, phoneNumber, authorizedNumber, password } = req.body;
     
     const gates = loadGates();
     const gate = gates[id];
@@ -199,11 +200,11 @@ router.put('/gates/:id', requireAdmin, (req, res) => {
     if (name) gate.name = name;
     if (phoneNumber) gate.phoneNumber = phoneNumber;
     if (authorizedNumber) gate.authorizedNumber = authorizedNumber;
+    if (password !== undefined) gate.password = password || null;
     
     gates[id] = gate;
     saveGates(gates);
     
-    console.log(`שער עודכן: "${gate.name}"`);
     res.json({ success: true, gate });
     
   } catch (error) {
@@ -225,7 +226,6 @@ router.delete('/gates/:id', requireAdmin, (req, res) => {
     delete gates[id];
     saveGates(gates);
     
-    console.log(`שער נמחק: "${gate.name}"`);
     res.json({ success: true, message: `השער "${gate.name}" נמחק בהצלחה` });
     
   } catch (error) {
@@ -236,12 +236,9 @@ router.delete('/gates/:id', requireAdmin, (req, res) => {
 
 router.get('/twilio/balance', requireAdmin, async (req, res) => {
   try {
-    console.log('מביא יתרת Twilio...');
     
     const client = getTwilioClient();
     const balanceData = await client.balance.fetch();
-    
-    console.log(`יתרת Twilio הובאה: ${balanceData.balance} ${balanceData.currency}`);
     
     res.json({ 
       balance: balanceData.balance,
@@ -295,6 +292,85 @@ router.get('/twilio/verified-callers', async (req, res) => {
   } catch (error) {
     console.error('Error fetching verified caller IDs:', error);
     res.status(500).json({ error: 'שגיאה בקבלת מספרי טלפון מורשים' });
+  }
+});
+
+// Initiate Twilio validation request for a phone number
+router.post('/twilio/validate-phone', requireAdmin, async (req, res) => {
+  try {
+    const { phoneNumber, friendlyName } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'מספר טלפון נדרש' });
+    }
+
+    const client = getTwilioClient();
+    
+    // Create validation request
+    const validationRequest = await client.validationRequests.create({
+      friendlyName: friendlyName || phoneNumber,
+      phoneNumber: phoneNumber
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `בקשת אימות נשלחה ל-${phoneNumber}`,
+      validationSid: validationRequest.sid,
+      phoneNumber: phoneNumber,
+      status: validationRequest.status,
+      validationCode: validationRequest.validationCode
+    });
+    
+  } catch (error) {
+    console.error('שגיאה ביצירת בקשת אימות:', error);
+    
+    // Provide specific error messages
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
+    } else if (error.code === 'ENOTFOUND') {
+      res.status(500).json({ error: 'שגיאת רשת - לא ניתן להגיע ל-Twilio' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
+    } else if (error.code === 60200) {
+      res.status(400).json({ error: 'מספר טלפון לא תקין' });
+    } else {
+      res.status(500).json({ error: 'נכשל ביצירת בקשת אימות', details: error.message });
+    }
+  }
+});
+
+// Get validation request status
+router.get('/twilio/validation-status/:sid', requireAdmin, async (req, res) => {
+  try {
+    const { sid } = req.params;
+    
+    if (!sid) {
+      return res.status(400).json({ error: 'SID של בקשת האימות נדרש' });
+    }
+
+    const client = getTwilioClient();
+    
+    // Get validation request status
+    const validationRequest = await client.validationRequests(sid).fetch();
+    
+    res.json({ 
+      success: true,
+      validationSid: validationRequest.sid,
+      phoneNumber: validationRequest.phoneNumber,
+      friendlyName: validationRequest.friendlyName,
+      status: validationRequest.status,
+      callSid: validationRequest.callSid,
+      codeLength: validationRequest.codeLength
+    });
+    
+  } catch (error) {
+    console.error('שגיאה בבדיקת סטטוס בקשת אימות:', error);
+    
+    if (error.code === 20404) {
+      res.status(404).json({ error: 'בקשת האימות לא נמצאה' });
+    } else {
+      res.status(500).json({ error: 'נכשל בבדיקת סטטוס בקשת האימות', details: error.message });
+    }
   }
 });
 
