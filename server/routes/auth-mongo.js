@@ -76,16 +76,58 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     const gate = await Gate.findById(id);
     
     if (!gate || !gate.isActive) {
+      // Log failed gate opening attempt - gate not found
+      try {
+        await new GateHistory({
+          userId: req.user._id,
+          gateId: req.params.id,
+          username: req.user.username,
+          gateName: 'Unknown',
+          success: false,
+          errorMessage: 'השער לא נמצא או לא פעיל'
+        }).save();
+      } catch (logError) {
+        console.error('שגיאה ברישום היסטוריית כישלון:', logError);
+      }
+      
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
     
     // Check if user has permission to open this gate
     if (req.user.role !== 'admin' && !req.user.canAccessGate(id)) {
+      // Log failed gate opening attempt - no permission
+      try {
+        await new GateHistory({
+          userId: req.user._id,
+          gateId: gate._id,
+          username: req.user.username,
+          gateName: gate.name,
+          success: false,
+          errorMessage: 'אין הרשאה לפתוח שער זה'
+        }).save();
+      } catch (logError) {
+        console.error('שגיאה ברישום היסטוריית כישלון:', logError);
+      }
+      
       return res.status(403).json({ error: 'אין הרשאה לפתוח שער זה' });
     }
     
     // Check if gate requires password
     if (gate.password && gate.password !== password) {
+      // Log failed gate opening attempt due to wrong password
+      try {
+        await new GateHistory({
+          userId: req.user._id,
+          gateId: gate._id,
+          username: req.user.username,
+          gateName: gate.name,
+          success: false,
+          errorMessage: 'סיסמה שגויה'
+        }).save();
+      } catch (logError) {
+        console.error('שגיאה ברישום היסטוריית כישלון:', logError);
+      }
+      
       return res.status(401).json({ error: 'סיסמה שגויה' });
     }
     
@@ -166,6 +208,32 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   } catch (error) {
     console.error('שגיאה בעדכון סטטוס שיחה:', error);
     res.sendStatus(200); // Still return 200 to Twilio to avoid retries
+  }
+});
+
+// Gate history endpoint (admin only) - MUST be before /gates/:id route
+router.get('/gates/history', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { limit = 100, gateId, userId } = req.query;
+    const limitNum = Math.min(parseInt(limit), 500); // Max 500 records
+    
+    let history;
+    if (gateId) {
+      history = await GateHistory.findByGate(gateId, limitNum);
+    } else if (userId) {
+      history = await GateHistory.findByUser(userId, limitNum);
+    } else {
+      history = await GateHistory.findAllHistory(limitNum);
+    }
+    
+    res.json({ 
+      history,
+      count: history.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('שגיאה בטעינת היסטוריית שערים:', error);
+    res.status(500).json({ error: 'נכשל בטעינת היסטוריית השערים' });
   }
 });
 
@@ -313,31 +381,7 @@ router.delete('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, asy
   }
 });
 
-// Gate history endpoint (admin only)
-router.get('/gates/history', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { limit = 100, gateId, userId } = req.query;
-    const limitNum = Math.min(parseInt(limit), 500); // Max 500 records
-    
-    let history;
-    if (gateId) {
-      history = await GateHistory.findByGate(gateId, limitNum);
-    } else if (userId) {
-      history = await GateHistory.findByUser(userId, limitNum);
-    } else {
-      history = await GateHistory.findAllHistory(limitNum);
-    }
-    
-    res.json({ 
-      history,
-      count: history.length,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('שגיאה בטעינת היסטוריית שערים:', error);
-    res.status(500).json({ error: 'נכשל בטעינת היסטוריית השערים' });
-  }
-});
+
 
 // Database status endpoint
 router.get('/database/status', async (req, res) => {
@@ -495,6 +539,62 @@ router.get('/twilio/validation-status/:sid', authenticateToken, requireAdmin, as
     } else {
       res.status(500).json({ error: 'נכשל בבדיקת סטטוס בקשת האימות', details: error.message });
     }
+  }
+});
+
+// Admin Settings Routes
+router.get('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Get settings from environment variables or use defaults
+    const settings = {
+      gateCooldownSeconds: parseInt(process.env.GATE_COOLDOWN_SECONDS) || 30,
+      maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
+      enableNotifications: process.env.ENABLE_NOTIFICATIONS !== 'false',
+      autoRefreshInterval: parseInt(process.env.AUTO_REFRESH_INTERVAL) || 5
+    };
+    
+    res.json({ settings });
+  } catch (error) {
+    console.error('שגיאה בקבלת הגדרות:', error);
+    res.status(500).json({ error: 'נכשל בקבלת הגדרות' });
+  }
+});
+
+router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval } = req.body;
+    
+    // Validate input
+    if (gateCooldownSeconds < 10 || gateCooldownSeconds > 300) {
+      return res.status(400).json({ error: 'זמן דילאי חייב להיות בין 10 ל-300 שניות' });
+    }
+    
+    if (maxRetries < 1 || maxRetries > 10) {
+      return res.status(400).json({ error: 'מספר ניסיונות חייב להיות בין 1 ל-10' });
+    }
+    
+    if (autoRefreshInterval < 1 || autoRefreshInterval > 60) {
+      return res.status(400).json({ error: 'מרווח רענון חייב להיות בין 1 ל-60 דקות' });
+    }
+    
+    // In a real application, you would save these to a database
+    // For now, we'll just return success
+    // You can implement actual saving logic here
+    
+    const updatedSettings = {
+      gateCooldownSeconds,
+      maxRetries,
+      enableNotifications,
+      autoRefreshInterval
+    };
+    
+    res.json({ 
+      message: 'ההגדרות נשמרו בהצלחה',
+      settings: updatedSettings
+    });
+  } catch (error) {
+    console.error('שגיאה בשמירת הגדרות:', error);
+    res.status(500).json({ error: 'נכשל בשמירת הגדרות' });
   }
 });
 

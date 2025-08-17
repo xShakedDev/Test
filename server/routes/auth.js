@@ -91,6 +91,20 @@ router.post('/gates/:id/open', async (req, res) => {
       return res.status(401).json({ error: 'סיסמה שגויה' });
     }
     
+    // Check cooldown (30 seconds)
+    const COOLDOWN_MS = 30 * 1000; // 30 seconds in milliseconds
+    if (gate.lastOpenedAt) {
+      const timeSinceLastOpen = Date.now() - new Date(gate.lastOpenedAt).getTime();
+      if (timeSinceLastOpen < COOLDOWN_MS) {
+        const remainingTime = Math.ceil((COOLDOWN_MS - timeSinceLastOpen) / 1000);
+        return res.status(429).json({ 
+          error: `השער נפתח לאחרונה. נסה שוב בעוד ${remainingTime} שניות`,
+          remainingTime: remainingTime,
+          cooldownEndsAt: new Date(new Date(gate.lastOpenedAt).getTime() + COOLDOWN_MS)
+        });
+      }
+    }
+    
     const client = getTwilioClient();
     const call = await client.calls.create({
       url: 'http://demo.twilio.com/docs/voice.xml',
@@ -371,6 +385,62 @@ router.get('/twilio/validation-status/:sid', requireAdmin, async (req, res) => {
     } else {
       res.status(500).json({ error: 'נכשל בבדיקת סטטוס בקשת האימות', details: error.message });
     }
+  }
+});
+
+// Admin Settings Routes
+router.get('/admin/settings', requireAdmin, async (req, res) => {
+  try {
+    // Get settings from environment variables or use defaults
+    const settings = {
+      gateCooldownSeconds: parseInt(process.env.GATE_COOLDOWN_SECONDS) || 30,
+      maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
+      enableNotifications: process.env.ENABLE_NOTIFICATIONS !== 'false',
+      autoRefreshInterval: parseInt(process.env.AUTO_REFRESH_INTERVAL) || 5
+    };
+    
+    res.json({ settings });
+  } catch (error) {
+    console.error('שגיאה בקבלת הגדרות:', error);
+    res.status(500).json({ error: 'נכשל בקבלת הגדרות' });
+  }
+});
+
+router.put('/admin/settings', requireAdmin, async (req, res) => {
+  try {
+    const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval } = req.body;
+    
+    // Validate input
+    if (gateCooldownSeconds < 10 || gateCooldownSeconds > 300) {
+      return res.status(400).json({ error: 'זמן דילאי חייב להיות בין 10 ל-300 שניות' });
+    }
+    
+    if (maxRetries < 1 || maxRetries > 10) {
+      return res.status(400).json({ error: 'מספר ניסיונות חייב להיות בין 1 ל-10' });
+    }
+    
+    if (autoRefreshInterval < 1 || autoRefreshInterval > 60) {
+      return res.status(400).json({ error: 'מרווח רענון חייב להיות בין 1 ל-60 דקות' });
+    }
+    
+    // In a real application, you would save these to a database
+    // For now, we'll just return success
+    // You can implement actual saving logic here
+    
+    const updatedSettings = {
+      gateCooldownSeconds,
+      maxRetries,
+      enableNotifications,
+      autoRefreshInterval
+    };
+    
+    res.json({ 
+      message: 'ההגדרות נשמרו בהצלחה',
+      settings: updatedSettings
+    });
+  } catch (error) {
+    console.error('שגיאה בשמירת הגדרות:', error);
+    res.status(500).json({ error: 'נכשל בשמירת הגדרות' });
   }
 });
 

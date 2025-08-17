@@ -5,12 +5,6 @@
     "role": "admin",
     "createdAt": 1755387815850
   },
-  "qiz4zt6s14meewvc6o": {
-    "userId": "68a11888e8cc0172077410ab",
-    "username": "test",
-    "role": "user",
-    "createdAt": 1755388299120
-  },
   "zs1m74rk9obmeeyz824": {
     "userId": "68a11888e8cc0172077410ab",
     "username": "test",
@@ -28,5 +22,11 @@
     "username": "admin",
     "role": "admin",
     "createdAt": 1755392011952
+  },
+  "a00589mbx68meftv6kn": {
+    "userId": "68a110dddd662118dcd95fba",
+    "username": "admin",
+    "role": "admin",
+    "createdAt": 1755443719175
   }
 }
