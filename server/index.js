@@ -1,13 +1,19 @@
- const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
 
 // Load environment variables from .env
-require('dotenv').config({ path: '.env' });
+require('dotenv').config({ path: 'test.env' });
 
+// MongoDB integration
+const { connectDB, isConnected, getConnectionStatus } = require('./config/database');
+
+// Routes - choose between file-based or MongoDB-based
 const gateRoutes = require('./routes/auth');
+const mongoRoutes = require('./routes/auth-mongo');
+const { router: userAuthRoutes } = require('./routes/auth-users');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +49,12 @@ app.get('/api/status', (req, res) => {
       server: 'OK',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
+      storage: {
+        type: process.env.USE_MONGODB === 'true' ? 'MongoDB' : 'File-based',
+        useMongoDB: process.env.USE_MONGODB === 'true',
+        mongoConnected: isConnected(),
+        mongoStatus: getConnectionStatus()
+      },
       files: {
         buildPath,
         indexPath,
@@ -87,69 +99,108 @@ app.get('/api/files', (req, res) => {
   }
 });
 
-// API Routes
-app.use('/api', gateRoutes);
+// Initialize server with proper MongoDB connection handling
+const initializeServer = async () => {
+  try {
+    // Initialize MongoDB connection and wait for it to complete
+    const USE_MONGODB = process.env.USE_MONGODB === 'true';
+    let mongoConnection = null;
+    
+    if (USE_MONGODB) {
+      mongoConnection = await connectDB();
+    }
 
-// Serve static files from React build (in both development and production)
-const buildPath = path.join(__dirname, '../public');
-const indexPath = path.join(buildPath, 'index.html');
+    // Choose which routes to use based on MongoDB connection
+    if (USE_MONGODB && isConnected()) {
+      console.log('📊 Using MongoDB for data storage');
+      app.use('/api', mongoRoutes);
+      // Add user authentication routes (only available with MongoDB)
+      app.use('/api/auth', userAuthRoutes);
+    } else {
+      console.log('📁 Using file-based storage (JSON)');
+      if (USE_MONGODB && !mongoConnection) {
+        console.warn('⚠️  MongoDB requested but connection failed, using file storage');
+      }
+      app.use('/api', gateRoutes);
+    }
 
-// Check if build files exist
-if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
-  app.use(express.static(buildPath));
+    // Serve static files from React build (in both development and production)
+    const buildPath = path.join(__dirname, '../public');
+    const indexPath = path.join(buildPath, 'index.html');
 
-  // Serve React app for any non-API routes
-  app.get('*', (req, res) => {
-    res.sendFile(indexPath);
-  });
-} else {
-  // Fallback for missing build files
-  app.get('*', (req, res) => {
-    res.status(404).json({ 
-      error: 'אפליקציית React לא נבנתה. אנא בנה את הלקוח תחילה.',
-      path: buildPath,
-      exists: fs.existsSync(buildPath)
+    // Check if build files exist
+    if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
+      app.use(express.static(buildPath));
+
+      // Serve React app for any non-API routes
+      app.get('*', (req, res) => {
+        res.sendFile(indexPath);
+      });
+    } else {
+      // Fallback for missing build files
+      app.get('*', (req, res) => {
+        res.status(404).json({ 
+          error: 'אפליקציית React לא נבנתה. אנא בנה את הלקוח תחילה.',
+          path: buildPath,
+          exists: fs.existsSync(buildPath)
+        });
+      });
+    }
+
+    // Error handling middleware
+    app.use((err, req, res, next) => {
+      console.error('מטפל שגיאות גלובלי:', {
+        error: err.message,
+        stack: err.stack,
+        url: req.url,
+        method: req.method,
+        body: req.body,
+        headers: req.headers,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Don't expose internal error details in production
+      if (process.env.NODE_ENV === 'production') {
+        res.status(500).json({ error: 'שגיאה בפעולה' });
+      } else {
+        res.status(500).json({ 
+          error: 'שגיאה בפעולה',
+          message: err.message,
+          stack: err.stack
+        });
+      }
     });
-  });
-}
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('מטפל שגיאות גלובלי:', {
-    error: err.message,
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-    body: req.body,
-    headers: req.headers,
-    timestamp: new Date().toISOString()
-  });
-  
-  // Don't expose internal error details in production
-  if (process.env.NODE_ENV === 'production') {
-    res.status(500).json({ error: 'שגיאה בפעולה' });
-  } else {
-    res.status(500).json({ 
-      error: 'שגיאה בפעולה',
-      message: err.message,
-      stack: err.stack
+    // Start the server
+    const server = app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`   Storage: ${USE_MONGODB && isConnected() ? 'MongoDB' : 'File-based'}`);
     });
+
+    // Graceful shutdown
+    process.on('SIGINT', () => {
+      console.log('\n⏹️  Shutting down server...');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('\n⏹️  Shutting down server...');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+
+    return server;
+  } catch (error) {
+    console.error('❌ Failed to initialize server:', error);
+    process.exit(1);
   }
-});
+};
 
-const server = app.listen(PORT, () => {
-  // Server started successfully
-});
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-  server.close(() => {
-    process.exit(0);
-  });
-});
-
-process.on('SIGTERM', () => {
-  server.close(() => {
-    process.exit(0);
-  });
-});
+// Start the server
+initializeServer();

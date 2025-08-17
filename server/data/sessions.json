@@ -1,0 +1,32 @@
+{
+  "njb5llnhzzsmeewkzai": {
+    "userId": "68a110dddd662118dcd95fba",
+    "username": "admin",
+    "role": "admin",
+    "createdAt": 1755387815850
+  },
+  "qiz4zt6s14meewvc6o": {
+    "userId": "68a11888e8cc0172077410ab",
+    "username": "test",
+    "role": "user",
+    "createdAt": 1755388299120
+  },
+  "zs1m74rk9obmeeyz824": {
+    "userId": "68a11888e8cc0172077410ab",
+    "username": "test",
+    "role": "user",
+    "createdAt": 1755391839628
+  },
+  "e2ztdhwkx4meez0tla": {
+    "userId": "68a110dddd662118dcd95fba",
+    "username": "admin",
+    "role": "admin",
+    "createdAt": 1755391914190
+  },
+  "y39cqzqexoameez2x0w": {
+    "userId": "68a110dddd662118dcd95fba",
+    "username": "admin",
+    "role": "admin",
+    "createdAt": 1755392011952
+  }
+}

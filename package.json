@@ -9,13 +9,19 @@
     "server": "nodemon server/index.js",
     "client": "cd client && npm start",
     "build": "cd client && npm install && npm run build",
-    "install-all": "npm install && cd client && npm install"
+    "install-all": "npm install && cd client && npm install",
+    "migrate-to-mongo": "node server/scripts/migrate-to-mongo.js",
+    "start:mongo": "USE_MONGODB=true node server/index.js",
+    "dev:mongo": "USE_MONGODB=true concurrently \"npm run server:mongo\" \"npm run client\"",
+    "server:mongo": "USE_MONGODB=true nodemon server/index.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "mongoose": "^8.17.1",
     "mysql2": "^3.14.3",
     "sequelize": "^6.37.7",
     "twilio": "^4.19.0"
