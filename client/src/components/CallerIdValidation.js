@@ -30,8 +30,6 @@ const CallerIdValidation = ({ token, onClose }) => {
 
   const fetchVerifiedCallers = async () => {
     try {
-      console.log('Fetching verified callers with token:', token ? 'Token exists' : 'No token');
-      
       const response = await fetch('/api/twilio/verified-callers', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -39,12 +37,8 @@ const CallerIdValidation = ({ token, onClose }) => {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('Verified callers data:', data);
         setVerifiedCallers(data.callerIds || []);
         setError('');
       } else {

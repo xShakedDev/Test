@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { isSessionExpired, handleSessionExpiration } from '../utils/auth';
 
 const UserManagement = ({ user, token }) => {
@@ -16,6 +16,10 @@ const UserManagement = ({ user, token }) => {
     role: 'user',
     authorizedGates: []
   });
+  
+  // Refs for scrolling to messages
+  const errorRef = useRef(null);
+  const successRef = useRef(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -25,20 +29,21 @@ const UserManagement = ({ user, token }) => {
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Users data received:', data); // Debug log
-        setUsers(data);
-      } else {
-        const errorData = await response.json();
-        if (isSessionExpired(errorData)) {
-          handleSessionExpiration();
-          return;
+        if (response.ok) {
+          const data = await response.json();
+          setUsers(data);
+        } else {
+          const errorData = await response.json();
+          if (isSessionExpired(errorData)) {
+            handleSessionExpiration();
+            return;
+          }
+          setError('שגיאה בטעינת משתמשים');
+          scrollToMessage('error');
         }
-        setError('שגיאה בטעינת משתמשים');
-      }
     } catch (error) {
       setError('שגיאת רשת');
+      scrollToMessage('error');
     } finally {
       setLoading(false);
     }
@@ -74,6 +79,18 @@ const UserManagement = ({ user, token }) => {
       fetchGates();
     }
   }, [user, fetchUsers, fetchGates]);
+
+  // Function to scroll to error or success message
+  const scrollToMessage = (type) => {
+    const ref = type === 'error' ? errorRef : successRef;
+    if (ref.current) {
+      ref.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
+    }
+  };
 
 
 
@@ -112,20 +129,16 @@ const UserManagement = ({ user, token }) => {
     e.preventDefault();
     
     try {
-      console.log('editingUser:', editingUser); // Debug log
-      
       // Validate that editingUser has an id when updating
       if (editingUser && !editingUser.id) {
-        console.error('editingUser missing id:', editingUser);
         setError('שגיאה: מזהה משתמש חסר');
+        scrollToMessage('error');
         return;
       }
       
       const url = editingUser 
         ? `/api/auth/users/${editingUser.id}` 
         : '/api/auth/users';
-      
-      console.log('URL:', url); // Debug log
       
       const method = editingUser ? 'PUT' : 'POST';
       
@@ -149,6 +162,7 @@ const UserManagement = ({ user, token }) => {
           return;
         }
         setError(data.error || 'שגיאה בשמירת המשתמש');
+        scrollToMessage('error');
       }
     } catch (error) {
       setError('שגיאת רשת');
@@ -156,7 +170,6 @@ const UserManagement = ({ user, token }) => {
   };
 
   const handleEdit = (userItem) => {
-    console.log('userItem in handleEdit:', userItem); // Debug log
     setEditingUser(userItem);
     setFormData({
       username: userItem.username,
@@ -193,6 +206,7 @@ const UserManagement = ({ user, token }) => {
           return;
         }
         setError(data.error || 'שגיאה במחיקת המשתמש');
+        scrollToMessage('error');
       }
     } catch (error) {
       setError('שגיאת רשת');
@@ -234,7 +248,7 @@ const UserManagement = ({ user, token }) => {
 
       {/* Error Message */}
       {error && (
-        <div className="error-message">
+        <div className="error-message" ref={errorRef}>
           <span>{error}</span>
           <button onClick={() => setError('')}>✕</button>
         </div>

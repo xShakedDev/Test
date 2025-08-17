@@ -20,7 +20,6 @@ export const isSessionExpired = (errorData) => {
  * Handle session expiration by redirecting to login
  */
 export const handleSessionExpiration = () => {
-  console.log('Session expired, redirecting to login');
   // Clear local storage
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');

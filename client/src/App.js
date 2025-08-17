@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import GateDashboard from './components/GateDashboard';
 import Login from './components/Login';
 import UserManagement from './components/UserManagement';
+import GateHistory from './components/GateHistory';
+import AdminSettings from './components/AdminSettings';
 import { isSessionExpired } from './utils/auth';
 import './App.css';
 
@@ -12,27 +14,15 @@ function App() {
   const [currentView, setCurrentView] = useState('gates'); // 'gates' or 'users'
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for saved authentication on app load
-  useEffect(() => {
-    const savedToken = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('user');
-    
-    if (savedToken && savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setToken(savedToken);
-        setUser(parsedUser);
-        // Verify token is still valid
-        verifyToken(savedToken, parsedUser);
-      } catch (error) {
-        console.error('Error parsing saved user:', error);
-        handleLogout();
-      }
-    }
-    setIsLoading(false);
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    setCurrentView('gates');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
   }, []);
 
-  const verifyToken = async (tokenToVerify, userData) => {
+  const verifyToken = useCallback(async (tokenToVerify, userData) => {
     try {
       const response = await fetch('/api/auth/me', {
         headers: {
@@ -42,11 +32,9 @@ function App() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.log('Token verification failed:', errorData);
         
         // Check if it's a session expiration error
         if (isSessionExpired(errorData)) {
-          console.log('Session expired, logging out user');
           handleLogout();
           return;
         }
@@ -67,7 +55,7 @@ function App() {
       // but schedule a retry
       setTimeout(() => verifyToken(tokenToVerify, userData), 30000); // Retry in 30 seconds
     }
-  };
+  }, [handleLogout]);
 
   const handleLogin = (userData, userToken) => {
     setUser(userData);
@@ -75,17 +63,29 @@ function App() {
     setCurrentView('gates'); // Default to gates view after login
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
-    setCurrentView('gates');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-  };
-
   const handleViewChange = (view) => {
     setCurrentView(view);
   };
+
+  // Check for saved authentication on app load
+  useEffect(() => {
+    const savedToken = localStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setToken(savedToken);
+        setUser(parsedUser);
+        // Verify token is still valid
+        verifyToken(savedToken, parsedUser);
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+        handleLogout();
+      }
+    }
+    setIsLoading(false);
+  }, [verifyToken, handleLogout]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show loading spinner during initial authentication check
   if (isLoading) {
@@ -121,6 +121,16 @@ function App() {
           />
         ) : currentView === 'users' && user.role === 'admin' ? (
           <UserManagement 
+            user={user}
+            token={token}
+          />
+        ) : currentView === 'history' ? (
+          <GateHistory 
+            user={user}
+            token={token}
+          />
+        ) : currentView === 'settings' && user.role === 'admin' ? (
+          <AdminSettings 
             user={user}
             token={token}
           />

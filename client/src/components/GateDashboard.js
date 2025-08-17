@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import GateHistory from './GateHistory';
 import CallerIdValidation from './CallerIdValidation';
 import { isSessionExpired, handleSessionExpiration } from '../utils/auth';
@@ -19,6 +19,11 @@ const GateDashboard = ({ user, token }) => {
     authorizedNumber: '',
     password: ''
   });
+  const [cooldowns, setCooldowns] = useState({});
+  
+  // Refs for scrolling to errors
+  const errorRef = useRef(null);
+  const successRef = useRef(null);
 
   const fetchGates = useCallback(async () => {
     try {
@@ -39,6 +44,7 @@ const GateDashboard = ({ user, token }) => {
           return;
         }
         setError(errorData.error || 'שגיאה בטעינת שערים');
+        scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error fetching gates:', error);
@@ -63,20 +69,62 @@ const GateDashboard = ({ user, token }) => {
     }
   }, [successMessage, error]);
 
-
-
-  const handleOpenGate = async (gate) => {
-    let password = '';
-    
-    // Check if gate requires password
-    if (gate.password) {
-      password = window.prompt(`הכנס סיסמה לשער "${gate.name}":`);
-      if (!password) {
-        setError('לא הוכנסה סיסמה');
-        return;
-      }
+  // Function to scroll to error or success message
+  const scrollToMessage = (type) => {
+    const ref = type === 'error' ? errorRef : successRef;
+    if (ref.current) {
+      ref.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
     }
+  };
 
+  // Calculate cooldowns and update timer every second
+  useEffect(() => {
+    const calculateCooldowns = () => {
+      const now = Date.now();
+      const COOLDOWN_MS = 30 * 1000; // 30 seconds
+      
+      const newCooldowns = {};
+      gates.forEach(gate => {
+        if (gate.lastOpenedAt) {
+          const timeSinceLastOpen = now - new Date(gate.lastOpenedAt).getTime();
+          if (timeSinceLastOpen < COOLDOWN_MS) {
+            newCooldowns[gate.id] = Math.ceil((COOLDOWN_MS - timeSinceLastOpen) / 1000);
+          }
+        }
+      });
+      
+      setCooldowns(newCooldowns);
+    };
+
+    // Calculate initial cooldowns
+    calculateCooldowns();
+
+    // Update timer every second
+    const interval = setInterval(calculateCooldowns, 1000);
+
+    return () => clearInterval(interval);
+  }, [gates]);
+
+
+
+  const handleOpenGateClick = (gate) => {
+    if (gate.password) {
+      // Show password prompt for protected gates
+      const password = prompt(`הכנס סיסמה לפתיחת השער "${gate.name}":`);
+      if (password !== null) { // User didn't cancel
+        handleOpenGate(gate, password);
+      }
+    } else {
+      // Open gate directly for unprotected gates
+      handleOpenGate(gate, '');
+    }
+  };
+
+  const handleOpenGate = async (gate, password = '') => {
     try {
       setIsSubmitting(true);
       const response = await fetch(`/api/gates/${gate.id}/open`, {
@@ -92,14 +140,20 @@ const GateDashboard = ({ user, token }) => {
 
       if (response.ok) {
         setSuccessMessage(`פותח שער "${gate.name}" באמצעות שיחת טלפון`);
+        scrollToMessage('success');
+        // Update cooldown immediately
+        setCooldowns(prev => ({
+          ...prev,
+          [gate.id]: 30
+        }));
         await fetchGates();
       } else {
-        const data = await response.json();
         if (isSessionExpired(data)) {
           handleSessionExpiration();
           return;
         }
         setError(data.error || 'שגיאה בפתיחת השער');
+        scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error opening gate:', error);
@@ -144,6 +198,7 @@ const GateDashboard = ({ user, token }) => {
           ? `שער "${newGateData.name}" עודכן בהצלחה` 
           : `שער "${newGateData.name}" נוסף בהצלחה`
         );
+        scrollToMessage('success');
         setShowAddGate(false);
         setEditingGate(null);
         setNewGateData({
@@ -155,6 +210,7 @@ const GateDashboard = ({ user, token }) => {
         await fetchGates();
       } else {
         setError(data.error || 'שגיאה בשמירת השער');
+        scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error saving gate:', error);
@@ -190,10 +246,12 @@ const GateDashboard = ({ user, token }) => {
 
       if (response.ok) {
         setSuccessMessage(`שער "${gateName}" נמחק בהצלחה`);
+        scrollToMessage('success');
         await fetchGates();
       } else {
         const data = await response.json();
         setError(data.error || 'שגיאה במחיקת השער');
+        scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error deleting gate:', error);
@@ -248,15 +306,7 @@ const GateDashboard = ({ user, token }) => {
                 <span>הוסף שער חדש</span>
               </button>
               
-              <button
-                onClick={() => setShowHistory(true)}
-                className="btn btn-secondary"
-              >
-                <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>היסטוריית פעילות</span>
-              </button>
+
               
               <button
                 onClick={() => setShowCallerIdValidation(true)}
@@ -274,7 +324,7 @@ const GateDashboard = ({ user, token }) => {
 
       {/* Error Message */}
       {error && (
-        <div className="error-message">
+        <div className="error-message" ref={errorRef}>
           <span>{error}</span>
           <button onClick={() => setError('')}>✕</button>
         </div>
@@ -282,7 +332,7 @@ const GateDashboard = ({ user, token }) => {
 
       {/* Success Message */}
       {successMessage && (
-        <div className="success-message">
+        <div className="success-message" ref={successRef}>
           <span>{successMessage}</span>
           <button onClick={() => setSuccessMessage('')}>✕</button>
         </div>
@@ -451,25 +501,32 @@ const GateDashboard = ({ user, token }) => {
 
               <div className="gate-actions">
                 <div className="gate-open-section">
-                  <div className="password-input-section">
-                    {gate.password && (
-                      <input
-                        type="password"
-                        className="gate-password-input"
-                        placeholder="הכנס סיסמה לפתיחת השער"
-                        id={`password-${gate.id}`}
-                      />
-                    )}
-                  </div>
+                  {/* Cooldown indicator */}
+                  {cooldowns[gate.id] && (
+                    <div className="cooldown-indicator">
+                      <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>השער נפתח לאחרונה - נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
+                    </div>
+                  )}
+                  
                   <button
-                    onClick={() => handleOpenGate(gate)}
-                    disabled={isSubmitting}
-                    className="btn btn-primary gate-open-btn"
+                    onClick={() => handleOpenGateClick(gate)}
+                    disabled={isSubmitting || cooldowns[gate.id]}
+                    className={`btn ${cooldowns[gate.id] ? 'btn-secondary cooldown' : 'btn-primary'} gate-open-btn`}
                   >
                     {isSubmitting ? (
                       <>
                         <div className="loading-spinner-small"></div>
                         <span>פותח...</span>
+                      </>
+                    ) : cooldowns[gate.id] ? (
+                      <>
+                        <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
                       </>
                     ) : (
                       <>
@@ -502,6 +559,8 @@ const GateDashboard = ({ user, token }) => {
           onClose={() => setShowCallerIdValidation(false)}
         />
       )}
+
+
     </div>
   );
 };

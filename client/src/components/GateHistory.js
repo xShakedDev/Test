@@ -1,15 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-const GateHistory = ({ token, onClose }) => {
+const GateHistory = ({ user, token }) => {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all'); // all, gate, user
   const [filterValue, setFilterValue] = useState('');
+  
+  // Ref for scrolling to error message
+  const errorRef = useRef(null);
 
   useEffect(() => {
     fetchHistory();
-  }, [filter, filterValue]);
+  }, [filter, filterValue, token]);
+
+  // Function to scroll to error message
+  const scrollToError = () => {
+    if (errorRef.current) {
+      errorRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
+    }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -35,6 +49,7 @@ const GateHistory = ({ token, onClose }) => {
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'שגיאה בטעינת היסטוריה');
+        scrollToError();
       }
     } catch (error) {
       console.error('Error fetching history:', error);
@@ -50,155 +65,121 @@ const GateHistory = ({ token, onClose }) => {
     return date.toLocaleString('he-IL');
   };
 
-  const getStatusIcon = (success) => {
-    if (success) {
-      return (
-        <svg className="icon-small text-green-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-        </svg>
-      );
-    } else {
-      return (
-        <svg className="icon-small text-red-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-        </svg>
-      );
-    }
-  };
+
 
   return (
-    <div className="history-modal-overlay">
-      <div className="history-modal">
-        <div className="validation-result">
-          {/* Header */}
-          <div className="validation-result-header">
-            <h3>היסטוריית פתיחת שערים</h3>
-            <button
-              onClick={onClose}
-              className="close-btn"
-            >
-              ✕
-            </button>
-          </div>
+    <div className="history-page">
+      <div className="history-container">
+        {/* Header */}
+        <div className="history-header">
+          <h2>היסטוריית פתיחת שערים</h2>
+        </div>
 
-          {/* Filters */}
-          <div className="history-filters">
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+        {/* Filters */}
+        <div className="history-filters">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="form-input"
+          >
+            <option value="all">כל ההיסטוריה</option>
+            <option value="gate">לפי שער</option>
+            <option value="user">לפי משתמש</option>
+          </select>
+
+          {filter !== 'all' && (
+            <input
+              type="text"
+              value={filterValue}
+              onChange={(e) => setFilterValue(e.target.value)}
+              placeholder={filter === 'gate' ? 'הכנס שם שער' : 'הכנס שם משתמש'}
               className="form-input"
-            >
-              <option value="all">כל ההיסטוריה</option>
-              <option value="gate">לפי שער</option>
-              <option value="user">לפי משתמש</option>
-            </select>
-
-            {filter !== 'all' && (
-              <input
-                type="text"
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                placeholder={filter === 'gate' ? 'הכנס שם שער' : 'הכנס שם משתמש'}
-                className="form-input"
-              />
-            )}
-
-            <button
-              onClick={fetchHistory}
-              disabled={isLoading}
-              className="btn btn-primary"
-            >
-              {isLoading ? 'טוען...' : 'סנן'}
-            </button>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="error-message">
-              <span>{error}</span>
-              <button onClick={() => setError('')}>✕</button>
-            </div>
+            />
           )}
 
-          {/* History Table */}
-          <div className="history-table-container">
-            <table className="history-table">
-              <thead>
-                <tr>
-                  <th>סטטוס</th>
-                  <th>שער</th>
-                  <th>משתמש</th>
-                  <th>תאריך</th>
-                  <th>פרטים</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan="5" className="loading-cell">
-                      <div className="loading-content">
-                        <div className="loading-spinner"></div>
-                        <p>טוען היסטוריה...</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : history.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="empty-cell">
-                      אין רשומות היסטוריה
-                    </td>
-                  </tr>
-                ) : (
-                  history.map(record => (
-                    <tr key={record.id} className="history-row">
-                      <td className="status-cell">
-                        <div className="status-icon">
-                          {getStatusIcon(record.success)}
-                        </div>
-                      </td>
-                      <td className="gate-cell">
-                        {record.gate?.name || 'לא ידוע'}
-                      </td>
-                      <td className="user-cell">
-                        {record.user?.name || 'לא ידוע'}
-                      </td>
-                      <td className="date-cell">
-                        {formatDate(record.createdAt)}
-                      </td>
-                      <td className="details-cell">
-                        {record.success ? (
-                          <span className="status-badge status-completed">
-                            הצלחה
-                          </span>
-                        ) : (
-                          <span className="status-badge status-failed">
-                            כישלון
-                          </span>
-                        )}
-                        {record.error && (
-                          <div className="error-details">
-                            {record.error}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <button
+            onClick={fetchHistory}
+            disabled={isLoading}
+            className="btn btn-primary"
+          >
+            {isLoading ? 'טוען...' : 'סנן'}
+          </button>
+        </div>
 
-          {/* Footer */}
-          <div className="history-footer">
-            <div className="history-stats">
-              סה"כ רשומות: {history.length}
-            </div>
-            <button
-              onClick={onClose}
-              className="btn btn-secondary"
-            >
-              סגור
-            </button>
+        {/* Error Message */}
+        {error && (
+          <div className="error-message" ref={errorRef}>
+            <span>{error}</span>
+            <button onClick={() => setError('')}>✕</button>
+          </div>
+        )}
+
+        {/* History Table */}
+        <div className="history-table-container">
+          <table className="history-table">
+            <thead>
+              <tr>
+                <th>שער</th>
+                <th>משתמש</th>
+                <th>תאריך</th>
+                <th>פרטים</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan="4" className="loading-cell">
+                    <div className="loading-content">
+                      <div className="loading-spinner"></div>
+                      <p>טוען היסטוריה...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : history.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="empty-cell">
+                    אין רשומות היסטוריה
+                  </td>
+                </tr>
+              ) : (
+                history.map(record => (
+                  <tr key={record._id || record.id} className="history-row">
+                    <td className="gate-cell">
+                      {record.gateName || record.gate?.name || 'לא ידוע'}
+                    </td>
+                    <td className="user-cell">
+                      {record.username || record.user?.name || 'לא ידוע'}
+                    </td>
+                    <td className="date-cell">
+                      {formatDate(record.timestamp || record.createdAt)}
+                    </td>
+                    <td className="details-cell">
+                      {record.success ? (
+                        <span className="status-badge status-completed">
+                          הצלחה
+                        </span>
+                      ) : (
+                        <span className="status-badge status-failed">
+                          כישלון
+                        </span>
+                      )}
+                      {record.errorMessage && (
+                        <div className="error-details">
+                          {record.errorMessage}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="history-footer">
+          <div className="history-stats">
+            סה"כ רשומות: {history.length}
           </div>
         </div>
       </div>
