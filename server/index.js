@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Load environment variables from .env
-require('dotenv').config({ path: 'test.env' });
+require('dotenv').config({ path: '.env' });
 
 // MongoDB integration
 const { connectDB, isConnected, getConnectionStatus } = require('./config/database');
