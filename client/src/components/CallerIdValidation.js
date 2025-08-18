@@ -104,6 +104,11 @@ const CallerIdValidation = ({ token, onClose }) => {
         setValidationData({ phoneNumber: '', friendlyName: '' });
         setShowValidationForm(false);
         
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`בקשת אימות נשלחה למספר ${validationData.phoneNumber}`, 'info');
+        }
+        
         // Start checking validation status after 30 seconds
         if (data.validationSid) {
           window.validationTimeout = setTimeout(() => {
@@ -121,10 +126,20 @@ const CallerIdValidation = ({ token, onClose }) => {
           return;
         }
         setError(data.error || 'שגיאה בשליחת בקשת אימות');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה בשליחת בקשת אימות: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
       }
     } catch (error) {
       console.error('Error submitting validation request:', error);
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת בשליחת בקשת אימות', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -161,10 +176,15 @@ const CallerIdValidation = ({ token, onClose }) => {
               status: 'approved',
               message: 'המספר נמצא ברשימת המספרים המאומתים'
             });
+            
+            // Show system notification if enabled
+            if (window.showSystemNotification) {
+              window.showSystemNotification(`מספר ${validationResult.phoneNumber} אומת בהצלחה!`, 'success');
+            }
           } else {
             setValidationStatus({
               status: 'pending',
-              message: 'המספר עדיין לא אומת - יבדק שוב בעוד 60 שניות'
+              message: 'המספר עדיין לא אומת - יבדק שוב בעוד 30 שניות'
             });
             
             // Schedule another check in 30 seconds if not verified yet

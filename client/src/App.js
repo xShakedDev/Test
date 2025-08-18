@@ -13,13 +13,34 @@ function App() {
   const [token, setToken] = useState(null);
   const [currentView, setCurrentView] = useState('gates'); // 'gates' or 'users'
   const [isLoading, setIsLoading] = useState(true);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
 
   const handleLogout = useCallback(() => {
+    // Show system notification if enabled
+    if (window.showSystemNotification) {
+      window.showSystemNotification('התנתקת בהצלחה מהמערכת', 'info');
+    }
+    
     setUser(null);
     setToken(null);
     setCurrentView('gates');
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+  }, []);
+
+  // Check maintenance status
+  const checkMaintenanceStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/settings/maintenance');
+      if (response.ok) {
+        const data = await response.json();
+        setMaintenanceMode(data.inMaintenance);
+        setMaintenanceMessage(data.message);
+      }
+    } catch (error) {
+      console.error('Error checking maintenance status:', error);
+    }
   }, []);
 
   const verifyToken = useCallback(async (tokenToVerify, userData) => {
@@ -84,8 +105,12 @@ function App() {
         handleLogout();
       }
     }
+    
+    // Check maintenance status
+    checkMaintenanceStatus();
+    
     setIsLoading(false);
-  }, [verifyToken, handleLogout]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [verifyToken, handleLogout, checkMaintenanceStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show loading spinner during initial authentication check
   if (isLoading) {
@@ -107,6 +132,18 @@ function App() {
   // Main application for authenticated users
   return (
     <div className="App">
+      {/* Maintenance Mode Banner */}
+      {maintenanceMode && (
+        <div className="maintenance-banner">
+          <div className="maintenance-content">
+            <span className="maintenance-icon">⚠️</span>
+            <span className="maintenance-text">
+              {maintenanceMessage || 'המערכת בתחזוקה כרגע'}
+            </span>
+          </div>
+        </div>
+      )}
+      
       <Header 
         user={user}
         currentView={currentView}

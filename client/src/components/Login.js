@@ -49,13 +49,29 @@ const Login = ({ onLogin, isLoading }) => {
         // Save token and user info
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`ברוך הבא, ${data.user.username}!`, 'success');
+        }
+        
         onLogin(data.user, data.token);
       } else {
         setError(data.error || 'שגיאה בהתחברות');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה בהתחברות: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
       }
     } catch (error) {
       console.error('Login error:', error);
       setError('שגיאת רשת - אנא נסה שוב');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת - אנא נסה שוב', 'error');
+      }
     } finally {
       setLoading(false);
     }

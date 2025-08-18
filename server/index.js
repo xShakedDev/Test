@@ -10,8 +10,7 @@ require('dotenv').config({ path: '.env' });
 // MongoDB integration
 const { connectDB, isConnected, getConnectionStatus } = require('./config/database');
 
-// Routes - choose between file-based or MongoDB-based
-const gateRoutes = require('./routes/auth');
+// Routes - MongoDB-based only
 const mongoRoutes = require('./routes/auth-mongo');
 const { router: userAuthRoutes } = require('./routes/auth-users');
 
@@ -50,8 +49,8 @@ app.get('/api/status', (req, res) => {
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
       storage: {
-        type: process.env.USE_MONGODB === 'true' ? 'MongoDB' : 'File-based',
-        useMongoDB: process.env.USE_MONGODB === 'true',
+        type: 'MongoDB',
+        useMongoDB: true,
         mongoConnected: isConnected(),
         mongoStatus: getConnectionStatus()
       },
@@ -102,27 +101,21 @@ app.get('/api/files', (req, res) => {
 // Initialize server with proper MongoDB connection handling
 const initializeServer = async () => {
   try {
-    // Initialize MongoDB connection and wait for it to complete
-    const USE_MONGODB = process.env.USE_MONGODB === 'true';
+    // Force MongoDB usage - no more file-based fallback
     let mongoConnection = null;
     
-    if (USE_MONGODB) {
-      mongoConnection = await connectDB();
+    // Initialize MongoDB connection and wait for it to complete
+    mongoConnection = await connectDB();
+    
+    if (!isConnected()) {
+      console.error('MongoDB connection failed. Server cannot start without database.');
+      process.exit(1);
     }
 
-    // Choose which routes to use based on MongoDB connection
-    if (USE_MONGODB && isConnected()) {
-      console.log('Using MongoDB for data storage');
-      app.use('/api', mongoRoutes);
-      // Add user authentication routes (only available with MongoDB)
-      app.use('/api/auth', userAuthRoutes);
-    } else {
-      console.log('Using file-based storage (JSON)');
-      if (USE_MONGODB && !mongoConnection) {
-        console.warn('MongoDB requested but connection failed, using file storage');
-      }
-      app.use('/api', gateRoutes);
-    }
+    console.log('Using MongoDB for data storage');
+    app.use('/api', mongoRoutes);
+    // Add user authentication routes (only available with MongoDB)
+    app.use('/api/auth', userAuthRoutes);
 
     // Serve static files from React build (in both development and production)
     const buildPath = path.join(__dirname, '../public');
@@ -175,7 +168,7 @@ const initializeServer = async () => {
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`   Storage: ${USE_MONGODB && isConnected() ? 'MongoDB' : 'File-based'}`);
+      console.log(`   Storage: MongoDB`);
     });
 
     // Graceful shutdown

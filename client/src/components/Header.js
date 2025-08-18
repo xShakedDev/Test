@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const Header = ({ user, currentView, onViewChange, onLogout }) => {
   const [twilioBalance, setTwilioBalance] = useState(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
 
   // Fetch Twilio balance for admin users
   useEffect(() => {
@@ -174,10 +176,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
 
             {/* Change Password button */}
             <button
-              onClick={() => {
-                // For now, just show an alert. In the future, this could open a modal
-                alert('פונקציונליות שינוי סיסמה תתווסף בקרוב');
-              }}
+              onClick={() => setIsChangePasswordModalOpen(true)}
               className="btn btn-secondary btn-header"
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
@@ -282,10 +281,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
 
             {/* Mobile Change Password Button */}
             <button
-              onClick={() => {
-                // For now, just show an alert. In the future, this could open a modal
-                alert('פונקציונליות שינוי סיסמה תתווסף בקרוב');
-              }}
+              onClick={() => setIsChangePasswordModalOpen(true)}
               className="btn btn-secondary mobile-logout-btn btn-header"
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
@@ -330,6 +326,17 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
           )}
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+        onSuccess={() => {
+          // Could show a success message or perform other actions
+          console.log('Password changed successfully');
+        }}
+        token={localStorage.getItem('authToken')}
+      />
     </header>
   );
 };

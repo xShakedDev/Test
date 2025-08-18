@@ -82,6 +82,40 @@ const GateDashboard = ({ user, token }) => {
     }
   }, [fetchGates, fetchVerifiedCallers, user]);
 
+  // Auto-refresh functionality based on admin settings
+  useEffect(() => {
+    let refreshInterval;
+    
+    const setupAutoRefresh = async () => {
+      try {
+        const response = await fetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          const { autoRefreshInterval } = data.settings;
+          
+          if (autoRefreshInterval && autoRefreshInterval > 0) {
+            refreshInterval = setInterval(() => {
+              fetchGates();
+              if (user?.role === 'admin') {
+                fetchVerifiedCallers();
+              }
+            }, autoRefreshInterval * 60 * 1000); // Convert minutes to milliseconds
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto-refresh settings:', error);
+      }
+    };
+    
+    setupAutoRefresh();
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [fetchGates, fetchVerifiedCallers, user]);
+
   // Clear messages after 3 seconds
   useEffect(() => {
     if (successMessage || error) {
@@ -107,30 +141,62 @@ const GateDashboard = ({ user, token }) => {
 
   // Calculate cooldowns and update timer every second
   useEffect(() => {
-    const calculateCooldowns = () => {
-      const now = Date.now();
-      const COOLDOWN_MS = 30 * 1000; // 30 seconds
-      
-      const newCooldowns = {};
-      gates.forEach(gate => {
-        if (gate.lastOpenedAt) {
-          const timeSinceLastOpen = now - new Date(gate.lastOpenedAt).getTime();
-          if (timeSinceLastOpen < COOLDOWN_MS) {
-            newCooldowns[gate.id] = Math.ceil((COOLDOWN_MS - timeSinceLastOpen) / 1000);
-          }
+    let cooldownInterval;
+    
+    const calculateCooldowns = async () => {
+      try {
+        // Get cooldown setting from admin settings
+        const response = await fetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          const { gateCooldownSeconds } = data.settings;
+          
+          const now = Date.now();
+          const COOLDOWN_MS = (gateCooldownSeconds || 30) * 1000; // Use setting or default to 30 seconds
+          
+          const newCooldowns = {};
+          gates.forEach(gate => {
+            if (gate.lastOpenedAt) {
+              const timeSinceLastOpen = now - new Date(gate.lastOpenedAt).getTime();
+              if (timeSinceLastOpen < COOLDOWN_MS) {
+                newCooldowns[gate.id] = Math.ceil((COOLDOWN_MS - timeSinceLastOpen) / 1000);
+              }
+            }
+          });
+          
+          setCooldowns(newCooldowns);
         }
-      });
-      
-      setCooldowns(newCooldowns);
+      } catch (error) {
+        console.error('Error fetching cooldown settings:', error);
+        // Fallback to default cooldown
+        const now = Date.now();
+        const COOLDOWN_MS = 30 * 1000; // 30 seconds default
+        
+        const newCooldowns = {};
+        gates.forEach(gate => {
+          if (gate.lastOpenedAt) {
+            const timeSinceLastOpen = now - new Date(gate.lastOpenedAt).getTime();
+            if (timeSinceLastOpen < COOLDOWN_MS) {
+              newCooldowns[gate.id] = Math.ceil((COOLDOWN_MS - timeSinceLastOpen) / 1000);
+            }
+          }
+        });
+        
+        setCooldowns(newCooldowns);
+      }
     };
 
     // Calculate initial cooldowns
     calculateCooldowns();
 
     // Update timer every second
-    const interval = setInterval(calculateCooldowns, 1000);
+    cooldownInterval = setInterval(calculateCooldowns, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (cooldownInterval) {
+        clearInterval(cooldownInterval);
+      }
+    };
   }, [gates]);
 
 
@@ -165,6 +231,12 @@ const GateDashboard = ({ user, token }) => {
       if (response.ok) {
         setSuccessMessage(`פותח שער "${gate.name}" באמצעות שיחת טלפון`);
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שער "${gate.name}" נפתח בהצלחה`, 'success');
+        }
+        
         // Update cooldown immediately
         setCooldowns(prev => ({
           ...prev,
@@ -176,12 +248,55 @@ const GateDashboard = ({ user, token }) => {
           handleSessionExpiration();
           return;
         }
-        setError(data.error || 'שגיאה בפתיחת השער');
+        
+        // Handle specific error cases
+        if (response.status === 503 && data.error === 'המערכת בתחזוקה') {
+          setError(`המערכת בתחזוקה: ${data.message || 'נסה שוב מאוחר יותר'}`);
+          
+          // Show system notification if enabled
+          if (window.showSystemNotification) {
+            window.showSystemNotification(`המערכת בתחזוקה: ${data.message || 'נסה שוב מאוחר יותר'}`, 'warning');
+          }
+        } else if (response.status === 429) {
+          if (data.error === 'דילאי פעיל') {
+            setError(`דילאי פעיל: ${data.message}`);
+            
+            // Update cooldown with remaining time
+            if (data.remainingTime) {
+              setCooldowns(prev => ({
+                ...prev,
+                [gate.id]: data.remainingTime
+              }));
+            }
+            
+            // Show system notification if enabled
+            if (window.showSystemNotification) {
+              window.showSystemNotification(`דילאי פעיל: ${data.message}`, 'warning');
+            }
+          } else if (data.error === 'חריגה ממספר הניסיונות') {
+            setError(`חריגה ממספר הניסיונות: ${data.message}`);
+            
+            // Show system notification if enabled
+            if (window.showSystemNotification) {
+              window.showSystemNotification(`חריגה ממספר הניסיונות: ${data.message}`, 'error');
+            }
+          } else {
+            setError(data.error || 'יותר מדי בקשות - נסה שוב מאוחר יותר');
+          }
+        } else {
+          setError(data.error || 'שגיאה בפתיחת השער');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error opening gate:', error);
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת בפתיחת השער', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -223,6 +338,16 @@ const GateDashboard = ({ user, token }) => {
           : `שער "${newGateData.name}" נוסף בהצלחה!`
         );
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          if (editingGate) {
+            window.showSystemNotification(`שער "${newGateData.name}" עודכן בהצלחה`, 'success');
+          } else {
+            window.showSystemNotification(`שער "${newGateData.name}" נוסף בהצלחה`, 'success');
+          }
+        }
+        
         setShowAddGate(false);
         setEditingGate(null);
         setNewGateData({
@@ -233,12 +358,27 @@ const GateDashboard = ({ user, token }) => {
         });
         await fetchGates();
       } else {
+        if (isSessionExpired(data)) {
+          handleSessionExpiration();
+          return;
+        }
         setError(data.error || 'שגיאה בשמירת השער');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה בשמירת השער: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error saving gate:', error);
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת בשמירת השער', 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -271,15 +411,32 @@ const GateDashboard = ({ user, token }) => {
       if (response.ok) {
         setSuccessMessage(`שער "${gateName}" נמחק בהצלחה!`);
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שער "${gateName}" נמחק בהצלחה`, 'info');
+        }
+        
         await fetchGates();
       } else {
         const data = await response.json();
         setError(data.error || 'שגיאה במחיקת השער');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה במחיקת השער: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error deleting gate:', error);
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת במחיקת השער', 'error');
+      }
     }
   };
 

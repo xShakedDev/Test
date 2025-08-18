@@ -146,6 +146,10 @@ const GateHistory = ({ user, token }) => {
       return;
     }
 
+    console.log('Deleting selected logs:', selectedLogs);
+    console.log('Selected logs type:', typeof selectedLogs[0]);
+    console.log('Selected logs sample:', selectedLogs.slice(0, 3));
+
     try {
       const response = await fetch('/api/gates/history/bulk-delete', {
         method: 'DELETE',
@@ -159,6 +163,12 @@ const GateHistory = ({ user, token }) => {
       if (response.ok) {
         setSuccessMessage(`${selectedLogs.length} רשומות נמחקו בהצלחה!`);
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`${selectedLogs.length} רשומות היסטוריה נמחקו בהצלחה`, 'info');
+        }
+        
         setSelectedLogs([]);
         setSelectAll(false);
         await fetchHistory();
@@ -169,10 +179,23 @@ const GateHistory = ({ user, token }) => {
           return;
         }
         setError(data.error || 'שגיאה במחיקת הרשומות');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה במחיקת הרשומות: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
+      console.error('Network error during bulk delete:', error);
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת במחיקת הרשומות', 'error');
+      }
+      
       scrollToMessage('error');
     }
   };
@@ -193,6 +216,12 @@ const GateHistory = ({ user, token }) => {
       if (response.ok) {
         setSuccessMessage('כל ההיסטוריה נמחקה בהצלחה!');
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification('כל היסטוריית המערכת נמחקה בהצלחה', 'warning');
+        }
+        
         setHistory([]);
         setSelectedLogs([]);
         setSelectAll(false);
@@ -203,10 +232,22 @@ const GateHistory = ({ user, token }) => {
           return;
         }
         setError(data.error || 'שגיאה במחיקת כל ההיסטוריה');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה במחיקת כל ההיסטוריה: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת במחיקת כל ההיסטוריה', 'error');
+      }
+      
       scrollToMessage('error');
     }
   };

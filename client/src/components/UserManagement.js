@@ -180,6 +180,16 @@ const UserManagement = ({ user, token }) => {
         setError('');
         setSuccessMessage(data.message || (editingUser ? 'משתמש עודכן בהצלחה!' : 'משתמש נוצר בהצלחה!'));
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          if (editingUser) {
+            window.showSystemNotification(`משתמש "${formData.username}" עודכן בהצלחה`, 'success');
+          } else {
+            window.showSystemNotification(`משתמש "${formData.username}" נוצר בהצלחה`, 'success');
+          }
+        }
+        
         resetForm();
         await fetchUsers();
       } else {
@@ -189,10 +199,21 @@ const UserManagement = ({ user, token }) => {
           return;
         }
         setError(data.error || 'שגיאה בשמירת המשתמש');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה בשמירת המשתמש: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת בשמירת המשתמש', 'error');
+      }
     }
   };
 
@@ -228,6 +249,12 @@ const UserManagement = ({ user, token }) => {
         setError('');
         setSuccessMessage(data.message || 'משתמש נמחק בהצלחה!');
         scrollToMessage('success');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`משתמש "${username}" נמחק בהצלחה`, 'info');
+        }
+        
         await fetchUsers();
       } else {
         const data = await response.json();
@@ -236,10 +263,22 @@ const UserManagement = ({ user, token }) => {
           return;
         }
         setError(data.error || 'שגיאה במחיקת המשתמש');
+        
+        // Show system notification if enabled
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה במחיקת המשתמש: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+        
         scrollToMessage('error');
       }
     } catch (error) {
+      console.error('Delete user error:', error);
       setError('שגיאת רשת');
+      
+      // Show system notification if enabled
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת במחיקת המשתמש', 'error');
+      }
     }
   };
 

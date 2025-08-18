@@ -1,84 +1,27 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Gate = require('../models/Gate');
 
 const router = express.Router();
 
-// File-based session storage to persist across server restarts
-const sessionsFilePath = path.join(__dirname, '../data/sessions.json');
+// JWT secret key
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-jwt-key-change-in-production';
 
-// Ensure data directory exists
-const dataDir = path.dirname(sessionsFilePath);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// Load sessions from file
-const loadSessions = () => {
-  try {
-    if (fs.existsSync(sessionsFilePath)) {
-      const data = fs.readFileSync(sessionsFilePath, 'utf8');
-      const sessions = JSON.parse(data);
-      // Filter out expired sessions
-      const now = Date.now();
-      const validSessions = {};
-      let expiredCount = 0;
-      
-      for (const [token, sessionData] of Object.entries(sessions)) {
-        if (now - sessionData.createdAt <= 24 * 60 * 60 * 1000) {
-          validSessions[token] = sessionData;
-        } else {
-          expiredCount++;
-        }
-      }
-      
-
-      return validSessions;
-    }
-  } catch (error) {
-    console.error('Error loading sessions:', error);
-  }
-  return {};
+// Generate JWT token
+const generateToken = (user) => {
+  return jwt.sign(
+    { 
+      userId: user._id, 
+      username: user.username, 
+      role: user.role 
+    },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
 };
 
-// Save sessions to file
-const saveSessions = (sessions) => {
-  try {
-    fs.writeFileSync(sessionsFilePath, JSON.stringify(sessions, null, 2));
-
-  } catch (error) {
-    console.error('Error saving sessions:', error);
-  }
-};
-
-// Initialize sessions from file
-let activeSessions = loadSessions();
-
-// Clean up expired sessions periodically (every hour)
-setInterval(() => {
-  const now = Date.now();
-  let hasChanges = false;
-  
-  for (const [token, sessionData] of Object.entries(activeSessions)) {
-    if (now - sessionData.createdAt > 24 * 60 * 60 * 1000) {
-      delete activeSessions[token];
-      hasChanges = true;
-    }
-  }
-  
-  if (hasChanges) {
-    saveSessions(activeSessions);
-  }
-}, 60 * 60 * 1000); // Check every hour
-
-// Generate simple session token
-const generateSessionToken = () => {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36);
-};
-
-// Middleware to verify session token
+// Middleware to verify JWT token
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -88,41 +31,30 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const sessionData = activeSessions[token];
+    const decoded = jwt.verify(token, JWT_SECRET);
     
-    if (!sessionData) {
-      return res.status(401).json({ error: 'סשן לא תקף או פג תוקף' });
-    }
-
-    // Check if session is expired (24 hours)
-    if (Date.now() - sessionData.createdAt > 24 * 60 * 60 * 1000) {
-      delete activeSessions[token];
-      saveSessions(activeSessions);
-      return res.status(401).json({ error: 'סשן פג תוקף' });
-    }
-    
-    const user = await User.findById(sessionData.userId).populate('authorizedGates');
-    
+    // Get user from database to ensure they still exist and are active
+    const user = await User.findById(decoded.userId);
     if (!user || !user.isActive) {
-      delete activeSessions[token];
-      saveSessions(activeSessions);
       return res.status(401).json({ error: 'משתמש לא תקף' });
     }
 
+    // Add user info to request
     req.user = user;
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(403).json({ error: 'שגיאה באימות' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'סשן פג תוקף' });
+    }
+    return res.status(401).json({ error: 'שגיאה באימות' });
   }
 };
 
-// Middleware to verify admin role
+// Middleware to require admin role
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'נדרשת הרשאת מנהל' });
   }
-  
   next();
 };
 
@@ -153,19 +85,8 @@ router.post('/login', async (req, res) => {
     await user.updateLastLogin();
 
     // Generate JWT token
-    const token = generateSessionToken();
+    const token = generateToken(user);
     
-    // Store session data
-    activeSessions[token] = {
-      userId: user._id,
-      username: user.username,
-      role: user.role,
-      createdAt: Date.now()
-    };
-    saveSessions(activeSessions);
-    
-
-
     res.json({
       message: 'התחברות הצליחה',
       token,
@@ -213,11 +134,8 @@ router.post('/logout', (req, res) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   
-  if (token && activeSessions[token]) {
-    delete activeSessions[token];
-    saveSessions(activeSessions);
-  }
-  
+  // JWT logout is client-side, no server-side session to invalidate here
+  // For simplicity, we'll just return a success message
   res.json({ message: 'התנתקות הצליחה' });
 });
 

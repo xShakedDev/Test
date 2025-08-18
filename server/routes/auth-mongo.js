@@ -1,7 +1,9 @@
 const express = require('express');
 const twilio = require('twilio');
+const mongoose = require('mongoose');
 const Gate = require('../models/Gate');
 const GateHistory = require('../models/GateHistory');
+const AdminSettings = require('../models/AdminSettings');
 const { isConnected } = require('../config/database');
 const { authenticateToken, requireAdmin } = require('./auth-users');
 const router = express.Router();
@@ -71,10 +73,22 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
   }
 });
 
+// Gate opening endpoint
 router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { password } = req.body;
+    
+    // Get current admin settings
+    const adminSettings = await AdminSettings.getCurrentSettings();
+    
+    // Check if system is in maintenance mode
+    if (adminSettings.systemMaintenance) {
+      return res.status(503).json({ 
+        error: 'המערכת בתחזוקה', 
+        message: adminSettings.maintenanceMessage || 'המערכת בתחזוקה כרגע'
+      });
+    }
     
     const gate = await Gate.findOne({ id: parseInt(id) });
     
@@ -113,6 +127,64 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       }
       
       return res.status(403).json({ error: 'אין הרשאה לפתוח שער זה' });
+    }
+    
+    // Check cooldown for this gate
+    const now = new Date();
+    const cooldownMs = adminSettings.gateCooldownSeconds * 1000;
+    
+    if (gate.lastOpened && (now - gate.lastOpened) < cooldownMs) {
+      const remainingTime = Math.ceil((cooldownMs - (now - gate.lastOpened)) / 1000);
+      
+      // Log failed attempt due to cooldown
+      try {
+        await new GateHistory({
+          userId: req.user._id,
+          gateId: gate.id,
+          username: req.user.username,
+          gateName: gate.name,
+          success: false,
+          errorMessage: `דילאי פעיל - נסה שוב בעוד ${remainingTime} שניות`
+        }).save();
+      } catch (logError) {
+        console.error('שגיאה ברישום היסטוריית כישלון:', logError);
+      }
+      
+      return res.status(429).json({ 
+        error: 'דילאי פעיל', 
+        message: `נסה שוב בעוד ${remainingTime} שניות`,
+        remainingTime
+      });
+    }
+    
+    // Check retry limit for this user and gate
+    const recentAttempts = await GateHistory.find({
+      userId: req.user._id,
+      gateId: gate.id,
+      timestamp: { $gte: new Date(now - 24 * 60 * 60 * 1000) } // Last 24 hours
+    });
+    
+    const failedAttempts = recentAttempts.filter(attempt => !attempt.success).length;
+    
+    if (failedAttempts >= adminSettings.maxRetries) {
+      // Log failed attempt due to retry limit
+      try {
+        await new GateHistory({
+          userId: req.user._id,
+          gateId: gate.id,
+          username: req.user.username,
+          gateName: gate.name,
+          success: false,
+          errorMessage: `חריגה ממספר הניסיונות המותר (${adminSettings.maxRetries})`
+        }).save();
+      } catch (logError) {
+        console.error('שגיאה ברישום היסטוריית כישלון:', logError);
+      }
+      
+      return res.status(429).json({ 
+        error: 'חריגה ממספר הניסיונות', 
+        message: `חריגה ממספר הניסיונות המותר (${adminSettings.maxRetries}). נסה שוב מחר.`
+      });
     }
     
     // Check if gate requires password
@@ -236,36 +308,112 @@ router.get('/gates/history', requireMongoDB, authenticateToken, requireAdmin, as
           .sort({ timestamp: -1 })
           .limit(limitNum)
           .populate('userId', 'username name');
-              }
-      } else if (username) {
-        // Filter by username
-        history = await GateHistory.find({ username })
+      }
+    } else if (username) {
+      // Filter by username
+      history = await GateHistory.find({ username })
+        .sort({ timestamp: -1 })
+        .limit(limitNum)
+        .populate('userId', 'username name');
+    } else if (userId) {
+      // Check if userId is a valid ObjectId or if it's actually a username
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        history = await GateHistory.findByUser(userId, limitNum);
+      } else {
+        // If userId is not a valid ObjectId, treat it as username
+        history = await GateHistory.find({ username: userId })
           .sort({ timestamp: -1 })
           .limit(limitNum)
           .populate('userId', 'username name');
-      } else if (userId) {
-        // Check if userId is a valid ObjectId or if it's actually a username
-        if (mongoose.Types.ObjectId.isValid(userId)) {
-          history = await GateHistory.findByUser(userId, limitNum);
-        } else {
-          // If userId is not a valid ObjectId, treat it as username
-          history = await GateHistory.find({ username: userId })
-            .sort({ timestamp: -1 })
-            .limit(limitNum)
-            .populate('userId', 'username name');
-        }
-      } else {
-        history = await GateHistory.findAllHistory(limitNum);
       }
+    } else {
+      history = await GateHistory.findAllHistory(limitNum);
+    }
     
     res.json({ 
-      history,
+      history: history.map(record => record.toJSON()),
       count: history.length,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('שגיאה בטעינת היסטוריית שערים:', error);
     res.status(500).json({ error: 'נכשל בטעינת היסטוריית השערים' });
+  }
+});
+
+// Bulk delete history records (admin only)
+router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { logIds } = req.body;
+    
+    console.log('Bulk delete request received:', { logIds, count: logIds?.length });
+    
+    if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
+      return res.status(400).json({ error: 'רשימת מזההי רשומות נדרשת' });
+    }
+    
+    // Process IDs - GateHistory only has _id field, so we expect ObjectId strings
+    const processedIds = logIds.map(id => {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        return id; // Keep as ObjectId string
+      } else {
+        console.warn('Invalid ObjectId format:', id);
+        return null; // Invalid ID
+      }
+    }).filter(id => id !== null); // Remove invalid IDs
+    
+    console.log('Processed IDs:', { 
+      original: logIds, 
+      processed: processedIds,
+      validCount: processedIds.length,
+      invalidCount: logIds.length - processedIds.length
+    });
+    
+    if (processedIds.length === 0) {
+      return res.status(400).json({ error: 'לא נמצאו מזההי רשומות תקינים' });
+    }
+    
+    // Query by _id only since GateHistory only has _id field
+    const query = { _id: { $in: processedIds } };
+    
+    console.log('Delete query:', JSON.stringify(query, null, 2));
+    
+    const result = await GateHistory.deleteMany(query);
+    
+    console.log('Delete result:', result);
+    
+    res.json({ 
+      success: true, 
+      message: `${result.deletedCount} רשומות נמחקו בהצלחה`,
+      deletedCount: result.deletedCount,
+      requestedCount: logIds.length,
+      processedCount: processedIds.length,
+      invalidCount: logIds.length - processedIds.length
+    });
+  } catch (error) {
+    console.error('שגיאה במחיקת רשומות היסטוריה:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ error: 'נכשל במחיקת רשומות ההיסטוריה' });
+  }
+});
+
+// Delete all history records (admin only)
+router.delete('/gates/history/delete-all', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const result = await GateHistory.deleteMany({});
+    
+    res.json({ 
+      success: true, 
+      message: 'כל ההיסטוריה נמחקה בהצלחה',
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('שגיאה במחיקת כל ההיסטוריה:', error);
+    res.status(500).json({ error: 'נכשל במחיקת כל ההיסטוריה' });
   }
 });
 
@@ -555,18 +703,43 @@ router.get('/twilio/validation-status/:sid', authenticateToken, requireAdmin, as
   }
 });
 
+// Public route to get current settings (for other parts of the app)
+router.get('/settings/current', async (req, res) => {
+  try {
+    const settings = await AdminSettings.getCurrentSettings();
+    
+    res.json({ 
+      settings: settings.toJSON(),
+      lastUpdated: settings.lastUpdated
+    });
+  } catch (error) {
+    console.error('שגיאה בקבלת הגדרות נוכחיות:', error);
+    res.status(500).json({ error: 'נכשל בקבלת הגדרות' });
+  }
+});
+
+// Public route to check maintenance status
+router.get('/settings/maintenance', async (req, res) => {
+  try {
+    const maintenanceStatus = await AdminSettings.isSystemInMaintenance();
+    
+    res.json(maintenanceStatus);
+  } catch (error) {
+    console.error('שגיאה בבדיקת מצב תחזוקה:', error);
+    res.status(500).json({ error: 'נכשל בבדיקת מצב תחזוקה' });
+  }
+});
+
 // Admin Settings Routes
 router.get('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    // Get settings from environment variables or use defaults
-    const settings = {
-      gateCooldownSeconds: parseInt(process.env.GATE_COOLDOWN_SECONDS) || 30,
-      maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
-      enableNotifications: process.env.ENABLE_NOTIFICATIONS !== 'false',
-      autoRefreshInterval: parseInt(process.env.AUTO_REFRESH_INTERVAL) || 5
-    };
+    const settings = await AdminSettings.getCurrentSettings();
     
-    res.json({ settings });
+    res.json({ 
+      settings: settings.toJSON(),
+      lastUpdated: settings.lastUpdated,
+      updatedBy: settings.updatedBy
+    });
   } catch (error) {
     console.error('שגיאה בקבלת הגדרות:', error);
     res.status(500).json({ error: 'נכשל בקבלת הגדרות' });
@@ -575,7 +748,7 @@ router.get('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
 
 router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval } = req.body;
+    const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval, systemMaintenance, maintenanceMessage } = req.body;
     
     // Validate input
     if (gateCooldownSeconds < 10 || gateCooldownSeconds > 300) {
@@ -590,24 +763,29 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
       return res.status(400).json({ error: 'מרווח רענון חייב להיות בין 1 ל-60 דקות' });
     }
     
-    // In a real application, you would save these to a database
-    // For now, we'll just return success
-    // You can implement actual saving logic here
-    
-    const updatedSettings = {
+    // Update settings in MongoDB
+    const updatedSettings = await AdminSettings.updateSettings({
       gateCooldownSeconds,
       maxRetries,
       enableNotifications,
-      autoRefreshInterval
-    };
+      autoRefreshInterval,
+      systemMaintenance: systemMaintenance || false,
+      maintenanceMessage: maintenanceMessage || 'המערכת בתחזוקה'
+    }, req.user._id);
     
     res.json({ 
       message: 'ההגדרות נשמרו בהצלחה',
-      settings: updatedSettings
+      settings: updatedSettings.toJSON(),
+      lastUpdated: updatedSettings.lastUpdated
     });
   } catch (error) {
     console.error('שגיאה בשמירת הגדרות:', error);
-    res.status(500).json({ error: 'נכשל בשמירת הגדרות' });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      res.status(400).json({ error: 'נתונים לא תקינים', details: messages });
+    } else {
+      res.status(500).json({ error: 'נכשל בשמירת הגדרות' });
+    }
   }
 });
 

@@ -1,32 +1,8 @@
 {
-  "njb5llnhzzsmeewkzai": {
+  "k755xzxy3jmehfeb4n": {
     "userId": "68a110dddd662118dcd95fba",
     "username": "admin",
     "role": "admin",
-    "createdAt": 1755387815850
-  },
-  "zs1m74rk9obmeeyz824": {
-    "userId": "68a11888e8cc0172077410ab",
-    "username": "test",
-    "role": "user",
-    "createdAt": 1755391839628
-  },
-  "e2ztdhwkx4meez0tla": {
-    "userId": "68a110dddd662118dcd95fba",
-    "username": "admin",
-    "role": "admin",
-    "createdAt": 1755391914190
-  },
-  "y39cqzqexoameez2x0w": {
-    "userId": "68a110dddd662118dcd95fba",
-    "username": "admin",
-    "role": "admin",
-    "createdAt": 1755392011952
-  },
-  "a00589mbx68meftv6kn": {
-    "userId": "68a110dddd662118dcd95fba",
-    "username": "admin",
-    "role": "admin",
-    "createdAt": 1755443719175
+    "createdAt": 1755540349655
   }
 }
