@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authenticatedFetch } from '../utils/auth';
 
 const Login = ({ onLogin, isLoading }) => {
   const [formData, setFormData] = useState({
@@ -35,7 +36,7 @@ const Login = ({ onLogin, isLoading }) => {
         username: formData.username.toLowerCase().trim()
       };
 
-      const response = await fetch('/api/auth/login', {
+      const response = await authenticatedFetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -46,8 +47,9 @@ const Login = ({ onLogin, isLoading }) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Save token and user info
-        localStorage.setItem('authToken', data.token);
+        // Save tokens and user info
+        localStorage.setItem('authToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.user));
         
         // Show system notification if enabled
@@ -55,7 +57,7 @@ const Login = ({ onLogin, isLoading }) => {
           window.showSystemNotification(`ברוך הבא, ${data.user.username}!`, 'success');
         }
         
-        onLogin(data.user, data.token);
+        onLogin(data.user, { accessToken: data.accessToken, refreshToken: data.refreshToken });
       } else {
         setError(data.error || 'שגיאה בהתחברות');
         

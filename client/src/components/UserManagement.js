@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { isSessionExpired, handleSessionExpiration } from '../utils/auth';
+import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
 const UserManagement = ({ user, token }) => {
   const [users, setUsers] = useState([]);
@@ -9,6 +9,7 @@ const UserManagement = ({ user, token }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -24,11 +25,7 @@ const UserManagement = ({ user, token }) => {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/auth/users');
       
         if (response.ok) {
           const data = await response.json();
@@ -48,15 +45,11 @@ const UserManagement = ({ user, token }) => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   const fetchGates = useCallback(async () => {
     try {
-      const response = await fetch('/api/gates', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/gates');
       
       if (response.ok) {
         const data = await response.json();
@@ -72,7 +65,7 @@ const UserManagement = ({ user, token }) => {
     } catch (error) {
       console.error('Error fetching gates:', error);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -91,6 +84,23 @@ const UserManagement = ({ user, token }) => {
       return () => clearTimeout(timer);
     }
   }, [successMessage, error]);
+
+  // Check notification settings
+  useEffect(() => {
+    const checkNotificationSettings = async () => {
+      try {
+        const response = await authenticatedFetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          setNotificationsEnabled(data.settings?.enableNotifications || false);
+        }
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
+      }
+    };
+    
+    checkNotificationSettings();
+  }, []);
 
   // Function to scroll to error or success message
   const scrollToMessage = (type) => {
@@ -166,11 +176,10 @@ const UserManagement = ({ user, token }) => {
       
       const method = editingUser ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(dataToSend)
       });
@@ -237,11 +246,8 @@ const UserManagement = ({ user, token }) => {
     }
 
     try {
-      const response = await fetch(`/api/auth/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await authenticatedFetch(`/api/auth/users/${userId}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -315,16 +321,16 @@ const UserManagement = ({ user, token }) => {
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
+      {/* Error Message - Only show if notifications are disabled */}
+      {error && !notificationsEnabled && (
         <div className="error-message" ref={errorRef}>
           <span>{error}</span>
           <button onClick={() => setError('')}>✕</button>
         </div>
       )}
 
-      {/* Success Message */}
-      {successMessage && (
+      {/* Success Message - Only show if notifications are disabled */}
+      {successMessage && !notificationsEnabled && (
         <div className="success-message" ref={successRef}>
           <span>{successMessage}</span>
           <button onClick={() => setSuccessMessage('')}>✕</button>

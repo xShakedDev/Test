@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { authenticatedFetch } from '../utils/auth';
 
 const AdminSettings = ({ user, token }) => {
   const [settings, setSettings] = useState({
@@ -15,6 +16,7 @@ const AdminSettings = ({ user, token }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
   // Refs for scrolling to messages
   const errorRef = useRef(null);
@@ -23,6 +25,23 @@ const AdminSettings = ({ user, token }) => {
   useEffect(() => {
     fetchSettings();
   }, [token]);
+
+  // Check notification settings
+  useEffect(() => {
+    const checkNotificationSettings = async () => {
+      try {
+        const response = await authenticatedFetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          setNotificationsEnabled(data.settings?.enableNotifications || false);
+        }
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
+      }
+    };
+    
+    checkNotificationSettings();
+  }, []);
 
   // Function to scroll to error or success message
   const scrollToMessage = (type) => {
@@ -41,11 +60,7 @@ const AdminSettings = ({ user, token }) => {
       setIsLoading(true);
       setError('');
       
-      const response = await fetch('/api/admin/settings', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/admin/settings');
 
       if (response.ok) {
         const data = await response.json();
@@ -79,11 +94,10 @@ const AdminSettings = ({ user, token }) => {
     setError('');
 
     try {
-      const response = await fetch('/api/admin/settings', {
+      const response = await authenticatedFetch('/api/admin/settings', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(settings)
       });
@@ -121,7 +135,7 @@ const AdminSettings = ({ user, token }) => {
   // System notification function - Global function
   window.showSystemNotification = (message, type = 'info') => {
     // Check if notifications are enabled by fetching current settings
-    fetch('/api/settings/current')
+    authenticatedFetch('/api/settings/current')
       .then(response => response.json())
       .then(data => {
         if (!data.settings.enableNotifications) return;
@@ -207,16 +221,16 @@ const AdminSettings = ({ user, token }) => {
           </p>
         </div>
 
-        {/* Error Message */}
-        {error && (
+        {/* Error Message - Only show if notifications are disabled */}
+        {error && !notificationsEnabled && (
           <div className="error-message" ref={errorRef}>
             <span>{error}</span>
             <button onClick={() => setError('')}>✕</button>
           </div>
         )}
 
-        {/* Success Message */}
-        {successMessage && (
+        {/* Success Message - Only show if notifications are disabled */}
+        {successMessage && !notificationsEnabled && (
           <div className="success-message" ref={successRef}>
             <span>{successMessage}</span>
             <button onClick={() => setSuccessMessage('')}>✕</button>

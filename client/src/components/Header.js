@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ChangePasswordModal from './ChangePasswordModal';
+import { authenticatedFetch } from '../utils/auth';
 
 const Header = ({ user, currentView, onViewChange, onLogout }) => {
   const [twilioBalance, setTwilioBalance] = useState(null);
@@ -21,11 +22,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/twilio/balance', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/twilio/balance');
 
       if (response.ok) {
         const data = await response.json();

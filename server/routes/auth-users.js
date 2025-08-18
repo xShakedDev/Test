@@ -8,8 +8,12 @@ const router = express.Router();
 // JWT secret key
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-jwt-key-change-in-production';
 
+// Token expiration times
+const ACCESS_TOKEN_EXPIRY = '1h'; // Short-lived access token
+const REFRESH_TOKEN_EXPIRY = '7d'; // Long-lived refresh token
+
 // Generate JWT token
-const generateToken = (user) => {
+const generateToken = (user, expiry = ACCESS_TOKEN_EXPIRY) => {
   return jwt.sign(
     { 
       userId: user._id, 
@@ -17,8 +21,16 @@ const generateToken = (user) => {
       role: user.role 
     },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: expiry }
   );
+};
+
+// Generate both access and refresh tokens
+const generateTokenPair = (user) => {
+  const accessToken = generateToken(user, ACCESS_TOKEN_EXPIRY);
+  const refreshToken = generateToken(user, REFRESH_TOKEN_EXPIRY);
+  
+  return { accessToken, refreshToken };
 };
 
 // Middleware to verify JWT token
@@ -84,12 +96,13 @@ router.post('/login', async (req, res) => {
     // Update last login
     await user.updateLastLogin();
 
-    // Generate JWT token
-    const token = generateToken(user);
+    // Generate token pair
+    const tokens = generateTokenPair(user);
     
     res.json({
       message: 'התחברות הצליחה',
-      token,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: {
         id: user._id,
         username: user.username,
@@ -137,6 +150,41 @@ router.post('/logout', (req, res) => {
   // JWT logout is client-side, no server-side session to invalidate here
   // For simplicity, we'll just return a success message
   res.json({ message: 'התנתקות הצליחה' });
+});
+
+// Refresh token route
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'נדרש טוקן רענון' });
+    }
+    
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    
+    // Get user from database to ensure they still exist and are active
+    const user = await User.findById(decoded.userId);
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'משתמש לא תקף' });
+    }
+    
+    // Generate new token pair
+    const newTokens = generateTokenPair(user);
+    
+    res.json({
+      message: 'טוקן חודש בהצלחה',
+      accessToken: newTokens.accessToken,
+      refreshToken: newTokens.refreshToken
+    });
+    
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'סשן פג תוקף' });
+    }
+    return res.status(401).json({ error: 'שגיאה באימות' });
+  }
 });
 
 // Admin Routes - User Management

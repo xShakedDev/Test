@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { isSessionExpired, handleSessionExpiration } from '../utils/auth';
+import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
 const CallerIdValidation = ({ token, onClose }) => {
   const [verifiedCallers, setVerifiedCallers] = useState([]);
@@ -15,6 +15,7 @@ const CallerIdValidation = ({ token, onClose }) => {
   const [validationResult, setValidationResult] = useState(null);
   const [validationStatus, setValidationStatus] = useState(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   useEffect(() => {
     fetchVerifiedCallers();
@@ -30,12 +31,7 @@ const CallerIdValidation = ({ token, onClose }) => {
 
   const fetchVerifiedCallers = async () => {
     try {
-      const response = await fetch('/api/twilio/verified-callers', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await authenticatedFetch('/api/twilio/verified-callers');
 
       if (response.ok) {
         const data = await response.json();
@@ -87,11 +83,10 @@ const CallerIdValidation = ({ token, onClose }) => {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/twilio/validate-phone', {
+      const response = await authenticatedFetch('/api/twilio/validate-phone', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(validationData)
       });
@@ -150,12 +145,7 @@ const CallerIdValidation = ({ token, onClose }) => {
       setIsCheckingStatus(true);
       
       // Refresh the verified callers list to see if the phone number was verified
-      const response = await fetch('/api/twilio/verified-callers', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await authenticatedFetch('/api/twilio/verified-callers');
 
       if (response.ok) {
         const data = await response.json();
@@ -242,6 +232,23 @@ const CallerIdValidation = ({ token, onClose }) => {
   // Remove the automatic timer for validation result
   // The user will manually close it when they're done
 
+  // Check notification settings
+  useEffect(() => {
+    const checkNotificationSettings = async () => {
+      try {
+        const response = await authenticatedFetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          setNotificationsEnabled(data.settings?.enableNotifications || false);
+        }
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
+      }
+    };
+    
+    checkNotificationSettings();
+  }, []);
+
   if (isLoading) {
     return (
       <div className="modal-overlay">
@@ -269,16 +276,16 @@ const CallerIdValidation = ({ token, onClose }) => {
             מספרים חדשים דורשים אימות לפני שימוש.
           </p>
 
-          {/* Error Message */}
-          {error && (
+          {/* Error Message - Only show if notifications are disabled */}
+          {error && !notificationsEnabled && (
             <div className="error-message">
               <span>{error}</span>
               <button onClick={() => setError('')}>✕</button>
             </div>
           )}
 
-          {/* Success Message */}
-          {successMessage && (
+          {/* Success Message - Only show if notifications are disabled */}
+          {successMessage && !notificationsEnabled && (
             <div className="success-message">
               <span>{successMessage}</span>
               <button onClick={() => setSuccessMessage('')}>✕</button>

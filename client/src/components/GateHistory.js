@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { isSessionExpired, handleSessionExpiration } from '../utils/auth';
+import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
 const GateHistory = ({ user, token }) => {
   const [history, setHistory] = useState([]);
@@ -41,11 +41,7 @@ const GateHistory = ({ user, token }) => {
 
   const fetchGates = async () => {
     try {
-      const response = await fetch('/api/gates', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/gates');
       
       if (response.ok) {
         const data = await response.json();
@@ -58,11 +54,7 @@ const GateHistory = ({ user, token }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/auth/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/auth/users');
       
       if (response.ok) {
         const usersList = await response.json();
@@ -87,11 +79,7 @@ const GateHistory = ({ user, token }) => {
         url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
       }
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch(url);
 
       if (response.ok) {
         const data = await response.json();
@@ -151,11 +139,10 @@ const GateHistory = ({ user, token }) => {
     console.log('Selected logs sample:', selectedLogs.slice(0, 3));
 
     try {
-      const response = await fetch('/api/gates/history/bulk-delete', {
+      const response = await authenticatedFetch('/api/gates/history/bulk-delete', {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ logIds: selectedLogs })
       });
@@ -206,11 +193,8 @@ const GateHistory = ({ user, token }) => {
     }
 
     try {
-      const response = await fetch('/api/gates/history/delete-all', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await authenticatedFetch('/api/gates/history/delete-all', {
+        method: 'DELETE'
       });
 
       if (response.ok) {

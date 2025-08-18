@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { authenticatedFetch } from '../utils/auth';
 
 const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
   const [formData, setFormData] = useState({
@@ -9,6 +10,28 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  // Refs for scrolling to messages
+  const errorRef = useRef(null);
+  const successRef = useRef(null);
+
+  // Check notification settings
+  useEffect(() => {
+    const checkNotificationSettings = async () => {
+      try {
+        const response = await authenticatedFetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          setNotificationsEnabled(data.settings?.enableNotifications || false);
+        }
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
+      }
+    };
+    
+    checkNotificationSettings();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -47,11 +70,10 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
     setSuccessMessage('');
 
     try {
-      const response = await fetch('/api/auth/change-password', {
+      const response = await authenticatedFetch('/api/auth/change-password', {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           currentPassword: formData.currentPassword,
@@ -130,15 +152,17 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="modal-form">
-          {error && (
-            <div className="error-message">
+          {error && !notificationsEnabled && (
+            <div className="error-message" ref={errorRef}>
               <span>{error}</span>
+              <button onClick={() => setError('')}>✕</button>
             </div>
           )}
 
-          {successMessage && (
-            <div className="success-message">
+          {successMessage && !notificationsEnabled && (
+            <div className="success-message" ref={successRef}>
               <span>{successMessage}</span>
+              <button onClick={() => setSuccessMessage('')}>✕</button>
             </div>
           )}
 

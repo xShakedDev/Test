@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import GateHistory from './GateHistory';
 import CallerIdValidation from './CallerIdValidation';
-import { isSessionExpired, handleSessionExpiration } from '../utils/auth';
+import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
 const GateDashboard = ({ user, token }) => {
   const [gates, setGates] = useState([]);
@@ -21,18 +21,29 @@ const GateDashboard = ({ user, token }) => {
   });
   const [verifiedCallers, setVerifiedCallers] = useState([]);
   const [cooldowns, setCooldowns] = useState({});
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [selectedGate, setSelectedGate] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Refs for scrolling to errors
   const errorRef = useRef(null);
   const successRef = useRef(null);
 
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const fetchGates = useCallback(async () => {
     try {
-      const response = await fetch('/api/gates', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/gates');
       
       if (response.ok) {
         const data = await response.json();
@@ -53,15 +64,11 @@ const GateDashboard = ({ user, token }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, []);
 
   const fetchVerifiedCallers = useCallback(async () => {
     try {
-      const response = await fetch('/api/twilio/verified-callers', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await authenticatedFetch('/api/twilio/verified-callers');
       
       if (response.ok) {
         const data = await response.json();
@@ -73,7 +80,7 @@ const GateDashboard = ({ user, token }) => {
     } catch (error) {
       console.error('Error fetching verified callers:', error);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchGates();
@@ -88,7 +95,7 @@ const GateDashboard = ({ user, token }) => {
     
     const setupAutoRefresh = async () => {
       try {
-        const response = await fetch('/api/settings/current');
+        const response = await authenticatedFetch('/api/settings/current');
         if (response.ok) {
           const data = await response.json();
           const { autoRefreshInterval } = data.settings;
@@ -146,7 +153,7 @@ const GateDashboard = ({ user, token }) => {
     const calculateCooldowns = async () => {
       try {
         // Get cooldown setting from admin settings
-        const response = await fetch('/api/settings/current');
+        const response = await authenticatedFetch('/api/settings/current');
         if (response.ok) {
           const data = await response.json();
           const { gateCooldownSeconds } = data.settings;
@@ -199,6 +206,22 @@ const GateDashboard = ({ user, token }) => {
     };
   }, [gates]);
 
+  // Check notification settings
+  useEffect(() => {
+    const checkNotificationSettings = async () => {
+      try {
+        const response = await authenticatedFetch('/api/settings/current');
+        if (response.ok) {
+          const data = await response.json();
+          setNotificationsEnabled(data.settings?.enableNotifications || false);
+        }
+      } catch (error) {
+        console.error('Error fetching notification settings:', error);
+      }
+    };
+    
+    checkNotificationSettings();
+  }, []);
 
 
   const handleOpenGateClick = (gate) => {
@@ -214,14 +237,23 @@ const GateDashboard = ({ user, token }) => {
     }
   };
 
+  const handleGateSelect = (gate) => {
+    if (isMobile) {
+      setSelectedGate(gate);
+    }
+  };
+
+  const handleBackToGates = () => {
+    setSelectedGate(null);
+  };
+
   const handleOpenGate = async (gate, password = '') => {
     try {
       setIsSubmitting(true);
-      const response = await fetch(`/api/gates/${gate.id}/open`, {
+      const response = await authenticatedFetch(`/api/gates/${gate.id}/open`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ password })
       });
@@ -321,11 +353,10 @@ const GateDashboard = ({ user, token }) => {
       
       const method = editingGate ? 'PUT' : 'POST';
       
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(newGateData)
       });
@@ -401,11 +432,8 @@ const GateDashboard = ({ user, token }) => {
     }
 
     try {
-      const response = await fetch(`/api/gates/${gateId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await authenticatedFetch(`/api/gates/${gateId}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
@@ -487,8 +515,6 @@ const GateDashboard = ({ user, token }) => {
                 <span>הוסף שער חדש</span>
               </button>
               
-
-              
               <button
                 onClick={() => setShowCallerIdValidation(true)}
                 className="btn btn-secondary"
@@ -503,16 +529,16 @@ const GateDashboard = ({ user, token }) => {
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
+      {/* Error Message - Only show if notifications are disabled */}
+      {error && !notificationsEnabled && (
         <div className="error-message" ref={errorRef}>
           <span>{error}</span>
           <button onClick={() => setError('')}>✕</button>
         </div>
       )}
 
-      {/* Success Message */}
-      {successMessage && (
+      {/* Success Message - Only show if notifications are disabled */}
+      {successMessage && !notificationsEnabled && (
         <div className="success-message" ref={successRef}>
           <span>{successMessage}</span>
           <button onClick={() => setSuccessMessage('')}>✕</button>
@@ -610,8 +636,110 @@ const GateDashboard = ({ user, token }) => {
         </div>
       )}
 
+      {/* Mobile: Show selected gate details */}
+      {isMobile && selectedGate && (
+        <div className="mobile-gate-detail">
+          <div className="mobile-gate-header">
+            <button onClick={handleBackToGates} className="btn btn-secondary btn-back">
+              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              חזור לשערים
+            </button>
+            <h2>{selectedGate.name}</h2>
+          </div>
+          
+          <div className="mobile-gate-content">
+            <div className="gate-info">
+              <p><strong>מספר טלפון:</strong> {selectedGate.phoneNumber}</p>
+              <p><strong>הגנה:</strong> {selectedGate.password ? 'מוגן' : 'לא מוגן'}</p>
+            </div>
+
+            <div className="gate-authorized">
+              <h4>
+                <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                מספר מורשה לפתיחה
+              </h4>
+              <div className="authorized-numbers">
+                <span className="authorized-number">
+                  {user?.role === 'admin'
+                    ? selectedGate.authorizedNumber
+                    : '***********'}
+                </span>
+              </div>
+              <p className="password-notice">
+                {selectedGate.password 
+                  ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
+                  : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
+                }
+              </p>
+            </div>
+
+            <div className="gate-actions">
+              <div className="gate-open-section">
+                {/* Cooldown indicator */}
+                {cooldowns[selectedGate.id] && (
+                  <div className="cooldown-indicator">
+                    <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>השער נפתח לאחרונה - נסה שוב בעוד {cooldowns[selectedGate.id]} שניות</span>
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => handleOpenGateClick(selectedGate)}
+                  disabled={isSubmitting || cooldowns[selectedGate.id]}
+                  className={`btn ${cooldowns[selectedGate.id] ? 'btn-secondary cooldown' : 'btn-primary'} gate-open-btn`}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="loading-spinner-small"></div>
+                      <span>פותח...</span>
+                    </>
+                  ) : cooldowns[selectedGate.id] ? (
+                    <>
+                      <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>נסה שוב בעוד {cooldowns[selectedGate.id]} שניות</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                      <span>פתח שער</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {user?.role === 'admin' && (
+              <div className="mobile-admin-actions">
+                <button
+                  onClick={() => handleEdit(selectedGate)}
+                  className="btn btn-secondary"
+                >
+                  ערוך שער
+                </button>
+                <button
+                  onClick={() => handleDelete(selectedGate.id, selectedGate.name)}
+                  className="btn btn-danger"
+                >
+                  מחק שער
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* No Gates State */}
-      {!showAddGate && gates.length === 0 && (
+      {!showAddGate && !selectedGate && gates.length === 0 && (
         <div className="no-gates">
           <div className="no-gates-icon">🚪</div>
           <h3>אין שערים במערכת</h3>
@@ -635,100 +763,138 @@ const GateDashboard = ({ user, token }) => {
         </div>
       )}
 
-      {/* Gates Grid */}
-      {!showAddGate && gates.length > 0 && (
-        <div className="gates-grid">
+      {/* Gates Grid - Show compact cards on mobile, full cards on desktop */}
+      {!showAddGate && !selectedGate && gates.length > 0 && (
+        <div className={`gates-grid ${isMobile ? 'gates-grid-mobile' : ''}`}>
           {gates.map(gate => (
-            <div key={gate.id} className="gate-card">
-              <div className="gate-header">
-                <h3>{gate.name}</h3>
-                <div className="gate-actions-header">
-                  {user?.role === 'admin' && (
-                    <>
-                      <button
-                        onClick={() => handleEdit(gate)}
-                        className="btn btn-small"
-                      >
-                        ערוך
-                      </button>
-                      <button
-                        onClick={() => handleDelete(gate.id, gate.name)}
-                        className="btn btn-danger btn-small"
-                      >
-                        מחק
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="gate-info">
-                <p><strong>מספר טלפון:</strong> {gate.phoneNumber}</p>
-                <p><strong>הגנה:</strong> {gate.password ? 'מוגן' : 'לא מוגן'}</p>
-              </div>
-
-              <div className="gate-authorized">
-                <h4>
-                  <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  מספר מורשה לפתיחה
-                </h4>
-                <div className="authorized-numbers">
-                  <span className="authorized-number">
-                    {user?.role === 'admin'
-                      ? gate.authorizedNumber
-                      : '***********'}
-                  </span>
-                </div>
-                <p className="password-notice">
-                  {gate.password 
-                    ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
-                    : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
-                  }
-                </p>
-              </div>
-
-              <div className="gate-actions">
-                <div className="gate-open-section">
-                  {/* Cooldown indicator */}
-                  {cooldowns[gate.id] && (
-                    <div className="cooldown-indicator">
-                      <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>השער נפתח לאחרונה - נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
-                    </div>
-                  )}
-                  
-                  <button
-                    onClick={() => handleOpenGateClick(gate)}
-                    disabled={isSubmitting || cooldowns[gate.id]}
-                    className={`btn ${cooldowns[gate.id] ? 'btn-secondary cooldown' : 'btn-primary'} gate-open-btn`}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="loading-spinner-small"></div>
-                        <span>פותח...</span>
-                      </>
-                    ) : cooldowns[gate.id] ? (
-                      <>
-                        <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
-                      </>
+            <div 
+              key={gate.id} 
+              className={`gate-card ${isMobile ? 'gate-card-mobile' : ''}`}
+              onClick={() => handleGateSelect(gate)}
+            >
+              {isMobile ? (
+                // Mobile: Compact card with just gate name
+                <div className="gate-card-mobile-content">
+                  <h3>{gate.name}</h3>
+                  <div className="gate-status">
+                    {gate.password ? (
+                      <span className="status-protected">🔒 מוגן</span>
                     ) : (
-                      <>
-                        <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                        <span>פתח שער</span>
-                      </>
+                      <span className="status-unprotected">🔓 לא מוגן</span>
                     )}
-                  </button>
+                    {cooldowns[gate.id] && (
+                      <span className="status-cooldown">⏰ {cooldowns[gate.id]}s</span>
+                    )}
+                  </div>
+                  <div className="gate-arrow">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                // Desktop: Full card with all details
+                <>
+                  <div className="gate-header">
+                    <h3>{gate.name}</h3>
+                    <div className="gate-actions-header">
+                      {user?.role === 'admin' && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(gate);
+                            }}
+                            className="btn btn-small"
+                          >
+                            ערוך
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(gate.id, gate.name);
+                            }}
+                            className="btn btn-danger btn-small"
+                          >
+                            מחק
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="gate-info">
+                    <p><strong>מספר טלפון:</strong> {gate.phoneNumber}</p>
+                    <p><strong>הגנה:</strong> {gate.password ? 'מוגן' : 'לא מוגן'}</p>
+                  </div>
+
+                  <div className="gate-authorized">
+                    <h4>
+                      <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      מספר מורשה לפתיחה
+                    </h4>
+                    <div className="authorized-numbers">
+                      <span className="authorized-number">
+                        {user?.role === 'admin'
+                          ? gate.authorizedNumber
+                          : '***********'}
+                      </span>
+                    </div>
+                    <p className="password-notice">
+                      {gate.password 
+                        ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
+                        : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
+                      }
+                    </p>
+                  </div>
+
+                  <div className="gate-actions">
+                    <div className="gate-open-section">
+                      {/* Cooldown indicator */}
+                      {cooldowns[gate.id] && (
+                        <div className="cooldown-indicator">
+                          <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>השער נפתח לאחרונה - נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenGateClick(gate);
+                        }}
+                        disabled={isSubmitting || cooldowns[gate.id]}
+                        className={`btn ${cooldowns[gate.id] ? 'btn-secondary cooldown' : 'btn-primary'} gate-open-btn`}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="loading-spinner-small"></div>
+                            <span>פותח...</span>
+                          </>
+                        ) : cooldowns[gate.id] ? (
+                          <>
+                            <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            <span>פתח שער</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -749,8 +915,6 @@ const GateDashboard = ({ user, token }) => {
           onClose={() => setShowCallerIdValidation(false)}
         />
       )}
-
-
     </div>
   );
 };

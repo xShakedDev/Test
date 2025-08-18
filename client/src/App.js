@@ -5,7 +5,7 @@ import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
-import { isSessionExpired } from './utils/auth';
+import { isSessionExpired, authenticatedFetch } from './utils/auth';
 import './App.css';
 
 function App() {
@@ -26,13 +26,14 @@ function App() {
     setToken(null);
     setCurrentView('gates');
     localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
   }, []);
 
   // Check maintenance status
   const checkMaintenanceStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/settings/maintenance');
+      const response = await authenticatedFetch('/api/settings/maintenance');
       if (response.ok) {
         const data = await response.json();
         setMaintenanceMode(data.inMaintenance);
@@ -45,7 +46,7 @@ function App() {
 
   const verifyToken = useCallback(async (tokenToVerify, userData) => {
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await authenticatedFetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${tokenToVerify}`
         }
@@ -78,9 +79,11 @@ function App() {
     }
   }, [handleLogout]);
 
-  const handleLogin = (userData, userToken) => {
+  const handleLogin = (userData, tokens) => {
     setUser(userData);
-    setToken(userToken);
+    setToken(tokens.accessToken);
+    // Store refresh token in localStorage
+    localStorage.setItem('refreshToken', tokens.refreshToken);
     setCurrentView('gates'); // Default to gates view after login
   };
 
@@ -111,6 +114,38 @@ function App() {
     
     setIsLoading(false);
   }, [verifyToken, handleLogout, checkMaintenanceStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refresh token every hour
+  useEffect(() => {
+    if (!token) return;
+    
+    const refreshInterval = setInterval(async () => {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          const response = await authenticatedFetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refreshToken }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setToken(data.accessToken);
+            localStorage.setItem('authToken', data.accessToken);
+            localStorage.setItem('refreshToken', data.refreshToken);
+            console.log('Token refreshed automatically');
+          }
+        }
+      } catch (error) {
+        console.error('Auto-refresh failed:', error);
+      }
+    }, 60 * 60 * 1000); // Every hour
+    
+    return () => clearInterval(refreshInterval);
+  }, [token]);
 
   // Show loading spinner during initial authentication check
   if (isLoading) {
