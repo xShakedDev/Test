@@ -315,7 +315,11 @@ const AdminSettings = ({ user, token }) => {
                   checked={settings.enableNotifications}
                   onChange={handleInputChange}
                   className="form-checkbox"
+                  id="enableNotifications"
                 />
+                <label htmlFor="enableNotifications" className="checkbox-label-mobile">
+                  <span className="checkbox-visual"></span>
+                </label>
               </div>
               <small className="form-help">
                 הצג התראות על פעולות חשובות במערכת
@@ -335,7 +339,11 @@ const AdminSettings = ({ user, token }) => {
                   checked={settings.systemMaintenance}
                   onChange={handleInputChange}
                   className="form-checkbox"
+                  id="systemMaintenance"
                 />
+                <label htmlFor="systemMaintenance" className="checkbox-label-mobile">
+                  <span className="checkbox-visual"></span>
+                </label>
               </div>
               <small className="form-help">
                 הפעל מצב תחזוקה למערכת
