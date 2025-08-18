@@ -51,10 +51,13 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
     if (req.user.role === 'admin') {
       gates = await Gate.findActive().sort({ createdAt: -1 });
     } else {
+      console.log('User authorized gates:', req.user.authorizedGates);
+      console.log('User role:', req.user.role);
       gates = await Gate.find({ 
-        _id: { $in: req.user.authorizedGates }, 
+        id: { $in: req.user.authorizedGates }, 
         isActive: true 
       }).sort({ createdAt: -1 });
+      console.log('Found gates for user:', gates.length);
     }
     
     res.json({ 
