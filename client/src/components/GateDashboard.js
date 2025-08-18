@@ -519,10 +519,9 @@ const GateDashboard = ({ user, token }) => {
                 </h4>
                 <div className="authorized-numbers">
                   <span className="authorized-number">
-                    {user?.role === 'admin' 
-                      ? gate.authorizedNumber 
-                      : gate.authorizedNumber.replace(/\d/g, '*')
-                    }
+                    {user?.role === 'admin'
+                      ? gate.authorizedNumber
+                      : '***********'}
                   </span>
                 </div>
                 <p className="password-notice">
