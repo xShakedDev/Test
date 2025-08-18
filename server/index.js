@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Load environment variables from .env
-require('dotenv').config({ path: '.env' });
+require('dotenv').config({ path: 'test.env' });
 
 // MongoDB integration
 const { connectDB, isConnected, getConnectionStatus } = require('./config/database');
@@ -112,14 +112,14 @@ const initializeServer = async () => {
 
     // Choose which routes to use based on MongoDB connection
     if (USE_MONGODB && isConnected()) {
-      console.log('📊 Using MongoDB for data storage');
+      console.log('Using MongoDB for data storage');
       app.use('/api', mongoRoutes);
       // Add user authentication routes (only available with MongoDB)
       app.use('/api/auth', userAuthRoutes);
     } else {
-      console.log('📁 Using file-based storage (JSON)');
+      console.log('Using file-based storage (JSON)');
       if (USE_MONGODB && !mongoConnection) {
-        console.warn('⚠️  MongoDB requested but connection failed, using file storage');
+        console.warn('MongoDB requested but connection failed, using file storage');
       }
       app.use('/api', gateRoutes);
     }
@@ -173,31 +173,29 @@ const initializeServer = async () => {
 
     // Start the server
     const server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`Server running on port ${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`   Storage: ${USE_MONGODB && isConnected() ? 'MongoDB' : 'File-based'}`);
     });
 
     // Graceful shutdown
     process.on('SIGINT', () => {
-      console.log('\n⏹️  Shutting down server...');
+      console.log('\nShutting down server...');
       server.close(() => {
-        console.log('✅ Server closed');
         process.exit(0);
       });
     });
 
     process.on('SIGTERM', () => {
-      console.log('\n⏹️  Shutting down server...');
+      console.log('\nShutting down server...');
       server.close(() => {
-        console.log('✅ Server closed');
         process.exit(0);
       });
     });
 
     return server;
   } catch (error) {
-    console.error('❌ Failed to initialize server:', error);
+    console.error('Failed to initialize server:', error);
     process.exit(1);
   }
 };

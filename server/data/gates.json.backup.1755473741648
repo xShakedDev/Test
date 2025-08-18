@@ -1,0 +1,18 @@
+{
+  "1": {
+    "id": "1",
+    "name": "שער סירקין שטח",
+    "phoneNumber": "+972505364453",
+    "authorizedNumber": "+972548827828",
+    "lastOpenedAt": "2025-08-16T20:48:43.769Z",
+    "password": null
+  },
+  "2": {
+    "id": "2",
+    "name": "שער סירקין ראשי",
+    "phoneNumber": "+972509127873",
+    "authorizedNumber": "+972548827828",
+    "lastOpenedAt": "2025-08-16T20:00:05.487Z",
+    "password": null
+  }
+}

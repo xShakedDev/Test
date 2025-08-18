@@ -29,12 +29,18 @@ const Login = ({ onLogin, isLoading }) => {
     setError('');
 
     try {
+      // Convert username to lowercase to ignore case sensitivity
+      const loginData = {
+        ...formData,
+        username: formData.username.toLowerCase().trim()
+      };
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(loginData)
       });
 
       const data = await response.json();

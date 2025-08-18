@@ -34,7 +34,7 @@ const loadSessions = () => {
         }
       }
       
-      console.log(`Loaded ${Object.keys(validSessions).length} valid sessions, cleaned up ${expiredCount} expired sessions`);
+
       return validSessions;
     }
   } catch (error) {
@@ -47,7 +47,7 @@ const loadSessions = () => {
 const saveSessions = (sessions) => {
   try {
     fs.writeFileSync(sessionsFilePath, JSON.stringify(sessions, null, 2));
-    console.log(`Saved ${Object.keys(sessions).length} sessions to file`);
+
   } catch (error) {
     console.error('Error saving sessions:', error);
   }
@@ -80,59 +80,35 @@ const generateSessionToken = () => {
 
 // Middleware to verify session token
 const authenticateToken = async (req, res, next) => {
-  console.log('🔐 authenticateToken middleware called:', {
-    url: req.url,
-    method: req.method,
-    hasAuthHeader: !!req.headers['authorization'],
-    authHeaderType: req.headers['authorization'] ? req.headers['authorization'].split(' ')[0] : 'None'
-  });
-  
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
-    console.log('❌ No token provided');
     return res.status(401).json({ error: 'נדרש טוקן גישה' });
   }
 
   try {
-    console.log('🔍 Checking token:', {
-      tokenLength: token.length,
-      tokenStart: token.substring(0, 10) + '...',
-      activeSessionsCount: Object.keys(activeSessions).length
-    });
-    
     const sessionData = activeSessions[token];
     
     if (!sessionData) {
-      console.log(`❌ Session not found for token: ${token.substring(0, 10)}...`);
       return res.status(401).json({ error: 'סשן לא תקף או פג תוקף' });
     }
 
     // Check if session is expired (24 hours)
     if (Date.now() - sessionData.createdAt > 24 * 60 * 60 * 1000) {
-      console.log(`Session expired for user: ${sessionData.username}`);
       delete activeSessions[token];
       saveSessions(activeSessions);
       return res.status(401).json({ error: 'סשן פג תוקף' });
     }
-
-    console.log('🔍 Looking up user:', {
-      userId: sessionData.userId,
-      username: sessionData.username,
-      role: sessionData.role
-    });
     
     const user = await User.findById(sessionData.userId).populate('authorizedGates');
     
     if (!user || !user.isActive) {
-      console.log(`❌ User not found or inactive: ${sessionData.username}`);
       delete activeSessions[token];
       saveSessions(activeSessions);
       return res.status(401).json({ error: 'משתמש לא תקף' });
     }
 
-    console.log(`✅ Authenticated user: ${user.username} (${user.role})`);
     req.user = user;
     next();
   } catch (error) {
@@ -143,19 +119,10 @@ const authenticateToken = async (req, res, next) => {
 
 // Middleware to verify admin role
 const requireAdmin = (req, res, next) => {
-  console.log('requireAdmin middleware check:', {
-    userId: req.user._id,
-    username: req.user.username,
-    role: req.user.role,
-    isAdmin: req.user.role === 'admin'
-  });
-  
   if (req.user.role !== 'admin') {
-    console.log('Access denied - user is not admin');
     return res.status(403).json({ error: 'נדרשת הרשאת מנהל' });
   }
   
-  console.log('Access granted - user is admin');
   next();
 };
 
@@ -197,7 +164,7 @@ router.post('/login', async (req, res) => {
     };
     saveSessions(activeSessions);
     
-    console.log(`User logged in: ${user.username} (${user.role}) - Session created`);
+
 
     res.json({
       message: 'התחברות הצליחה',
@@ -207,9 +174,10 @@ router.post('/login', async (req, res) => {
         username: user.username,
         name: user.name,
         role: user.role,
-        authorizedGates: user.authorizedGates ? user.authorizedGates.map(gate => 
-          typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString()
-        ) : []
+        authorizedGates: user.authorizedGates && user.authorizedGates.length > 0 ? user.authorizedGates.map(gateId => ({
+          id: gateId,
+          name: `שער ${gateId}`
+        })) : []
       }
     });
 
@@ -228,9 +196,10 @@ router.get('/me', authenticateToken, async (req, res) => {
         username: req.user.username,
         name: req.user.name,
         role: req.user.role,
-        authorizedGates: req.user.authorizedGates ? req.user.authorizedGates.map(gate => 
-          typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString()
-        ) : []
+        authorizedGates: req.user.authorizedGates && req.user.authorizedGates.length > 0 ? req.user.authorizedGates.map(gateId => ({
+          id: gateId,
+          name: `שער ${gateId}`
+        })) : []
       }
     });
   } catch (error) {
@@ -257,17 +226,29 @@ router.post('/logout', (req, res) => {
 // Get all users (admin only)
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await User.find({}).populate('authorizedGates').sort({ createdAt: -1 });
+    const users = await User.find({}).sort({ createdAt: -1 });
+    
+    // Get all gates to map IDs to names
+    const allGates = await Gate.find({ isActive: true });
+    const gateMap = {};
+    allGates.forEach(gate => {
+      gateMap[gate.id] = gate.name;
+    });
     
     // Convert users to plain objects and ensure consistent ID handling
     const usersWithStringIds = users.map(user => {
       const userObj = user.toJSON();
-      // Convert authorizedGates ObjectIds to strings
-      if (userObj.authorizedGates) {
-        userObj.authorizedGates = userObj.authorizedGates.map(gate => 
-          typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString()
-        );
+      
+      // Handle authorizedGates - show both ID and real name for better display
+      if (userObj.authorizedGates && userObj.authorizedGates.length > 0) {
+        userObj.authorizedGates = userObj.authorizedGates.map(gateId => ({
+          id: gateId,
+          name: gateMap[gateId] || `שער ${gateId}`
+        }));
+      } else {
+        userObj.authorizedGates = [];
       }
+      
       return userObj;
     });
     
@@ -293,10 +274,23 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'שם המשתמש כבר קיים' });
     }
 
-    // Validate authorized gates exist
+    // Clean and validate authorized gates - handle both object format {id, name} and direct IDs
+    let cleanAuthorizedGates = [];
     if (authorizedGates.length > 0) {
-      const validGates = await Gate.find({ _id: { $in: authorizedGates } });
-      if (validGates.length !== authorizedGates.length) {
+      cleanAuthorizedGates = authorizedGates.map(gateId => {
+        if (typeof gateId === 'object') {
+          // Handle {id, name} format from client
+          if (gateId.id) {
+            return parseInt(gateId.id);
+          }
+        }
+        // Handle direct string/ID
+        return parseInt(gateId);
+      });
+      
+      // Validate gates exist
+      const validGates = await Gate.find({ id: { $in: cleanAuthorizedGates } });
+      if (validGates.length !== cleanAuthorizedGates.length) {
         return res.status(400).json({ error: 'אחד או יותר מהשערים שנבחרו לא קיימים' });
       }
     }
@@ -306,18 +300,27 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
       password,
       name: name.trim(),
       role,
-      authorizedGates
+      authorizedGates: cleanAuthorizedGates
     });
 
     await newUser.save();
-    await newUser.populate('authorizedGates');
 
     // Convert to plain object and ensure consistent ID handling
     const userObj = newUser.toJSON();
-    if (userObj.authorizedGates) {
-      userObj.authorizedGates = userObj.authorizedGates.map(gate => 
-        typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString()
-      );
+    if (userObj.authorizedGates && userObj.authorizedGates.length > 0) {
+      // Get gate names for the response
+      const userGates = await Gate.find({ id: { $in: userObj.authorizedGates } });
+      const gateMap = {};
+      userGates.forEach(gate => {
+        gateMap[gate.id] = gate.name;
+      });
+      
+      userObj.authorizedGates = userObj.authorizedGates.map(gateId => ({
+        id: gateId,
+        name: gateMap[gateId] || `שער ${gateId}`
+      }));
+    } else {
+      userObj.authorizedGates = [];
     }
 
     res.status(201).json({
@@ -358,25 +361,46 @@ router.put('/users/:userId', authenticateToken, requireAdmin, async (req, res) =
     
     // Update authorized gates
     if (Array.isArray(authorizedGates)) {
+      // Clean and validate gate IDs - handle both object format {id, name} and direct IDs
+      const cleanGateIds = authorizedGates.map(gateId => {
+        if (typeof gateId === 'object') {
+          // Handle {id, name} format from client
+          if (gateId.id) {
+            return parseInt(gateId.id);
+          }
+        }
+        // Handle direct string/ID
+        return parseInt(gateId);
+      });
+      
       // Validate gates exist
-      if (authorizedGates.length > 0) {
-        const validGates = await Gate.find({ _id: { $in: authorizedGates } });
-        if (validGates.length !== authorizedGates.length) {
+      if (cleanGateIds.length > 0) {
+        const validGates = await Gate.find({ id: { $in: cleanGateIds } });
+        if (validGates.length !== cleanGateIds.length) {
           return res.status(400).json({ error: 'אחד או יותר מהשערים שנבחרו לא קיימים' });
         }
       }
-      user.authorizedGates = authorizedGates;
+      user.authorizedGates = cleanGateIds;
     }
 
     await user.save();
-    await user.populate('authorizedGates');
 
     // Convert to plain object and ensure consistent ID handling
     const userObj = user.toJSON();
-    if (userObj.authorizedGates) {
-      userObj.authorizedGates = userObj.authorizedGates.map(gate => 
-        typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString()
-      );
+    if (userObj.authorizedGates && userObj.authorizedGates.length > 0) {
+      // Get gate names for the response
+      const userGates = await Gate.find({ id: { $in: userObj.authorizedGates } });
+      const gateMap = {};
+      userGates.forEach(gate => {
+        gateMap[gate.id] = gate.name;
+      });
+      
+      userObj.authorizedGates = userObj.authorizedGates.map(gateId => ({
+        id: gateId,
+        name: gateMap[gateId] || `שער ${gateId}`
+      }));
+    } else {
+      userObj.authorizedGates = [];
     }
 
     res.json({

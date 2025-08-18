@@ -163,12 +163,28 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             {/* Logout button */}
             <button
               onClick={onLogout}
-              className="btn btn-secondary"
+              className="btn btn-secondary btn-header"
+              style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
               <span>התנתקות</span>
+            </button>
+
+            {/* Change Password button */}
+            <button
+              onClick={() => {
+                // For now, just show an alert. In the future, this could open a modal
+                alert('פונקציונליות שינוי סיסמה תתווסף בקרוב');
+              }}
+              className="btn btn-secondary btn-header"
+              style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
+            >
+              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              <span>שנה סיסמה</span>
             </button>
           </div>
         </div>
@@ -255,12 +271,28 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             {/* Mobile Logout Button */}
             <button
               onClick={onLogout}
-              className="btn btn-secondary mobile-logout-btn"
+              className="btn btn-secondary mobile-logout-btn btn-header"
+              style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
               <span>התנתקות</span>
+            </button>
+
+            {/* Mobile Change Password Button */}
+            <button
+              onClick={() => {
+                // For now, just show an alert. In the future, this could open a modal
+                alert('פונקציונליות שינוי סיסמה תתווסף בקרוב');
+              }}
+              className="btn btn-secondary mobile-logout-btn btn-header"
+              style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
+            >
+              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+              <span>שנה סיסמה</span>
             </button>
           </div>
 

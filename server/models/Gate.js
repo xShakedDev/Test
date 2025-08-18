@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const gateSchema = new mongoose.Schema({
+  id: {
+    type: Number,
+    required: true,
+    unique: true
+  },
   name: {
     type: String,
     required: true,
@@ -53,7 +58,7 @@ const gateSchema = new mongoose.Schema({
   timestamps: true, // adds createdAt and updatedAt automatically
   toJSON: {
     transform: function(doc, ret) {
-      ret.id = ret._id;
+      // Keep the numeric id, remove MongoDB-specific fields
       delete ret._id;
       delete ret.__v;
       return ret;
@@ -62,6 +67,7 @@ const gateSchema = new mongoose.Schema({
 });
 
 // Index for better query performance
+gateSchema.index({ id: 1 });
 gateSchema.index({ phoneNumber: 1 });
 gateSchema.index({ authorizedNumber: 1 });
 gateSchema.index({ isActive: 1 });
@@ -69,6 +75,18 @@ gateSchema.index({ isActive: 1 });
 // Static method to find active gates
 gateSchema.statics.findActive = function() {
   return this.find({ isActive: true });
+};
+
+// Static method to get next available ID
+gateSchema.statics.getNextId = async function() {
+  try {
+    // Find the gate with the highest ID
+    const lastGate = await this.findOne().sort({ id: -1 });
+    return lastGate ? lastGate.id + 1 : 1;
+  } catch (error) {
+    console.error('Error getting next ID:', error);
+    throw error;
+  }
 };
 
 // Instance method to mark as opened

@@ -73,14 +73,14 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     const { id } = req.params;
     const { password } = req.body;
     
-    const gate = await Gate.findById(id);
+    const gate = await Gate.findOne({ id: parseInt(id) });
     
     if (!gate || !gate.isActive) {
-      // Log failed gate opening attempt - gate not found
+        // Log failed gate opening attempt - gate not found
       try {
         await new GateHistory({
           userId: req.user._id,
-          gateId: req.params.id,
+          gateId: isNaN(parseInt(id, 10)) ? -1 : parseInt(id, 10),
           username: req.user.username,
           gateName: 'Unknown',
           success: false,
@@ -99,7 +99,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       try {
         await new GateHistory({
           userId: req.user._id,
-          gateId: gate._id,
+          gateId: gate.id,
           username: req.user.username,
           gateName: gate.name,
           success: false,
@@ -118,7 +118,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       try {
         await new GateHistory({
           userId: req.user._id,
-          gateId: gate._id,
+          gateId: gate.id,
           username: req.user.username,
           gateName: gate.name,
           success: false,
@@ -147,7 +147,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     // Log successful gate opening
     await new GateHistory({
       userId: req.user._id,
-      gateId: gate._id,
+      gateId: gate.id,
       username: req.user.username,
       gateName: gate.name,
       success: true,
@@ -168,7 +168,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     try {
       await new GateHistory({
         userId: req.user._id,
-        gateId: req.params.id,
+        gateId: isNaN(parseInt(req.params.id, 10)) ? -1 : parseInt(req.params.id, 10),
         username: req.user.username,
         gateName: gate?.name || 'Unknown',
         success: false,
@@ -198,7 +198,7 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
     const { id } = req.params;
     const { CallStatus, CallDuration } = req.body;
     
-    const gate = await Gate.findById(id);
+    const gate = await Gate.findOne({ id: parseInt(id) });
     
     if (gate) {
       await gate.updateCallStatus(CallStatus, CallDuration);
@@ -214,17 +214,46 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
 // Gate history endpoint (admin only) - MUST be before /gates/:id route
 router.get('/gates/history', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { limit = 100, gateId, userId } = req.query;
+    const { limit = 100, gateId, gateName, userId, username } = req.query;
     const limitNum = Math.min(parseInt(limit), 500); // Max 500 records
     
     let history;
-    if (gateId) {
-      history = await GateHistory.findByGate(gateId, limitNum);
-    } else if (userId) {
-      history = await GateHistory.findByUser(userId, limitNum);
-    } else {
-      history = await GateHistory.findAllHistory(limitNum);
-    }
+    if (gateName) {
+      history = await GateHistory.find({ gateName })
+        .sort({ timestamp: -1 })
+        .limit(limitNum)
+        .populate('userId', 'username name');
+    } else if (gateId) {
+      const numericGateId = parseInt(gateId, 10);
+      if (!isNaN(numericGateId)) {
+        history = await GateHistory.findByGate(numericGateId, limitNum);
+      } else {
+        // Backward compatibility: treat non-numeric gateId as gateName
+        history = await GateHistory.find({ gateName: gateId })
+          .sort({ timestamp: -1 })
+          .limit(limitNum)
+          .populate('userId', 'username name');
+              }
+      } else if (username) {
+        // Filter by username
+        history = await GateHistory.find({ username })
+          .sort({ timestamp: -1 })
+          .limit(limitNum)
+          .populate('userId', 'username name');
+      } else if (userId) {
+        // Check if userId is a valid ObjectId or if it's actually a username
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          history = await GateHistory.findByUser(userId, limitNum);
+        } else {
+          // If userId is not a valid ObjectId, treat it as username
+          history = await GateHistory.find({ username: userId })
+            .sort({ timestamp: -1 })
+            .limit(limitNum)
+            .populate('userId', 'username name');
+        }
+      } else {
+        history = await GateHistory.findAllHistory(limitNum);
+      }
     
     res.json({ 
       history,
@@ -240,7 +269,7 @@ router.get('/gates/history', requireMongoDB, authenticateToken, requireAdmin, as
 router.get('/gates/:id', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const gate = await Gate.findById(id);
+    const gate = await Gate.findOne({ id: parseInt(id) });
     
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
@@ -276,7 +305,11 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
       return res.status(409).json({ error: 'שער עם מספר טלפון זה כבר קיים' });
     }
     
+    // Get the next available numeric ID
+    const nextId = await Gate.getNextId();
+    
     const newGate = new Gate({
+      id: nextId,
       name,
       phoneNumber,
       authorizedNumber,
@@ -307,7 +340,7 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
     const { id } = req.params;
     const { name, phoneNumber, authorizedNumber, password } = req.body;
     
-    const gate = await Gate.findById(id);
+    const gate = await Gate.findOne({ id: parseInt(id) });
     
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
@@ -318,11 +351,11 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
       const existingGate = await Gate.findOne({ 
         phoneNumber, 
         isActive: true,
-        _id: { $ne: id }
+        id: { $ne: parseInt(id) }
       });
       if (existingGate) {
         return res.status(409).json({ error: 'שער אחר עם מספר טלפון זה כבר קיים' });
-      }
+    }
     }
     
     // Update fields
@@ -355,7 +388,7 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
 router.delete('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const gate = await Gate.findById(id);
+    const gate = await Gate.findOne({ id: parseInt(id) });
     
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
@@ -403,33 +436,10 @@ router.get('/database/status', async (req, res) => {
 });
 
 // Existing Twilio routes remain the same
-router.get('/twilio/balance', (req, res, next) => {
-  console.log('🔍 Twilio balance request received:', {
-    url: req.url,
-    method: req.method,
-    headers: {
-      authorization: req.headers.authorization ? 'Bearer ***' : 'None',
-      'content-type': req.headers['content-type']
-    },
-    timestamp: new Date().toISOString()
-  });
-  next();
-}, authenticateToken, requireAdmin, async (req, res) => {
+router.get('/twilio/balance', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    console.log('Twilio balance request from user:', {
-      userId: req.user._id,
-      username: req.user.username,
-      role: req.user.role,
-      isAdmin: req.user.role === 'admin'
-    });
-    
     const client = getTwilioClient();
     const balanceData = await client.balance.fetch();
-    
-    console.log('Twilio balance fetched successfully:', {
-      balance: balanceData.balance,
-      currency: balanceData.currency
-    });
     
     res.json({ 
       balance: balanceData.balance,

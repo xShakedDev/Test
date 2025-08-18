@@ -7,8 +7,7 @@ const gateHistorySchema = new mongoose.Schema({
     required: true
   },
   gateId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Gate',
+    type: Number,
     required: true
   },
   username: {
@@ -50,6 +49,8 @@ const gateHistorySchema = new mongoose.Schema({
 // Indexes for better query performance
 gateHistorySchema.index({ userId: 1, timestamp: -1 });
 gateHistorySchema.index({ gateId: 1, timestamp: -1 });
+gateHistorySchema.index({ gateName: 1, timestamp: -1 });
+gateHistorySchema.index({ username: 1, timestamp: -1 });
 gateHistorySchema.index({ timestamp: -1 });
 gateHistorySchema.index({ success: 1 });
 
@@ -66,7 +67,7 @@ gateHistorySchema.statics.findByUser = function(userId, limit = 100) {
   return this.find({ userId })
     .sort({ timestamp: -1 })
     .limit(limit)
-    .populate('gateId', 'name phoneNumber');
+    .populate('userId', 'username name');
 };
 
 // Static method to find all history (for admins)
@@ -74,8 +75,7 @@ gateHistorySchema.statics.findAllHistory = function(limit = 100) {
   return this.find({})
     .sort({ timestamp: -1 })
     .limit(limit)
-    .populate('userId', 'username name')
-    .populate('gateId', 'name phoneNumber');
+    .populate('userId', 'username name');
 };
 
 const GateHistory = mongoose.model('GateHistory', gateHistorySchema);

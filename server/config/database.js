@@ -41,7 +41,7 @@ const connectDB = async () => {
     
     // In development, continue without MongoDB for now
     if (process.env.NODE_ENV === 'development') {
-      console.warn('⚠️  Running without MongoDB in development mode');
+      console.warn('Running without MongoDB in development mode');
       console.warn('   Install MongoDB or set MONGODB_URI environment variable');
       return null;
     }

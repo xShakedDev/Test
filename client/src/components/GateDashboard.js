@@ -19,6 +19,7 @@ const GateDashboard = ({ user, token }) => {
     authorizedNumber: '',
     password: ''
   });
+  const [verifiedCallers, setVerifiedCallers] = useState([]);
   const [cooldowns, setCooldowns] = useState({});
   
   // Refs for scrolling to errors
@@ -54,9 +55,32 @@ const GateDashboard = ({ user, token }) => {
     }
   }, [token]);
 
+  const fetchVerifiedCallers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/twilio/verified-callers', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setVerifiedCallers(data.callerIds || []);
+      } else {
+        const errorData = await response.json();
+        console.error('Error fetching verified callers:', errorData);
+      }
+    } catch (error) {
+      console.error('Error fetching verified callers:', error);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchGates();
-  }, [fetchGates]);
+    if (user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  }, [fetchGates, fetchVerifiedCallers, user]);
 
   // Clear messages after 3 seconds
   useEffect(() => {
@@ -195,8 +219,8 @@ const GateDashboard = ({ user, token }) => {
 
       if (response.ok) {
         setSuccessMessage(editingGate 
-          ? `שער "${newGateData.name}" עודכן בהצלחה` 
-          : `שער "${newGateData.name}" נוסף בהצלחה`
+          ? `שער "${newGateData.name}" עודכן בהצלחה!` 
+          : `שער "${newGateData.name}" נוסף בהצלחה!`
         );
         scrollToMessage('success');
         setShowAddGate(false);
@@ -245,7 +269,7 @@ const GateDashboard = ({ user, token }) => {
       });
 
       if (response.ok) {
-        setSuccessMessage(`שער "${gateName}" נמחק בהצלחה`);
+        setSuccessMessage(`שער "${gateName}" נמחק בהצלחה!`);
         scrollToMessage('success');
         await fetchGates();
       } else {
@@ -376,16 +400,22 @@ const GateDashboard = ({ user, token }) => {
 
               <div className="form-group">
                 <label htmlFor="authorizedNumber">מספר מורשה *</label>
-                <input
-                  type="tel"
+                <select
                   id="authorizedNumber"
                   name="authorizedNumber"
                   value={newGateData.authorizedNumber}
                   onChange={handleInputChange}
                   required
                   disabled={isSubmitting}
-                />
-                <small>מספר הטלפון המורשה לפתיחת השער</small>
+                >
+                  <option value="">בחר מספר מורשה</option>
+                  {verifiedCallers.map(caller => (
+                    <option key={caller.phoneNumber} value={caller.phoneNumber}>
+                      {caller.phoneNumber} {caller.friendlyName ? `(${caller.friendlyName})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <small>בחר מספר טלפון מורשה מ-Twilio לפתיחת השער</small>
               </div>
 
               <div className="form-group">
@@ -477,27 +507,28 @@ const GateDashboard = ({ user, token }) => {
 
               <div className="gate-info">
                 <p><strong>מספר טלפון:</strong> {gate.phoneNumber}</p>
-                <p><strong>מספר מורשה:</strong> {gate.authorizedNumber}</p>
                 <p><strong>הגנה:</strong> {gate.password ? 'מוגן' : 'לא מוגן'}</p>
               </div>
 
-              <div className="gate-authorized">
-                <h4>
-                  <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  מספר מורשה לפתיחה
-                </h4>
-                <div className="authorized-numbers">
-                  <span className="authorized-number">{gate.authorizedNumber}</span>
+              {user?.role === 'admin' && (
+                <div className="gate-authorized">
+                  <h4>
+                    <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    מספר מורשה לפתיחה
+                  </h4>
+                  <div className="authorized-numbers">
+                    <span className="authorized-number">{gate.authorizedNumber}</span>
+                  </div>
+                  <p className="password-notice">
+                    {gate.password 
+                      ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
+                      : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
+                    }
+                  </p>
                 </div>
-                <p className="password-notice">
-                  {gate.password 
-                    ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
-                    : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
-                  }
-                </p>
-              </div>
+              )}
 
               <div className="gate-actions">
                 <div className="gate-open-section">

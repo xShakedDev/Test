@@ -27,8 +27,7 @@ const userSchema = new mongoose.Schema({
     default: 'user'
   },
   authorizedGates: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Gate'
+    type: Number
   }],
   isActive: {
     type: Boolean,
@@ -85,12 +84,9 @@ userSchema.methods.updateLastLogin = function() {
 userSchema.methods.canAccessGate = function(gateId) {
   if (this.role === 'admin') return true;
   
-  // Handle both ObjectId and string cases
-  const gateIdStr = gateId.toString();
-  return this.authorizedGates.some(gate => {
-    const authorizedGateId = typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString();
-    return authorizedGateId === gateIdStr;
-  });
+  // Convert gateId to number for comparison
+  const gateIdNum = parseInt(gateId);
+  return this.authorizedGates.some(authorizedGateId => authorizedGateId === gateIdNum);
 };
 
 // Static method to find active users

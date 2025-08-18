@@ -6,6 +6,7 @@ const UserManagement = ({ user, token }) => {
   const [gates, setGates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   
@@ -80,6 +81,17 @@ const UserManagement = ({ user, token }) => {
     }
   }, [user, fetchUsers, fetchGates]);
 
+  // Clear messages after 5 seconds
+  useEffect(() => {
+    if (successMessage || error) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage, error]);
+
   // Function to scroll to error or success message
   const scrollToMessage = (type) => {
     const ref = type === 'error' ? errorRef : successRef;
@@ -123,6 +135,8 @@ const UserManagement = ({ user, token }) => {
     });
     setEditingUser(null);
     setShowCreateForm(false);
+    setError('');
+    setSuccessMessage('');
   };
 
   const handleSubmit = async (e) => {
@@ -134,6 +148,16 @@ const UserManagement = ({ user, token }) => {
         setError('שגיאה: מזהה משתמש חסר');
         scrollToMessage('error');
         return;
+      }
+
+      // For editing users, if password is empty, don't send it
+      // Convert username to lowercase to ignore case sensitivity
+      const dataToSend = { 
+        ...formData,
+        username: formData.username.toLowerCase().trim()
+      };
+      if (editingUser && !dataToSend.password.trim()) {
+        delete dataToSend.password;
       }
       
       const url = editingUser 
@@ -148,11 +172,14 @@ const UserManagement = ({ user, token }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSend)
       });
 
       if (response.ok) {
+        const data = await response.json();
         setError('');
+        setSuccessMessage(data.message || (editingUser ? 'משתמש עודכן בהצלחה!' : 'משתמש נוצר בהצלחה!'));
+        scrollToMessage('success');
         resetForm();
         await fetchUsers();
       } else {
@@ -177,7 +204,7 @@ const UserManagement = ({ user, token }) => {
       name: userItem.name,
       role: userItem.role,
       authorizedGates: userItem.authorizedGates ? userItem.authorizedGates.map(gate => 
-        typeof gate === 'object' && gate._id ? gate._id.toString() : gate.toString()
+        typeof gate === 'object' && gate.id ? gate.id.toString() : gate.toString()
       ) : []
     });
     setShowCreateForm(true);
@@ -197,7 +224,10 @@ const UserManagement = ({ user, token }) => {
       });
 
       if (response.ok) {
+        const data = await response.json();
         setError('');
+        setSuccessMessage(data.message || 'משתמש נמחק בהצלחה!');
+        scrollToMessage('success');
         await fetchUsers();
       } else {
         const data = await response.json();
@@ -254,6 +284,14 @@ const UserManagement = ({ user, token }) => {
         </div>
       )}
 
+      {/* Success Message */}
+      {successMessage && (
+        <div className="success-message" ref={successRef}>
+          <span>{successMessage}</span>
+          <button onClick={() => setSuccessMessage('')}>✕</button>
+        </div>
+      )}
+
       {/* Create/Edit User Form */}
       {showCreateForm && (
         <div className="form-container">
@@ -285,6 +323,7 @@ const UserManagement = ({ user, token }) => {
                   value={formData.password}
                   onChange={handleInputChange}
                   required={!editingUser}
+                  placeholder={editingUser ? 'השאר ריק אם אינך רוצה לשנות' : 'הזן סיסמה'}
                 />
                 <small>{editingUser ? 'השאר ריק אם אינך רוצה לשנות' : 'סיסמה להתחברות'}</small>
               </div>
@@ -330,7 +369,7 @@ const UserManagement = ({ user, token }) => {
                         name="authorizedGates"
                         value={gateId}
                         checked={formData.authorizedGates.some(id => 
-                          (typeof id === 'object' && id._id ? id._id.toString() : id.toString()) === gateId.toString()
+                          (typeof id === 'object' && id.id ? id.id.toString() : id.toString()) === gateId.toString()
                         )}
                         onChange={handleInputChange}
                       />
@@ -395,15 +434,18 @@ const UserManagement = ({ user, token }) => {
                       <span className="all-gates-badge">כל השערים</span>
                     ) : userItem.authorizedGates && userItem.authorizedGates.length > 0 ? (
                       <div className="user-gates-list">
-                        {userItem.authorizedGates.map(gateId => {
-                          // Handle both ObjectId and string cases
-                          const gateIdStr = typeof gateId === 'object' && gateId._id ? gateId._id.toString() : gateId.toString();
-                          const gate = gates.find(g => g.id === gateIdStr || g._id === gateIdStr);
-                          return gate ? (
-                            <span key={gate.id || gate._id} className="gate-badge">
-                              {gate.name}
+                        {userItem.authorizedGates.map(gateEntry => {
+                          const gateKey = (typeof gateEntry === 'object' && gateEntry.id != null) ? gateEntry.id : gateEntry;
+                          const gateFromList = gates.find(g => String(g.id) === String(gateKey) || String(g._id) === String(gateKey));
+                          const displayName = (typeof gateEntry === 'object' && gateEntry.name) 
+                            ? gateEntry.name 
+                            : (gateFromList ? gateFromList.name : `שער ${gateKey}`);
+                          const key = String(gateKey);
+                          return (
+                            <span key={key} className="gate-badge">
+                              {displayName}
                             </span>
-                          ) : null;
+                          );
                         })}
                       </div>
                     ) : (
