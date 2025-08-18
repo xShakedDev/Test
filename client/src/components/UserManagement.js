@@ -505,7 +505,7 @@ const UserManagement = ({ user, token }) => {
                       <div className="user-action-buttons">
                         <button
                           onClick={() => handleEdit(userItem)}
-                          className="btn btn-small"
+                          className="btn btn-primary btn-small"
                         >
                           ערוך
                         </button>

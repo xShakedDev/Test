@@ -162,7 +162,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             {/* Logout button */}
             <button
               onClick={onLogout}
-              className="btn btn-secondary btn-header"
+              className="btn btn-primary btn-header"
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,7 +174,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             {/* Change Password button */}
             <button
               onClick={() => setIsChangePasswordModalOpen(true)}
-              className="btn btn-secondary btn-header"
+              className="btn btn-primary btn-header"
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,7 +267,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             {/* Mobile Logout Button */}
             <button
               onClick={onLogout}
-              className="btn btn-secondary mobile-logout-btn btn-header"
+              className="btn btn-primary mobile-logout-btn btn-header"
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,7 +279,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             {/* Mobile Change Password Button */}
             <button
               onClick={() => setIsChangePasswordModalOpen(true)}
-              className="btn btn-secondary mobile-logout-btn btn-header"
+              className="btn btn-primary mobile-logout-btn btn-header"
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -910,16 +910,31 @@ body::before {
 
 .gate-authorized {
   margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(40, 167, 69, 0.05);
+  border-radius: 12px;
+  border-right: 4px solid #28a745;
+  direction: rtl;
 }
 
 .gate-authorized h4 {
+  color: #333;
   font-size: 1.1rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  font-weight: 600;
+}
+
+.icon-small {
+  width: 18px;
+  height: 18px;
+  color: #28a745;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
 }
 
 .authorized-numbers {
