@@ -510,25 +510,28 @@ const GateDashboard = ({ user, token }) => {
                 <p><strong>הגנה:</strong> {gate.password ? 'מוגן' : 'לא מוגן'}</p>
               </div>
 
-              {user?.role === 'admin' && (
-                <div className="gate-authorized">
-                  <h4>
-                    <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    מספר מורשה לפתיחה
-                  </h4>
-                  <div className="authorized-numbers">
-                    <span className="authorized-number">{gate.authorizedNumber}</span>
-                  </div>
-                  <p className="password-notice">
-                    {gate.password 
-                      ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
-                      : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
+              <div className="gate-authorized">
+                <h4>
+                  <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  מספר מורשה לפתיחה
+                </h4>
+                <div className="authorized-numbers">
+                  <span className="authorized-number">
+                    {user?.role === 'admin' 
+                      ? gate.authorizedNumber 
+                      : gate.authorizedNumber.replace(/\d/g, '*')
                     }
-                  </p>
+                  </span>
                 </div>
-              )}
+                <p className="password-notice">
+                  {gate.password 
+                    ? 'שער זה מוגן בסיסמה - תצטרך להזין אותה בעת הפתיחה' 
+                    : 'שער זה אינו מוגן בסיסמה - ניתן לפתוח ישירות'
+                  }
+                </p>
+              </div>
 
               <div className="gate-actions">
                 <div className="gate-open-section">
