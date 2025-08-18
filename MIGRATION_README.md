@@ -87,7 +87,7 @@ If you need to rollback:
 ## Troubleshooting
 
 If the migration fails:
-1. Check your MongoDB connection string in `test.env`
+1. Check your MongoDB connection string in `.env`
 2. Ensure you have write permissions to the database
 3. Check the console output for specific error messages
 4. Verify no other processes are accessing the database

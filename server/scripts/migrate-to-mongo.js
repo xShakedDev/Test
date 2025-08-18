@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables from test.env
-require('dotenv').config({ path: path.join(__dirname, '../../test.env') });
+// Load environment variables from .env
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
 const { connectDB } = require('../config/database');
 const Gate = require('../models/Gate');
