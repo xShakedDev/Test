@@ -82,6 +82,36 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     // Get current admin settings
     const adminSettings = await AdminSettings.getCurrentSettings();
     
+    // If not admin, block opening when Twilio balance is below threshold
+    if (req.user.role !== 'admin' && adminSettings.blockIfLowTwilioBalance) {
+      try {
+        const client = getTwilioClient();
+        const balanceData = await client.balance.fetch();
+        const balanceNumeric = parseFloat(balanceData.balance);
+        if (!isNaN(balanceNumeric) && balanceNumeric < (adminSettings.twilioBalanceThreshold || 5)) {
+          // Log blocked attempt due to low balance
+          try {
+            const gateForLog = await Gate.findOne({ id: parseInt(id) });
+            await new GateHistory({
+              userId: req.user._id,
+              gateId: gateForLog?.id || (isNaN(parseInt(id, 10)) ? -1 : parseInt(id, 10)),
+              username: req.user.username,
+              gateName: gateForLog?.name || 'Unknown',
+              success: false,
+              errorMessage: 'חסימת פתיחת שערים - יתרת Twilio נמוכה'
+            }).save();
+          } catch (_) {}
+          return res.status(402).json({
+            error: 'יתרת Twilio נמוכה',
+            message: 'לשקד תכף נגמר הכסף תפקידו לו'
+          });
+        }
+      } catch (twilioErr) {
+        // If Twilio not configured or unreachable, do not block by this rule
+        // Continue with normal flow
+      }
+    }
+
     // Check if system is in maintenance mode
     if (adminSettings.systemMaintenance) {
       return res.status(503).json({ 
@@ -748,7 +778,7 @@ router.get('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
 
 router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval, systemMaintenance, maintenanceMessage } = req.body;
+    const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval, systemMaintenance, maintenanceMessage, blockIfLowTwilioBalance, twilioBalanceThreshold } = req.body;
     
     // Validate input
     if (gateCooldownSeconds < 10 || gateCooldownSeconds > 300) {
@@ -762,6 +792,9 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
     if (autoRefreshInterval < 1 || autoRefreshInterval > 60) {
       return res.status(400).json({ error: 'מרווח רענון חייב להיות בין 1 ל-60 דקות' });
     }
+    if (twilioBalanceThreshold !== undefined && (isNaN(Number(twilioBalanceThreshold)) || Number(twilioBalanceThreshold) < 0)) {
+      return res.status(400).json({ error: 'סף יתרת Twilio חייב להיות מספר אי-שלילי' });
+    }
     
     // Update settings in MongoDB
     const updatedSettings = await AdminSettings.updateSettings({
@@ -770,7 +803,9 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
       enableNotifications,
       autoRefreshInterval,
       systemMaintenance: systemMaintenance || false,
-      maintenanceMessage: maintenanceMessage || 'המערכת בתחזוקה'
+      maintenanceMessage: maintenanceMessage || 'המערכת בתחזוקה',
+      blockIfLowTwilioBalance: !!blockIfLowTwilioBalance,
+      twilioBalanceThreshold: twilioBalanceThreshold !== undefined ? Number(twilioBalanceThreshold) : undefined
     }, req.user._id);
     
     res.json({ 

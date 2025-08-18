@@ -8,7 +8,9 @@ const AdminSettings = ({ user, token }) => {
     enableNotifications: true,
     autoRefreshInterval: 5,
     systemMaintenance: false,
-    maintenanceMessage: 'המערכת בתחזוקה'
+    maintenanceMessage: 'המערכת בתחזוקה',
+    blockIfLowTwilioBalance: true,
+    twilioBalanceThreshold: 5
   });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [updatedBy, setUpdatedBy] = useState(null);
@@ -193,7 +195,9 @@ const AdminSettings = ({ user, token }) => {
       enableNotifications: true,
       autoRefreshInterval: 5,
       systemMaintenance: false,
-      maintenanceMessage: 'המערכת בתחזוקה'
+      maintenanceMessage: 'המערכת בתחזוקה',
+      blockIfLowTwilioBalance: true,
+      twilioBalanceThreshold: 5
     });
   };
 
@@ -286,6 +290,46 @@ const AdminSettings = ({ user, token }) => {
           <div className="settings-section">
             <h3>הגדרות מערכת</h3>
             
+            <div className="form-group">
+              <div className="checkbox-container">
+                <span className="checkbox-text">חסום פתיחת שערים כשהיתרה נמוכה</span>
+                <input
+                  type="checkbox"
+                  name="blockIfLowTwilioBalance"
+                  checked={settings.blockIfLowTwilioBalance}
+                  onChange={handleInputChange}
+                  className="form-checkbox"
+                  id="blockIfLowTwilioBalance"
+                />
+                <label htmlFor="blockIfLowTwilioBalance" className="checkbox-label-mobile">
+                  <span className="checkbox-visual"></span>
+                </label>
+              </div>
+              <small className="form-help">
+                מנע ממשתמשים שאינם מנהלים לפתוח שערים אם יתרת Twilio נמוכה מהסף
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="twilioBalanceThreshold">
+                סף יתרת Twilio (דולר)
+              </label>
+              <input
+                type="number"
+                id="twilioBalanceThreshold"
+                name="twilioBalanceThreshold"
+                value={settings.twilioBalanceThreshold}
+                onChange={handleInputChange}
+                min="0"
+                step="0.01"
+                className="form-input"
+                required
+              />
+              <small className="form-help">
+                ברירת מחדל: 5$. מתחת לסכום זה, משתמשים שאינם מנהלים ייחסמו מפתיחה
+              </small>
+            </div>
+
             <div className="form-group">
               <label htmlFor="autoRefreshInterval">
                 מרווח רענון אוטומטי (דקות)

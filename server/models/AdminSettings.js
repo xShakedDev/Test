@@ -42,6 +42,20 @@ const adminSettingsSchema = new mongoose.Schema({
     default: 'המערכת בתחזוקה'
   },
   
+  // Twilio balance protection
+  blockIfLowTwilioBalance: {
+    type: Boolean,
+    required: true,
+    default: true
+  },
+  twilioBalanceThreshold: {
+    type: Number,
+    required: true,
+    min: 0,
+    max: 10000,
+    default: 5
+  },
+  
   // Timestamps
   lastUpdated: {
     type: Date,
@@ -68,6 +82,20 @@ adminSettingsSchema.statics.getCurrentSettings = async function() {
     await settings.save();
   }
   
+  // Backfill newly added fields with defaults for existing documents
+  let shouldSave = false;
+  if (typeof settings.blockIfLowTwilioBalance === 'undefined') {
+    settings.blockIfLowTwilioBalance = true;
+    shouldSave = true;
+  }
+  if (typeof settings.twilioBalanceThreshold === 'undefined') {
+    settings.twilioBalanceThreshold = 5;
+    shouldSave = true;
+  }
+  if (shouldSave) {
+    await settings.save();
+  }
+  
   return settings;
 };
 
@@ -78,7 +106,9 @@ adminSettingsSchema.statics.updateSettings = async function(newSettings, userId)
   // Update fields
   Object.keys(newSettings).forEach(key => {
     if (currentSettings.schema.paths[key]) {
-      currentSettings[key] = newSettings[key];
+      if (typeof newSettings[key] !== 'undefined') {
+        currentSettings[key] = newSettings[key];
+      }
     }
   });
   

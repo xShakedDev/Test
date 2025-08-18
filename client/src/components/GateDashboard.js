@@ -315,6 +315,12 @@ const GateDashboard = ({ user, token }) => {
           } else {
             setError(data.error || 'יותר מדי בקשות - נסה שוב מאוחר יותר');
           }
+        } else if (response.status === 402 && data.error === 'יתרת Twilio נמוכה') {
+          const msg = data.message || 'לשקד תכף נגמר הכסף תפקידו לו';
+          setError(msg);
+          if (window.showSystemNotification) {
+            window.showSystemNotification(msg, 'warning');
+          }
         } else {
           setError(data.error || 'שגיאה בפתיחת השער');
         }

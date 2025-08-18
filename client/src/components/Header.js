@@ -8,6 +8,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   const [balanceError, setBalanceError] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Fetch Twilio balance for admin users
   useEffect(() => {
@@ -15,6 +16,20 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
       fetchTwilioBalance();
     }
   }, [user]);
+
+  // Detect viewport to differentiate mobile vs desktop rendering
+  useEffect(() => {
+    const updateIsMobile = () => {
+      try {
+        setIsMobile(window.innerWidth <= 768);
+      } catch (_e) {
+        setIsMobile(false);
+      }
+    };
+    updateIsMobile();
+    window.addEventListener('resize', updateIsMobile);
+    return () => window.removeEventListener('resize', updateIsMobile);
+  }, []);
 
   const fetchTwilioBalance = async () => {
     setBalanceLoading(true);
@@ -66,7 +81,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
           </div>
           
           {/* Desktop Navigation - Hidden on mobile */}
-          {user?.role === 'admin' && (
+          {!isMobile && user?.role === 'admin' && (
             <nav className="header-navigation desktop-navigation">
               <button
                 onClick={() => onViewChange('gates')}
@@ -102,7 +117,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
         {/* Right side - User info, Twilio balance, and logout */}
         <div className="header-right">
           {/* Twilio Balance - Only visible to admins */}
-          {user?.role === 'admin' && (
+          {!isMobile && user?.role === 'admin' && (
             <div className="twilio-balance">
               <div className="balance-card">
                 <div className="balance-icon">
@@ -159,29 +174,32 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               )}
             </div>
 
-            {/* Logout button */}
-            <button
-              onClick={onLogout}
-              className="btn btn-primary btn-header"
-              style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
-            >
-              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span>התנתקות</span>
-            </button>
+            {/* Logout and Change Password buttons - desktop only */}
+            {!isMobile && (
+              <>
+                <button
+                  onClick={onLogout}
+                  className="btn btn-primary btn-header"
+                  style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
+                >
+                  <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>התנתקות</span>
+                </button>
 
-            {/* Change Password button */}
-            <button
-              onClick={() => setIsChangePasswordModalOpen(true)}
-              className="btn btn-primary btn-header"
-              style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
-            >
-              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-              <span>שנה סיסמה</span>
-            </button>
+                <button
+                  onClick={() => setIsChangePasswordModalOpen(true)}
+                  className="btn btn-primary btn-header"
+                  style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
+                >
+                  <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <span>שנה סיסמה</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
