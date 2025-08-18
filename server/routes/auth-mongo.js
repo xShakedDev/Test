@@ -133,8 +133,8 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     const now = new Date();
     const cooldownMs = adminSettings.gateCooldownSeconds * 1000;
     
-    if (gate.lastOpened && (now - gate.lastOpened) < cooldownMs) {
-      const remainingTime = Math.ceil((cooldownMs - (now - gate.lastOpened)) / 1000);
+    if (gate.lastOpenedAt && (now - new Date(gate.lastOpenedAt)) < cooldownMs) {
+      const remainingTime = Math.ceil((cooldownMs - (now - new Date(gate.lastOpenedAt))) / 1000);
       
       // Log failed attempt due to cooldown
       try {

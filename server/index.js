@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
+// Using built-in body parsers from Express
 const path = require('path');
 const fs = require('fs');
 
@@ -19,19 +19,10 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Basic authentication middleware for admin routes
-const authenticateAdmin = (req, res, next) => {
-  const adminPassword = process.env.ADMIN_PASSWORD || 'your-secret-password';
-  const providedPassword = req.headers['x-admin-password'] || req.body.adminPassword;
-  if (providedPassword === adminPassword) {
-    next();
-  } else {
-    res.status(401).json({ error: 'לא מורשה: נדרשת גישת מנהל' });
-  }
-};
+// Admin authentication handled via JWT in auth-users
 
 // Health check endpoint
 app.get('/health', (req, res) => {
