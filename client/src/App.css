@@ -10,6 +10,12 @@
   box-sizing: border-box;
 }
 
+/* Ensure gradient background also applies to the root html element (mobile fallback) */
+html {
+  min-height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -230,19 +236,41 @@ body::before {
 }
 
 .mobile-nav-content.open {
-  max-height: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .mobile-nav-buttons {
   width: 100%;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .mobile-nav-button {
+  display: block;
+  width: min(92%, 520px);
   text-align: right;
   padding-right: 2rem;
   padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
+  margin: 0 auto 0.5rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 12px;
+  transition: background 0.2s ease, transform 0.12s ease, border-color 0.2s ease;
+}
+
+.mobile-nav-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.mobile-nav-button-active {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Mobile User Info Section */
@@ -253,6 +281,7 @@ body::before {
   padding: 1rem 2rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   margin-bottom: 1rem;
+  align-items: center;
 }
 
 .mobile-admin-badge {
@@ -382,7 +411,8 @@ body::before {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(229, 231, 235, 0.8);
   border-radius: 12px;
-  margin-top: 0.75rem;
+  margin: 0.75rem auto;
+  width: min(92%, 520px);
 }
 
 .mobile-balance-icon svg {
@@ -412,6 +442,11 @@ body::before {
 .mobile-refresh-btn {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
+}
+
+.mobile-logout-btn {
+  display: block;
+  margin: 0.5rem auto;
 }
 /* ========================================
    BUTTON STYLES
@@ -2693,3 +2728,262 @@ body::before {
 /* ========================================
    END OF CSS FILE
    ======================================== */
+
+/* ========================================
+   LOGIN PAGE STYLES (restored)
+   ======================================== */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  direction: rtl;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.logo-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  color: white;
+}
+
+.logo-svg {
+  width: 36px;
+  height: 36px;
+}
+
+.login-title {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: 900;
+  margin: 0.5rem 0 0.25rem 0;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.login-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 450px;
+  margin: 0 auto;
+}
+
+.login-form-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.login-submit-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.login-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+/* Mobile Login Page */
+@media (max-width: 768px) {
+  .login-page {
+    padding: 1rem;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-logo {
+    margin-bottom: 1rem;
+  }
+
+  .login-form-container {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .login-title {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .login-subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+  }
+
+  .login-submit-btn {
+    width: 100%;
+    height: 3.25rem;
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    padding: 0.75rem;
+  }
+
+  .login-title {
+    font-size: 1.6rem;
+  }
+
+  .login-submit-btn {
+    height: 3rem;
+    font-size: 1rem;
+  }
+}
+
+/* Login input icon alignment (RTL) */
+.input-container {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.input-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #667eea;
+}
+
+/* Admin Settings checkbox layout - desktop */
+@media (min-width: 769px) {
+  .settings-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  /* Keep the section title on its own row */
+  .settings-section > h3 {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .settings-section .form-group {
+    flex: 1 1 100%;
+  }
+
+  /* Shrink only checkbox groups so they can sit on the same row */
+  .settings-section .form-group:has(.checkbox-container) {
+    flex: 0 0 auto;
+    display: inline-block;
+    width: auto;
+    margin: 0;
+  }
+
+  .settings-section .form-group:has(.checkbox-container) .checkbox-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    width: auto;
+    min-width: 260px;
+    max-width: 420px;
+    white-space: nowrap;
+  }
+
+  .settings-section .form-group:has(.checkbox-container) .checkbox-text {
+    white-space: nowrap;
+  }
+}
+
+
+/* System Notifications */
+.system-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  z-index: 10000;
+  animation: slideInRight 0.3s ease-out;
+  max-width: 400px;
+  border-left: 4px solid #3b82f6;
+}
+
+.system-notification-success {
+  border-left-color: #10b981;
+}
+
+.system-notification-error {
+  border-left-color: #ef4444;
+}
+
+.system-notification-warning {
+  border-left-color: #f59e0b;
+}
+
+.system-notification-info {
+  border-left-color: #3b82f6;
+}
+
+.notification-message {
+  flex: 1;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.notification-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

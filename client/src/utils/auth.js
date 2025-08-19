@@ -101,7 +101,13 @@ export const authenticatedFetch = async (url, options = {}) => {
   
   // If unauthorized, try to refresh token
   if (response.status === 401) {
-    const errorData = await response.json();
+    // Use a clone so we don't consume the body; callers may read it
+    let errorData = null;
+    try {
+      errorData = await response.clone().json();
+    } catch (e) {
+      errorData = null;
+    }
     
     if (isTokenExpired(errorData)) {
       // Try to refresh the token

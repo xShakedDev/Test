@@ -36,11 +36,15 @@ const UserManagement = ({ user, token }) => {
             handleSessionExpiration();
             return;
           }
-          setError('שגיאה בטעינת משתמשים');
+          const msg = 'שגיאה בטעינת משתמשים';
+          setError(msg);
+          if (window.showSystemNotification) window.showSystemNotification(msg, 'error');
           scrollToMessage('error');
         }
     } catch (error) {
-      setError('שגיאת רשת');
+      const msg = 'שגיאת רשת';
+      setError(msg);
+      if (window.showSystemNotification) window.showSystemNotification(msg, 'error');
       scrollToMessage('error');
     } finally {
       setLoading(false);
@@ -155,7 +159,9 @@ const UserManagement = ({ user, token }) => {
     try {
       // Validate that editingUser has an id when updating
       if (editingUser && !editingUser.id) {
-        setError('שגיאה: מזהה משתמש חסר');
+        const msg = 'שגיאה: מזהה משתמש חסר';
+        setError(msg);
+        if (window.showSystemNotification) window.showSystemNotification(msg, 'error');
         scrollToMessage('error');
         return;
       }
@@ -187,10 +193,11 @@ const UserManagement = ({ user, token }) => {
       if (response.ok) {
         const data = await response.json();
         setError('');
-        setSuccessMessage(data.message || (editingUser ? 'משתמש עודכן בהצלחה!' : 'משתמש נוצר בהצלחה!'));
+        const msg = data.message || (editingUser ? 'משתמש עודכן בהצלחה!' : 'משתמש נוצר בהצלחה!');
+        setSuccessMessage(msg);
         scrollToMessage('success');
         
-        // Show system notification if enabled
+        // Show system notification
         if (window.showSystemNotification) {
           if (editingUser) {
             window.showSystemNotification(`משתמש "${formData.username}" עודכן בהצלחה`, 'success');
@@ -207,22 +214,15 @@ const UserManagement = ({ user, token }) => {
           handleSessionExpiration();
           return;
         }
-        setError(data.error || 'שגיאה בשמירת המשתמש');
-        
-        // Show system notification if enabled
-        if (window.showSystemNotification) {
-          window.showSystemNotification(`שגיאה בשמירת המשתמש: ${data.error || 'שגיאה לא ידועה'}`, 'error');
-        }
-        
+        const msg = data.error || 'שגיאה בשמירת המשתמש';
+        setError(msg);
+        if (window.showSystemNotification) window.showSystemNotification(`שגיאה בשמירת המשתמש: ${data.error || 'שגיאה לא ידועה'}`, 'error');
         scrollToMessage('error');
       }
     } catch (error) {
-      setError('שגיאת רשת');
-      
-      // Show system notification if enabled
-      if (window.showSystemNotification) {
-        window.showSystemNotification('שגיאת רשת בשמירת המשתמש', 'error');
-      }
+      const msg = 'שגיאת רשת';
+      setError(msg);
+      if (window.showSystemNotification) window.showSystemNotification('שגיאת רשת בשמירת המשתמש', 'error');
     }
   };
 
@@ -253,10 +253,10 @@ const UserManagement = ({ user, token }) => {
       if (response.ok) {
         const data = await response.json();
         setError('');
-        setSuccessMessage(data.message || 'משתמש נמחק בהצלחה!');
+        const msg = data.message || 'משתמש נמחק בהצלחה!';
+        setSuccessMessage(msg);
         scrollToMessage('success');
         
-        // Show system notification if enabled
         if (window.showSystemNotification) {
           window.showSystemNotification(`משתמש "${username}" נמחק בהצלחה`, 'info');
         }
@@ -268,23 +268,16 @@ const UserManagement = ({ user, token }) => {
           handleSessionExpiration();
           return;
         }
-        setError(data.error || 'שגיאה במחיקת המשתמש');
-        
-        // Show system notification if enabled
-        if (window.showSystemNotification) {
-          window.showSystemNotification(`שגיאה במחיקת המשתמש: ${data.error || 'שגיאה לא ידועה'}`, 'error');
-        }
-        
+        const msg = data.error || 'שגיאה במחיקת המשתמש';
+        setError(msg);
+        if (window.showSystemNotification) window.showSystemNotification(`שגיאה במחיקת המשתמש: ${data.error || 'שגיאה לא ידועה'}`, 'error');
         scrollToMessage('error');
       }
     } catch (error) {
+      const msg = 'שגיאת רשת';
       console.error('Delete user error:', error);
-      setError('שגיאת רשת');
-      
-      // Show system notification if enabled
-      if (window.showSystemNotification) {
-        window.showSystemNotification('שגיאת רשת במחיקת המשתמש', 'error');
-      }
+      setError(msg);
+      if (window.showSystemNotification) window.showSystemNotification('שגיאת רשת במחיקת המשתמש', 'error');
     }
   };
 
@@ -321,7 +314,7 @@ const UserManagement = ({ user, token }) => {
         </div>
       </div>
 
-      {/* Error Message - Only show if notifications are disabled */}
+      {/* Error/Success - kept for accessibility if notifications disabled */}
       {error && !notificationsEnabled && (
         <div className="error-message" ref={errorRef}>
           <span>{error}</span>
@@ -329,7 +322,6 @@ const UserManagement = ({ user, token }) => {
         </div>
       )}
 
-      {/* Success Message - Only show if notifications are disabled */}
       {successMessage && !notificationsEnabled && (
         <div className="success-message" ref={successRef}>
           <span>{successMessage}</span>

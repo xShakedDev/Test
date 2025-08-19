@@ -16,6 +16,28 @@ function App() {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState('');
 
+  // Ensure global system notification is available across the app
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.showSystemNotification) {
+      window.showSystemNotification = (message, type = 'info') => {
+        try {
+          const notification = document.createElement('div');
+          notification.className = `system-notification system-notification-${type}`;
+          notification.innerHTML = `
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.remove()">✕</button>
+          `;
+          document.body.appendChild(notification);
+          setTimeout(() => {
+            if (notification.parentElement) notification.remove();
+          }, 5000);
+        } catch (_e) {
+          // no-op fallback
+        }
+      };
+    }
+  }, []);
+
   const handleLogout = useCallback(() => {
     // Show system notification if enabled
     if (window.showSystemNotification) {
@@ -136,7 +158,6 @@ function App() {
             setToken(data.accessToken);
             localStorage.setItem('authToken', data.accessToken);
             localStorage.setItem('refreshToken', data.refreshToken);
-            console.log('Token refreshed automatically');
           }
         }
       } catch (error) {

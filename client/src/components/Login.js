@@ -22,7 +22,9 @@ const Login = ({ onLogin, isLoading }) => {
     e.preventDefault();
     
     if (!formData.username.trim() || !formData.password.trim()) {
-      setError('נדרש שם משתמש וסיסמה');
+      const msg = 'נדרש שם משתמש וסיסמה';
+      setError(msg);
+      if (window.showSystemNotification) window.showSystemNotification(msg, 'warning');
       return;
     }
 
@@ -59,20 +61,20 @@ const Login = ({ onLogin, isLoading }) => {
         
         onLogin(data.user, { accessToken: data.accessToken, refreshToken: data.refreshToken });
       } else {
-        setError(data.error || 'שגיאה בהתחברות');
-        
-        // Show system notification if enabled
+        const msg = data.error || 'שגיאה בהתחברות';
+        setError(msg);
         if (window.showSystemNotification) {
           window.showSystemNotification(`שגיאה בהתחברות: ${data.error || 'שגיאה לא ידועה'}`, 'error');
         }
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError('שגיאת רשת - אנא נסה שוב');
+      const msg = 'שגיאת רשת - אנא נסה שוב';
+      setError(msg);
       
       // Show system notification if enabled
       if (window.showSystemNotification) {
-        window.showSystemNotification('שגיאת רשת - אנא נסה שוב', 'error');
+        window.showSystemNotification(msg, 'error');
       }
     } finally {
       setLoading(false);

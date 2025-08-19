@@ -71,12 +71,15 @@ const AdminSettings = ({ user, token }) => {
         setUpdatedBy(data.updatedBy);
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'שגיאה בטעינת הגדרות');
+        const msg = errorData.error || 'שגיאה בטעינת הגדרות';
+        setError(msg);
+        if (window.showSystemNotification) window.showSystemNotification(msg, 'error');
         scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
       setError('שגיאת רשת');
+      if (window.showSystemNotification) window.showSystemNotification('שגיאת רשת', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -107,13 +110,10 @@ const AdminSettings = ({ user, token }) => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccessMessage('ההגדרות נשמרו בהצלחה');
+        const msg = 'ההגדרות נשמרו בהצלחה';
+        setSuccessMessage(msg);
+        if (window.showSystemNotification) window.showSystemNotification('הגדרות המערכת עודכנו בהצלחה', 'success');
         scrollToMessage('success');
-        
-        // Show notification if enabled
-        if (settings.enableNotifications) {
-          showLocalNotification('הגדרות המערכת עודכנו בהצלחה', 'success');
-        }
         
         // Update last updated info
         setLastUpdated(new Date());
@@ -122,70 +122,19 @@ const AdminSettings = ({ user, token }) => {
         // Clear success message after 3 seconds
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
-        setError(data.error || 'שגיאה בשמירת ההגדרות');
+        const msg = data.error || 'שגיאה בשמירת ההגדרות';
+        setError(msg);
+        if (window.showSystemNotification) window.showSystemNotification(msg, 'error');
         scrollToMessage('error');
       }
     } catch (error) {
       console.error('Error saving settings:', error);
       setError('שגיאת רשת');
+      if (window.showSystemNotification) window.showSystemNotification('שגיאת רשת', 'error');
       scrollToMessage('error');
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // System notification function - Global function
-  window.showSystemNotification = (message, type = 'info') => {
-    // Check if notifications are enabled by fetching current settings
-    authenticatedFetch('/api/settings/current')
-      .then(response => response.json())
-      .then(data => {
-        if (!data.settings.enableNotifications) return;
-        
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `system-notification system-notification-${type}`;
-        notification.innerHTML = `
-          <span class="notification-message">${message}</span>
-          <button class="notification-close" onclick="this.parentElement.remove()">✕</button>
-        `;
-        
-        // Add to page
-        document.body.appendChild(notification);
-        
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-          if (notification.parentElement) {
-            notification.remove();
-          }
-        }, 5000);
-      })
-      .catch(error => {
-        console.error('Error checking notification settings:', error);
-      });
-  };
-
-  // Local notification function for this component
-  const showLocalNotification = (message, type = 'info') => {
-    if (!settings.enableNotifications) return;
-    
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `system-notification system-notification-${type}`;
-    notification.innerHTML = `
-      <span class="notification-message">${message}</span>
-      <button class="notification-close" onclick="this.parentElement.remove()">✕</button>
-    `;
-    
-    // Add to page
-    document.body.appendChild(notification);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      if (notification.parentElement) {
-        notification.remove();
-      }
-    }, 5000);
   };
 
   const resetToDefaults = () => {
@@ -199,6 +148,7 @@ const AdminSettings = ({ user, token }) => {
       blockIfLowTwilioBalance: true,
       twilioBalanceThreshold: 5
     });
+    if (window.showSystemNotification) window.showSystemNotification('הגדרות שוחזרו לברירות מחדל', 'info');
   };
 
   if (isLoading) {
@@ -224,22 +174,6 @@ const AdminSettings = ({ user, token }) => {
             הגדר הגדרות כלליות למערכת ניהול השערים
           </p>
         </div>
-
-        {/* Error Message - Only show if notifications are disabled */}
-        {error && !notificationsEnabled && (
-          <div className="error-message" ref={errorRef}>
-            <span>{error}</span>
-            <button onClick={() => setError('')}>✕</button>
-          </div>
-        )}
-
-        {/* Success Message - Only show if notifications are disabled */}
-        {successMessage && !notificationsEnabled && (
-          <div className="success-message" ref={successRef}>
-            <span>{successMessage}</span>
-            <button onClick={() => setSuccessMessage('')}>✕</button>
-          </div>
-        )}
 
         {/* Settings Form */}
         <form onSubmit={handleSubmit} className="settings-form">
@@ -327,26 +261,6 @@ const AdminSettings = ({ user, token }) => {
               />
               <small className="form-help">
                 ברירת מחדל: 5$. מתחת לסכום זה, משתמשים שאינם מנהלים ייחסמו מפתיחה
-              </small>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="autoRefreshInterval">
-                מרווח רענון אוטומטי (דקות)
-              </label>
-              <input
-                type="number"
-                id="autoRefreshInterval"
-                name="autoRefreshInterval"
-                value={settings.autoRefreshInterval}
-                onChange={handleInputChange}
-                min="1"
-                max="60"
-                className="form-input"
-                required
-              />
-              <small className="form-help">
-                מרווח הזמן בין רענון אוטומטי של הנתונים בדף (1-60 דקות)
               </small>
             </div>
 
@@ -469,6 +383,10 @@ const AdminSettings = ({ user, token }) => {
               <span className="setting-value">
                 {settings.enableNotifications ? 'מופעל' : 'מושבת'}
               </span>
+            </div>
+            <div className="setting-item">
+              <span className="setting-label">סף יתרת Twilio:</span>
+              <span className="setting-value">{settings.twilioBalanceThreshold} דולר</span>
             </div>
             <div className="setting-item">
               <span className="setting-label">מצב תחזוקה:</span>

@@ -53,13 +53,10 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
     if (req.user.role === 'admin') {
       gates = await Gate.findActive().sort({ createdAt: -1 });
     } else {
-      console.log('User authorized gates:', req.user.authorizedGates);
-      console.log('User role:', req.user.role);
       gates = await Gate.find({ 
         id: { $in: req.user.authorizedGates }, 
         isActive: true 
       }).sort({ createdAt: -1 });
-      console.log('Found gates for user:', gates.length);
     }
     
     res.json({ 
@@ -743,8 +740,27 @@ router.get('/settings/current', async (req, res) => {
       lastUpdated: settings.lastUpdated
     });
   } catch (error) {
-    console.error('שגיאה בקבלת הגדרות נוכחיות:', error);
-    res.status(500).json({ error: 'נכשל בקבלת הגדרות' });
+    console.error('שגיאה בקבלת הגדרות נוכחיות:', {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack
+    });
+    // Return safe defaults to avoid breaking the client if DB is unavailable
+    const fallbackSettings = {
+      gateCooldownSeconds: 30,
+      maxRetries: 3,
+      enableNotifications: true,
+      autoRefreshInterval: 5,
+      systemMaintenance: false,
+      maintenanceMessage: 'המערכת בתחזוקה',
+      blockIfLowTwilioBalance: true,
+      twilioBalanceThreshold: 5
+    };
+    res.status(200).json({ 
+      settings: fallbackSettings,
+      lastUpdated: null,
+      warning: 'מוחזרות הגדרות ברירת מחדל עקב שגיאה במסד הנתונים'
+    });
   }
 });
 

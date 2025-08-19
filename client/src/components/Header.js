@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ChangePasswordModal from './ChangePasswordModal';
 import { authenticatedFetch } from '../utils/auth';
 
@@ -9,6 +9,9 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const mobileNavContentRef = useRef(null);
+  const mobileMenuToggleRef = useRef(null);
+  const [mobileNavMaxHeight, setMobileNavMaxHeight] = useState('80vh');
 
   // Fetch Twilio balance for admin users
   useEffect(() => {
@@ -30,6 +33,50 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
     window.addEventListener('resize', updateIsMobile);
     return () => window.removeEventListener('resize', updateIsMobile);
   }, []);
+
+  // Recalculate available height for the mobile nav content when open
+  useEffect(() => {
+    const recalcMaxHeight = () => {
+      if (!isMobileMenuOpen || !mobileNavContentRef.current) return;
+      const top = mobileNavContentRef.current.getBoundingClientRect().top || 0;
+      const available = Math.max(120, window.innerHeight - top - 8);
+      setMobileNavMaxHeight(`${available}px`);
+    };
+
+    if (isMobileMenuOpen) {
+      recalcMaxHeight();
+      window.addEventListener('resize', recalcMaxHeight);
+      window.addEventListener('orientationchange', recalcMaxHeight);
+      setTimeout(recalcMaxHeight, 0);
+    }
+    return () => {
+      window.removeEventListener('resize', recalcMaxHeight);
+      window.removeEventListener('orientationchange', recalcMaxHeight);
+    };
+  }, [isMobileMenuOpen]);
+
+  // Close mobile menu on outside click/tap
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const handlePointerDown = (e) => {
+      const menuEl = mobileNavContentRef.current;
+      const toggleEl = mobileMenuToggleRef.current;
+      if (!menuEl) return;
+      const clickedInsideMenu = menuEl.contains(e.target);
+      const clickedToggle = toggleEl && toggleEl.contains(e.target);
+      if (!clickedInsideMenu && !clickedToggle) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, [isMobileMenuOpen]);
 
   const fetchTwilioBalance = async () => {
     setBalanceLoading(true);
@@ -155,27 +202,27 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             </div>
           )}
 
-          <div className="admin-status">
-            <div className={`admin-badge ${user?.role === 'admin' ? 'admin-badge-admin' : 'admin-badge-user'}`}>
-              {user?.role === 'admin' ? (
-                <>
-                  <svg className="icon-small" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM15.657 6.343a1 1 0 011.414 0A9.972 9.972 0 0119 12a9.972 9.972 0 01-1.929 5.657 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 12c0-1.636-.491-3.154-1.343-4.243a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                  מנהל
-                </>
-              ) : (
-                <>
-                  <svg className="icon-small" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                  משתמש
-                </>
-              )}
-            </div>
+          {!isMobile && (
+            <div className="admin-status">
+              <div className={`admin-badge ${user?.role === 'admin' ? 'admin-badge-admin' : 'admin-badge-user'}`}>
+                {user?.role === 'admin' ? (
+                  <>
+                    <svg className="icon-small" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM15.657 6.343a1 1 0 011.414 0A9.972 9.972 0 0119 12a9.972 9.972 0 01-1.929 5.657 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 12c0-1.636-.491-3.154-1.343-4.243a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    מנהל
+                  </>
+                ) : (
+                  <>
+                    <svg className="icon-small" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                    משתמש
+                  </>
+                )}
+              </div>
 
-            {/* Logout and Change Password buttons - desktop only */}
-            {!isMobile && (
+              {/* Logout and Change Password buttons - desktop only */}
               <>
                 <button
                   onClick={onLogout}
@@ -199,8 +246,8 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                   <span>שנה סיסמה</span>
                 </button>
               </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -210,6 +257,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
           className="mobile-menu-toggle"
           onClick={toggleMobileMenu}
           aria-label="Toggle mobile menu"
+          ref={mobileMenuToggleRef}
         >
           <svg 
             className={`hamburger-icon ${isMobileMenuOpen ? 'open' : ''}`}
@@ -227,7 +275,11 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
           <span>תפריט ניווט</span>
         </button>
         
-        <div className={`mobile-nav-content ${isMobileMenuOpen ? 'open' : ''}`}>
+        <div
+          className={`mobile-nav-content ${isMobileMenuOpen ? 'open' : ''}`}
+          ref={mobileNavContentRef}
+          style={isMobileMenuOpen ? { maxHeight: mobileNavMaxHeight } : undefined}
+        >
           {/* Mobile User Info Section */}
           <div className="mobile-user-info">
             <div className={`mobile-admin-badge ${user?.role === 'admin' ? 'admin-badge-admin' : 'admin-badge-user'}`}>
@@ -301,7 +353,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               style={{ minWidth: '160px', width: '160px', maxWidth: '160px', minHeight: '60px', height: '60px', maxHeight: '60px' }}
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
               <span>שנה סיסמה</span>
             </button>
