@@ -806,7 +806,7 @@ const GateDashboard = ({ user, token }) => {
       )}
 
       {/* No Gates State */}
-      {!showAddGate && !selectedGate && gates.length === 0 && (
+      {!showAddGate && !showCallerIdValidation && !selectedGate && gates.length === 0 && (
         <div className="no-gates">
           <div className="no-gates-icon">🚪</div>
           <h3>אין שערים במערכת</h3>
@@ -831,7 +831,7 @@ const GateDashboard = ({ user, token }) => {
       )}
 
       {/* Gates Grid - Show compact cards on mobile, full cards on desktop */}
-      {!showAddGate && !selectedGate && gates.length > 0 && (
+      {!showAddGate && !showCallerIdValidation && !selectedGate && gates.length > 0 && (
         <div className={`gates-grid ${isMobile ? 'gates-grid-mobile' : ''}`}>
           {gates.map(gate => (
             <div 
@@ -1078,12 +1078,15 @@ const GateDashboard = ({ user, token }) => {
         />
       )}
 
-      {/* Caller ID Validation Modal */}
-      {showCallerIdValidation && (
-        <CallerIdValidation
-          token={token}
-          onClose={() => setShowCallerIdValidation(false)}
-        />
+      {/* Caller ID Validation Inline (opens like add new gate) */}
+      {showCallerIdValidation && !showAddGate && !selectedGate && (
+        <div className="form-container">
+          <CallerIdValidation
+            token={token}
+            mode="inline"
+            onClose={() => setShowCallerIdValidation(false)}
+          />
+        </div>
       )}
     </div>
   );

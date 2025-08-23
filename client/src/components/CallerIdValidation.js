@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
-const CallerIdValidation = ({ token, onClose }) => {
+const CallerIdValidation = ({ token, onClose, mode = 'modal' }) => {
+  const isModal = mode !== 'inline';
   const [verifiedCallers, setVerifiedCallers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -250,7 +251,7 @@ const CallerIdValidation = ({ token, onClose }) => {
   }, []);
 
   if (isLoading) {
-    return (
+    return isModal ? (
       <div className="modal-overlay">
         <div className="modal-content">
           <div className="loading">
@@ -259,10 +260,17 @@ const CallerIdValidation = ({ token, onClose }) => {
           </div>
         </div>
       </div>
+    ) : (
+      <div className="form-container caller-id-validation-inline">
+        <div className="loading">
+          <div className="loading-spinner"></div>
+          <p>טוען מספרי טלפון מורשים...</p>
+        </div>
+      </div>
     );
   }
 
-  return (
+  return isModal ? (
     <div className="modal-overlay">
       <div className="modal-content caller-id-validation-modal">
         <div className="modal-header">
@@ -276,7 +284,6 @@ const CallerIdValidation = ({ token, onClose }) => {
             מספרים חדשים דורשים אימות לפני שימוש.
           </p>
 
-          {/* Error Message - Only show if notifications are disabled */}
           {error && !notificationsEnabled && (
             <div className="error-message">
               <span>{error}</span>
@@ -284,7 +291,6 @@ const CallerIdValidation = ({ token, onClose }) => {
             </div>
           )}
 
-          {/* Success Message - Only show if notifications are disabled */}
           {successMessage && !notificationsEnabled && (
             <div className="success-message">
               <span>{successMessage}</span>
@@ -292,7 +298,6 @@ const CallerIdValidation = ({ token, onClose }) => {
             </div>
           )}
 
-          {/* Validation Result with Verification Code */}
           {validationResult && (
             <div className="validation-result">
               <h3>פרטי בקשת האימות</h3>
@@ -385,7 +390,6 @@ const CallerIdValidation = ({ token, onClose }) => {
             </div>
           )}
 
-          {/* Add New Validation Button */}
           <div className="validation-actions">
             <button
               onClick={() => {
@@ -402,7 +406,6 @@ const CallerIdValidation = ({ token, onClose }) => {
             </button>
           </div>
 
-          {/* Validation Form */}
           {showValidationForm && (
             <div className="validation-form">
               <h3>בקשת אימות מספר טלפון</h3>
@@ -469,7 +472,6 @@ const CallerIdValidation = ({ token, onClose }) => {
             </div>
           )}
 
-          {/* Verified Callers List */}
           <div className="verified-callers-section">
             <h3>מספרי טלפון מאומתים</h3>
             {verifiedCallers.length === 0 ? (
@@ -497,6 +499,227 @@ const CallerIdValidation = ({ token, onClose }) => {
             סגור
           </button>
         </div>
+      </div>
+    </div>
+  ) : (
+    <div className="form-container caller-id-validation-inline">
+      <div className="gate-header" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3>אימות מספרי טלפון</h3>
+        <button onClick={handleClose} className="btn btn-secondary btn-small">חזרה</button>
+      </div>
+
+      <p className="modal-description">
+        ניהול מספרי טלפון מורשים לשיחות יוצאות ב-Twilio. 
+        מספרים חדשים דורשים אימות לפני שימוש.
+      </p>
+
+      {error && !notificationsEnabled && (
+        <div className="error-message">
+          <span>{error}</span>
+          <button onClick={() => setError('')}>✕</button>
+        </div>
+      )}
+
+      {successMessage && !notificationsEnabled && (
+        <div className="success-message">
+          <span>{successMessage}</span>
+          <button onClick={() => setSuccessMessage('')}>✕</button>
+        </div>
+      )}
+
+      {validationResult && (
+        <div className="validation-result">
+          <h3>פרטי בקשת האימות</h3>
+          <div className="validation-details">
+            <div className="validation-item">
+              <strong>מספר טלפון:</strong> {validationResult.phoneNumber}
+            </div>
+            {validationResult.friendlyName && (
+              <div className="validation-item">
+                <strong>שם ידידותי:</strong> {validationResult.friendlyName}
+              </div>
+            )}
+            <div className="validation-item">
+              <strong>סטטוס:</strong> {validationResult.status}
+            </div>
+            {validationResult.validationCode && (
+              <div className="validation-item verification-code">
+                <strong>קוד האימות:</strong> 
+                <span className="code-display">{validationResult.validationCode}</span>
+                <small>הקש את הקוד בשיחה שתקבל</small>
+              </div>
+            )}
+            {validationResult.validationSid && (
+              <div className="validation-item">
+                <strong>מזהה בקשת אימות:</strong> {validationResult.validationSid}
+              </div>
+            )}
+            <div className="validation-item status-check">
+              <strong>בדיקת סטטוס:</strong>
+              <div className="status-info">
+                <span>⏰ בדיקה אוטומטית תתבצע בעוד 30 שניות</span>
+                {isCheckingStatus && (
+                  <div className="checking-status">
+                    <div className="loading-spinner-small"></div>
+                    <span>בודק סטטוס...</span>
+                  </div>
+                )}
+                {validationStatus && (
+                  <div className="status-update">
+                    <strong>סטטוס עדכני:</strong> 
+                    {validationStatus.status === 'approved' && (
+                      <span className="status-success">✅ מאומת!</span>
+                    )}
+                    {validationStatus.status === 'pending' && (
+                      <span className="status-pending">⏳ ממתין לאימות</span>
+                    )}
+                    {validationStatus.status === 'error' && (
+                      <span className="status-error">❌ שגיאה בבדיקה</span>
+                    )}
+                    <div className="status-message">{validationStatus.message}</div>
+                    {validationStatus.status === 'pending' && (
+                      <div className="auto-check-info">
+                        <small>🔄 בדיקה אוטומטית נוספת תתבצע בעוד 30 שניות</small>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="validation-actions">
+            <button 
+              onClick={() => {
+                setValidationResult(null);
+                setValidationStatus(null);
+              }} 
+              className="btn btn-secondary"
+            >
+              סגור
+            </button>
+            {validationResult && validationResult.phoneNumber && (
+              <button 
+                onClick={checkValidationStatus}
+                className="btn btn-primary"
+                disabled={isCheckingStatus}
+              >
+                {isCheckingStatus ? (
+                  <>
+                    <div className="loading-spinner-small"></div>
+                    <span>בודק...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔍 בדוק סטטוס עכשיו</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="validation-actions">
+        <button
+          onClick={() => {
+            setShowValidationForm(true);
+            setValidationResult(null);
+            setValidationStatus(null);
+          }}
+          className="btn btn-primary"
+        >
+          <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <span>הוסף מספר טלפון לאימות</span>
+        </button>
+      </div>
+
+      {showValidationForm && (
+        <div className="validation-form">
+          <h3>בקשת אימות מספר טלפון</h3>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label htmlFor="phoneNumber">מספר טלפון *</label>
+              <input
+                type="tel"
+                id="phoneNumber"
+                name="phoneNumber"
+                value={validationData.phoneNumber}
+                onChange={handleInputChange}
+                placeholder="+972501234567"
+                required
+                disabled={isSubmitting}
+              />
+              <small>הכנס מספר טלפון בפורמט בינלאומי (למשל: +972501234567)</small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="friendlyName">שם ידידותי (אופציונלי)</label>
+              <input
+                type="text"
+                id="friendlyName"
+                name="friendlyName"
+                value={validationData.friendlyName}
+                onChange={handleInputChange}
+                placeholder="שם או תיאור"
+                disabled={isSubmitting}
+              />
+              <small>שם או תיאור לזיהוי קל של המספר</small>
+            </div>
+
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={() => setShowValidationForm(false)}
+                className="btn btn-secondary"
+                disabled={isSubmitting}
+              >
+                ביטול
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="loading-spinner-small"></div>
+                    <span>שולח...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    <span>שלח בקשת אימות</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="verified-callers-section">
+        <h3>מספרי טלפון מאומתים</h3>
+        {verifiedCallers.length === 0 ? (
+          <p className="no-callers">אין מספרי טלפון מאומתים</p>
+        ) : (
+          <div className="callers-list">
+            {verifiedCallers.map(caller => (
+              <div key={caller.id} className="caller-item">
+                <div className="caller-info">
+                  <div className="caller-phone">{caller.phoneNumber}</div>
+                  <div className="caller-name">{caller.friendlyName || 'ללא שם'}</div>
+                </div>
+                <div className="caller-status">
+                  <span className="status-badge status-verified">מאומת</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
