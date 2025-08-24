@@ -227,6 +227,41 @@ const GateDashboard = ({ user, token }) => {
     checkNotificationSettings();
   }, []);
 
+  // Refresh verified callers when CallerIdValidation component is opened
+  useEffect(() => {
+    if (showCallerIdValidation && user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  }, [showCallerIdValidation, user, fetchVerifiedCallers]);
+
+  // Refresh verified callers when add/edit gate form is opened
+  useEffect(() => {
+    if (showAddGate && user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  }, [showAddGate, user, fetchVerifiedCallers]);
+
+  // Refresh verified callers when editing a gate
+  useEffect(() => {
+    if (editingGate && user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  }, [editingGate, user, fetchVerifiedCallers]);
+
+  // Refresh verified callers when history component is opened
+  useEffect(() => {
+    if (showHistory && user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  }, [showHistory, user, fetchVerifiedCallers]);
+
+  // Refresh verified callers when a single gate is selected (mobile view)
+  useEffect(() => {
+    if (selectedGate && user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  }, [selectedGate, user, fetchVerifiedCallers]);
+
 
   const handleOpenGateClick = (gate) => {
     if (gate.password) {
@@ -375,7 +410,12 @@ const GateDashboard = ({ user, token }) => {
           authorizedNumber: '',
           password: ''
         });
+        
+        // Refresh both gates and verified callers to ensure data consistency
         await fetchGates();
+        if (user?.role === 'admin') {
+          await fetchVerifiedCallers();
+        }
       } else {
         if (isSessionExpired(data)) {
           handleSessionExpiration();
@@ -449,6 +489,22 @@ const GateDashboard = ({ user, token }) => {
     });
   };
 
+  const handleOpenCallerIdValidation = async () => {
+    // Refresh verified callers before opening the validation component
+    if (user?.role === 'admin') {
+      await fetchVerifiedCallers();
+    }
+    setShowCallerIdValidation(true);
+  };
+
+  const handleCloseCallerIdValidation = () => {
+    setShowCallerIdValidation(false);
+    // Refresh verified callers after closing to get any updates
+    if (user?.role === 'admin') {
+      fetchVerifiedCallers();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="loading">
@@ -490,7 +546,7 @@ const GateDashboard = ({ user, token }) => {
               </button>
               
               <button
-                onClick={() => setShowCallerIdValidation(true)}
+                onClick={handleOpenCallerIdValidation}
                 className="btn btn-primary"
               >
                 <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1084,7 +1140,7 @@ const GateDashboard = ({ user, token }) => {
           <CallerIdValidation
             token={token}
             mode="inline"
-            onClose={() => setShowCallerIdValidation(false)}
+            onClose={handleCloseCallerIdValidation}
           />
         </div>
       )}

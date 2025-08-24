@@ -30,6 +30,11 @@ const CallerIdValidation = ({ token, onClose, mode = 'modal' }) => {
     };
   }, []);
 
+  // Refresh verified callers when component is opened
+  useEffect(() => {
+    fetchVerifiedCallers();
+  }, []);
+
   const fetchVerifiedCallers = async () => {
     try {
       const response = await authenticatedFetch('/api/twilio/verified-callers');
@@ -112,7 +117,10 @@ const CallerIdValidation = ({ token, onClose, mode = 'modal' }) => {
           }, 30000);
         }
         
-        // Refresh the list after a short delay to show immediate feedback
+        // Refresh the list immediately to show the new number
+        await fetchVerifiedCallers();
+        
+        // Also refresh after a short delay to ensure the server has processed the request
         setTimeout(() => {
           fetchVerifiedCallers();
         }, 2000);

@@ -5,6 +5,7 @@ import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
+import PhoneDialer from './components/PhoneDialer';
 import { isSessionExpired, authenticatedFetch } from './utils/auth';
 import './App.css';
 
@@ -224,6 +225,11 @@ function App() {
           />
         ) : currentView === 'settings' && user.role === 'admin' ? (
           <AdminSettings 
+            user={user}
+            token={token}
+          />
+        ) : currentView === 'phone' && user.role === 'admin' ? (
+          <PhoneDialer 
             user={user}
             token={token}
           />

@@ -157,6 +157,13 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               >
                 הגדרות מנהל
               </button>
+              
+              <button
+                onClick={() => onViewChange('phone')}
+                className={`nav-button ${currentView === 'phone' ? 'nav-button-active' : ''}`}
+              >
+                📞 טלפון
+              </button>
             </nav>
           )}
         </div>
@@ -388,6 +395,13 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                 className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
               >
                 הגדרות מנהל
+              </button>
+
+              <button
+                onClick={() => handleMobileNavClick('phone')}
+                className={`mobile-nav-button ${currentView === 'phone' ? 'mobile-nav-button-active' : ''}`}
+              >
+                📞 טלפון
               </button>
             </div>
           )}

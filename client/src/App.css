@@ -2987,3 +2987,573 @@ body::before {
     opacity: 1;
   }
 }
+
+/* Phone Dialer Styles */
+.phone-dialer {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.audio-device-selection {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.audio-device-selection label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.audio-device-selection select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 1rem;
+  color: #374151;
+  transition: border-color 0.2s;
+}
+
+.audio-device-selection select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.audio-device-selection select:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.phone-dialer-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.phone-dialer-header h2 {
+  font-size: 2rem;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.phone-dialer-header p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.phone-interface {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.phone-display {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.phone-number-display {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phone-input {
+  width: 100%;
+  max-width: 300px;
+  font-size: 1.5rem;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  font-weight: 600;
+  outline: none;
+}
+
+.phone-input::placeholder {
+  color: #9ca3af;
+}
+
+.call-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.call-status {
+  font-size: 1.2rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.call-duration {
+  font-size: 1.5rem;
+  color: #1f2937;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.call-quality {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.quality-excellent {
+  color: #059669;
+  font-weight: 600;
+}
+
+.quality-good {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.quality-poor {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.phone-keypad {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.keypad-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.keypad-button {
+  width: 70px;
+  height: 70px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2937;
+  font-size: 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.keypad-button:hover:not(:disabled) {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.keypad-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.keypad-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.call-controls {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.call-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 50px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.call-button-green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.call-button-green:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+}
+
+.call-button-red {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+}
+
+.call-button-red:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+}
+
+.call-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.call-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.active-call-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.call-options {
+  display: flex;
+  gap: 1rem;
+}
+
+.call-option-button {
+  width: 50px;
+  height: 50px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-option-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.call-option-button.active {
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.call-option-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.clear-section {
+  text-align: center;
+}
+
+.clear-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.clear-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.clear-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clear-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+}
+
+.message-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.message-success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.message-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.message-close:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.call-history {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.call-history h3 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.call-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.no-calls {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 2rem;
+}
+
+.call-history-item {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
+}
+
+.call-history-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.call-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.call-phone {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 1.1rem;
+}
+
+.call-time {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.call-details {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.call-status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.call-status-initiated {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.call-status-completed {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.call-status-failed {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.call-duration-badge {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.call-from {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .phone-dialer {
+    padding: 1rem;
+    margin: 1rem;
+  }
+  
+  .phone-interface {
+    padding: 1.5rem;
+  }
+  
+  .keypad-button {
+    width: 60px;
+    height: 60px;
+    font-size: 1.3rem;
+  }
+  
+  .call-button {
+    padding: 0.875rem 1.75rem;
+    font-size: 1rem;
+  }
+  
+  .call-history-item {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+  
+  .call-details {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .phone-dialer-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .phone-dialer-header p {
+    font-size: 1rem;
+  }
+  
+  .phone-interface {
+    padding: 1rem;
+  }
+  
+  .keypad-button {
+    width: 55px;
+    height: 55px;
+    font-size: 1.2rem;
+  }
+  
+  .keypad-row {
+    gap: 0.75rem;
+  }
+  
+  .call-button {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Caller ID Selection */
+.caller-id-selection {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.caller-id-selection label {
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.caller-id-selection select {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  color: #1f2937;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.caller-id-selection select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.caller-id-selection select:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}

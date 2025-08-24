@@ -840,4 +840,398 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
+// Phone Dialer Routes
+router.post('/twilio/make-call', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { phoneNumber, userId, userName, fromNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'מספר טלפון נדרש' });
+    }
+
+    // Check Twilio balance before making call
+    const client = getTwilioClient();
+    const balanceData = await client.balance.fetch();
+    const balanceNumeric = parseFloat(balanceData.balance);
+    
+    if (balanceNumeric < 1) {
+      return res.status(402).json({ error: 'יתרת Twilio נמוכה מדי לביצוע שיחה' });
+    }
+
+    // Use the selected from number or fall back to default
+    const callerId = fromNumber || process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_ACCOUNT_SID;
+
+    // Get the base URL dynamically
+    let baseUrl = process.env.BASE_URL;
+    if (!baseUrl) {
+      // Try to get the URL from the request
+      const protocol = req.protocol;
+      const host = req.get('host');
+      baseUrl = `${protocol}://${host}`;
+      
+      // If it's localhost, try to use ngrok or suggest alternative
+      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+        console.warn('Warning: Using localhost URL. Twilio may not be able to access this endpoint.');
+        console.warn('Consider using ngrok or setting BASE_URL environment variable to a public URL.');
+      }
+    }
+
+    // Create TwiML inline for the call
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Say a brief message in Hebrew
+    twiml.say('שלום, השיחה מתחברת כעת', { language: 'he-IL' });
+    
+    // Add a small delay
+    twiml.pause({ length: 1 });
+    
+    // Use <Dial> to connect the call - this enables two-way voice communication
+    // The <Dial> verb connects the incoming call to another phone number
+    twiml.dial(phoneNumber, {
+      callerId: callerId,
+      timeout: 30, // Wait 30 seconds for answer
+      record: false
+    });
+    
+    // If the dial fails or times out, say goodbye
+    twiml.say('השיחה הסתיימה', { language: 'he-IL' });
+
+    // Log the TwiML being sent
+    console.log('Generated TwiML:', twiml.toString());
+    
+    // Make the call using Twilio with inline TwiML
+    const call = await client.calls.create({
+      twiml: twiml.toString(),
+      to: phoneNumber,
+      from: callerId,
+      statusCallback: `${baseUrl}/api/twilio/call-status`,
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      statusCallbackMethod: 'POST'
+    });
+    
+    console.log(`Call created with SID: ${call.sid}, Status: ${call.status}`);
+
+    // Log the call attempt
+    console.log(`Call initiated by ${userName} (${userId}) to ${phoneNumber} from ${callerId}. Call SID: ${call.sid}`);
+
+    res.json({ 
+      success: true, 
+      message: 'השיחה מתחילה',
+      callSid: call.sid,
+      status: call.status,
+      phoneNumber: phoneNumber,
+      fromNumber: callerId
+    });
+    
+  } catch (error) {
+    console.error('שגיאה בביצוע השיחה:', error);
+    
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
+    } else if (error.code === 'ENOTFOUND') {
+      res.status(500).json({ error: 'שגיאת רשת - לא ניתן להגיע ל-Twilio' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
+    } else if (error.code === 21211) {
+      res.status(400).json({ error: 'מספר טלפון לא תקין' });
+    } else if (error.code === 21214) {
+      res.status(400).json({ error: 'מספר הטלפון לא מורשה לביצוע שיחות יוצאות' });
+    } else {
+      res.status(500).json({ error: 'נכשל בביצוע השיחה', details: error.message });
+    }
+  }
+});
+
+// TwiML endpoint for voice calls
+router.post('/twilio/voice-txml', (req, res) => {
+  try {
+    // Create TwiML response for voice call
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Say a brief message in Hebrew
+    twiml.say('שלום, השיחה מתחברת כעת', { language: 'he-IL' });
+    
+    // Add a small delay
+    twiml.pause({ length: 1 });
+    
+    // Create a conference room for the voice call
+    // This allows two-way communication between the caller and the person being called
+    twiml.connect().conference('voice-call', {
+      startConferenceOnEnter: true,
+      endConferenceOnExit: true,
+      maxParticipants: 2,
+      record: false,
+      trim: 'trim-silence',
+      // Add some music while waiting
+      waitUrl: 'http://com.twilio.sounds.music.s3.amazonaws.com/olddog_-_guitar.mp3',
+      waitMethod: 'GET'
+    });
+    
+    // Set content type to XML
+    res.type('text/xml');
+    res.send(twiml.toString());
+    
+  } catch (error) {
+    console.error('שגיאה ביצירת TwiML:', error);
+    res.status(500).send('שגיאה ביצירת TwiML');
+  }
+});
+
+// Endpoint for joining an existing call
+router.post('/twilio/join-call', (req, res) => {
+  try {
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Say a brief message
+    twiml.say('מתחבר לשיחה קיימת', { language: 'he-IL' });
+    
+    // Join the same conference room
+    twiml.connect().conference('voice-call', {
+      startConferenceOnEnter: false, // Don't start new conference
+      endConferenceOnExit: false,    // Don't end when this participant leaves
+      maxParticipants: 2,
+      record: false,
+      trim: 'trim-silence'
+    });
+    
+    res.type('text/xml');
+    res.send(twiml.toString());
+    
+  } catch (error) {
+    console.error('שגיאה בהצטרפות לשיחה:', error);
+    res.status(500).send('שגיאה בהצטרפות לשיחה');
+  }
+});
+
+// TwiML endpoint for Twilio Client calls
+router.post('/twilio/client-voice', (req, res) => {
+  try {
+    const { To, From } = req.body;
+    
+    console.log(`Incoming Twilio Client call from ${From} to ${To}`);
+    
+    // Create TwiML response for Twilio Client call
+    const twiml = new twilio.twiml.VoiceResponse();
+    
+    // Connect the call to the specified phone number
+    twiml.dial(To, {
+      callerId: From || process.env.TWILIO_PHONE_NUMBER,
+      timeout: 30,
+      record: false
+    });
+    
+    // If the dial fails or times out, say goodbye
+    twiml.say('השיחה הסתיימה', { language: 'he-IL' });
+    
+    res.type('text/xml');
+    res.send(twiml.toString());
+    
+  } catch (error) {
+    console.error('שגיאה ביצירת TwiML עבור Twilio Client:', error);
+    res.status(500).send('<Response><Say>שגיאה בשיחה</Say></Response>');
+  }
+});
+
+
+router.post('/twilio/end-call', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { callSid, phoneNumber } = req.body;
+    
+    if (!callSid) {
+      return res.status(400).json({ error: 'Call SID נדרש' });
+    }
+
+    const client = getTwilioClient();
+    
+    // End the specific call on Twilio
+    await client.calls(callSid).update({ status: 'completed' });
+    
+    console.log(`Call ${callSid} ended for ${phoneNumber} by admin`);
+
+    res.json({ 
+      success: true, 
+      message: 'השיחה הסתיימה בהצלחה'
+    });
+    
+  } catch (error) {
+    console.error('שגיאה בסיום השיחה:', error);
+    
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
+    } else if (error.code === 20404) {
+      res.status(404).json({ error: 'השיחה לא נמצאה' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
+    } else {
+      res.status(500).json({ error: 'נכשל בסיום השיחה', details: error.message });
+    }
+  }
+});
+
+router.get('/twilio/call-history', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const client = getTwilioClient();
+    
+    // Get recent calls (last 50 calls)
+    const calls = await client.calls.list({ limit: 50 });
+    
+    const callHistory = calls.map(call => ({
+      id: call.sid,
+      phoneNumber: call.to,
+      fromNumber: call.from,
+      status: call.status,
+      timestamp: call.dateCreated,
+      duration: call.duration ? parseInt(call.duration) : 0,
+      direction: call.direction,
+      price: call.price,
+      priceUnit: call.priceUnit
+    }));
+
+    res.json({ calls: callHistory });
+    
+  } catch (error) {
+    console.error('שגיאה בקבלת היסטוריית שיחות:', error);
+    
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
+    } else if (error.code === 'ENOTFOUND') {
+      res.status(500).json({ error: 'שגיאת רשת - לא ניתן להגיע ל-Twilio' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
+    } else {
+      res.status(500).json({ error: 'נכשל בקבלת היסטוריית שיחות', details: error.message });
+    }
+  }
+});
+
+// Get individual call status
+router.get('/twilio/call-status/:callSid', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { callSid } = req.params;
+    
+    if (!callSid) {
+      return res.status(400).json({ error: 'Call SID is required' });
+    }
+
+    const client = getTwilioClient();
+    
+    // Get the specific call details
+    const call = await client.calls(callSid).fetch();
+    
+    res.json({ 
+      callSid: call.sid,
+      status: call.status,
+      duration: call.duration ? parseInt(call.duration) : 0,
+      phoneNumber: call.to,
+      fromNumber: call.from,
+      direction: call.direction
+    });
+    
+  } catch (error) {
+    console.error('שגיאה בקבלת סטטוס השיחה:', error);
+    
+    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
+    } else if (error.code === 20404) {
+      res.status(404).json({ error: 'השיחה לא נמצאה' });
+    } else if (error.code === 'UNAUTHORIZED') {
+      res.status(500).json({ error: 'אימות Twilio נכשל - בדוק פרטי התחברות' });
+    } else {
+      res.status(500).json({ error: 'נכשל בקבלת סטטוס השיחה', details: error.message });
+    }
+  }
+});
+
+// Get Twilio Client access token for WebRTC calls
+router.get('/twilio/token', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    // Create an access token for Twilio Client
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
+    
+    // Create an access token
+    const token = new AccessToken(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_API_KEY || process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_API_SECRET || process.env.TWILIO_AUTH_TOKEN
+    );
+    
+    // Create Voice grant for this token
+    const voiceGrant = new VoiceGrant({
+      outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID,
+      incomingAllow: true
+    });
+    
+    // Add grant to token
+    token.addGrant(voiceGrant);
+    
+    // Set identity of the person associated with this token
+    token.identity = req.user.username || 'admin';
+    
+    // Generate the token
+    const generatedToken = token.toJwt();
+    
+    console.log(`Generated Twilio Client token for user: ${req.user.username}`);
+    
+    res.json({ 
+      token: generatedToken,
+      identity: req.user.username || 'admin'
+    });
+    
+  } catch (error) {
+    console.error('שגיאה ביצירת אסימון Twilio:', error);
+    res.status(500).json({ error: 'נכשל ביצירת אסימון Twilio', details: error.message });
+  }
+});
+
+// WebRTC offer/answer handling for voice calls
+router.post('/twilio/call-offer', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { callSid, offer } = req.body;
+    
+    if (!callSid || !offer) {
+      return res.status(400).json({ error: 'Call SID and offer are required' });
+    }
+
+    // Here you would implement the WebRTC signaling logic
+    // This is a simplified example - in a real implementation,
+    // you would need to handle the offer/answer exchange with Twilio
+    
+    console.log(`WebRTC offer received for call ${callSid}`);
+    
+    // For now, return a mock answer
+    // In a real implementation, you would:
+    // 1. Send the offer to Twilio
+    // 2. Get the answer from Twilio
+    // 3. Return the answer to the client
+    
+    res.json({ 
+      success: true,
+      message: 'Offer received, processing...',
+      answer: null // This would be the actual SDP answer from Twilio
+    });
+    
+  } catch (error) {
+    console.error('שגיאה בטיפול ב-WebRTC offer:', error);
+    res.status(500).json({ error: 'נכשל בטיפול ב-WebRTC offer' });
+  }
+});
+
+// Call status callback endpoint for Twilio
+router.post('/twilio/call-status', async (req, res) => {
+  try {
+    const { CallSid, CallStatus, CallDuration, To, From } = req.body;
+    
+    console.log(`Call status update: ${CallSid} - ${CallStatus} to ${To} from ${From}`);
+    
+    // Here you can implement call status tracking and logging
+    // For now, we'll just log the status
+    
+    res.sendStatus(200); // Return 200 to Twilio to avoid retries
+  } catch (error) {
+    console.error('שגיאה בעדכון סטטוס השיחה:', error);
+    res.sendStatus(200); // Still return 200 to Twilio to avoid retries
+  }
+});
+
 module.exports = router;
