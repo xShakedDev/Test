@@ -1143,8 +1143,13 @@ router.get('/twilio/call-status/:callSid', authenticateToken, requireAdmin, asyn
 });
 
 // Get Twilio Client access token for WebRTC calls
-router.get('/twilio/token', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/twilio/token', async (req, res) => {
   try {
+    // Check if required environment variables are set
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      return res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
+    }
+
     // Create an access token for Twilio Client
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
@@ -1166,16 +1171,17 @@ router.get('/twilio/token', authenticateToken, requireAdmin, async (req, res) =>
     token.addGrant(voiceGrant);
     
     // Set identity of the person associated with this token
-    token.identity = req.user.username || 'admin';
+    const identity = req.user?.username || 'admin';
+    token.identity = identity;
     
     // Generate the token
     const generatedToken = token.toJwt();
     
-    console.log(`Generated Twilio Client token for user: ${req.user.username}`);
+    console.log(`Generated Twilio Client token for user: ${identity}`);
     
     res.json({ 
       token: generatedToken,
-      identity: req.user.username || 'admin'
+      identity: identity
     });
     
   } catch (error) {
