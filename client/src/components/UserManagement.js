@@ -237,7 +237,6 @@ const UserManagement = ({ user, token }) => {
         typeof gate === 'object' && gate.id ? gate.id.toString() : gate.toString()
       ) : []
     });
-    setShowCreateForm(true);
   };
 
   const handleDelete = async (userId, username) => {
@@ -329,11 +328,11 @@ const UserManagement = ({ user, token }) => {
         </div>
       )}
 
-      {/* Create/Edit User Form */}
-      {showCreateForm && (
+      {/* Create User Form */}
+      {showCreateForm && !editingUser && (
         <div className="form-container">
-          <h3>{editingUser ? 'ערוך משתמש' : 'משתמש חדש'}</h3>
-          <p>{editingUser ? 'עדכן את פרטי המשתמש' : 'צור משתמש חדש במערכת'}</p>
+          <h3>משתמש חדש</h3>
+          <p>צור משתמש חדש במערכת</p>
           
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
@@ -346,23 +345,22 @@ const UserManagement = ({ user, token }) => {
                   value={formData.username}
                   onChange={handleInputChange}
                   required
-                  disabled={editingUser}
                 />
                 <small>שם משתמש ייחודי להתחברות</small>
               </div>
 
               <div className="form-group">
-                <label htmlFor="password">סיסמה {editingUser ? '' : '*'}</label>
+                <label htmlFor="password">סיסמה *</label>
                 <input
                   type="password"
                   id="password"
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  required={!editingUser}
-                  placeholder={editingUser ? 'השאר ריק אם אינך רוצה לשנות' : 'הזן סיסמה'}
+                  required
+                  placeholder="הזן סיסמה"
                 />
-                <small>{editingUser ? 'השאר ריק אם אינך רוצה לשנות' : 'סיסמה להתחברות'}</small>
+                <small>סיסמה להתחברות</small>
               </div>
 
               <div className="form-group">
@@ -430,7 +428,7 @@ const UserManagement = ({ user, token }) => {
                 type="submit"
                 className="btn btn-primary"
               >
-                {editingUser ? 'עדכן' : 'צור'}
+                צור
               </button>
             </div>
           </form>
@@ -454,62 +452,189 @@ const UserManagement = ({ user, token }) => {
             <tbody>
               {users.map(userItem => (
                 <tr key={userItem.id} className="user-row">
-                  <td className="user-username">
-                    {userItem.username}
-                    {userItem.id === user.id && (
-                      <span className="current-user-badge">(אתה)</span>
-                    )}
-                  </td>
-                  <td className="user-name">{userItem.name}</td>
-                  <td className="user-role">
-                    <span className={`role-badge role-${userItem.role}`}>
-                      {userItem.role === 'admin' ? 'מנהל' : 'משתמש'}
-                    </span>
-                  </td>
-                  <td className="user-gates">
-                    {userItem.role === 'admin' ? (
-                      <span className="all-gates-badge">כל השערים</span>
-                    ) : userItem.authorizedGates && userItem.authorizedGates.length > 0 ? (
-                      <div className="user-gates-list">
-                        {userItem.authorizedGates.map(gateEntry => {
-                          const gateKey = (typeof gateEntry === 'object' && gateEntry.id != null) ? gateEntry.id : gateEntry;
-                          const gateFromList = gates.find(g => String(g.id) === String(gateKey) || String(g._id) === String(gateKey));
-                          const displayName = (typeof gateEntry === 'object' && gateEntry.name) 
-                            ? gateEntry.name 
-                            : (gateFromList ? gateFromList.name : `שער ${gateKey}`);
-                          const key = String(gateKey);
-                          return (
-                            <span key={key} className="gate-badge">
-                              {displayName}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="no-gates-badge">אין הרשאות</span>
-                    )}
-                  </td>
-                  <td className="user-created">
-                    {new Date(userItem.createdAt).toLocaleDateString('he-IL')}
-                  </td>
-                  <td className="user-actions">
-                    {userItem.id !== user.id && (
-                      <div className="user-action-buttons">
-                        <button
-                          onClick={() => handleEdit(userItem)}
-                          className="btn btn-primary btn-small"
-                        >
-                          ערוך
-                        </button>
-                        <button
-                          onClick={() => handleDelete(userItem.id, userItem.username)}
-                          className="btn btn-danger btn-small"
-                        >
-                          מחק
-                        </button>
-                      </div>
-                    )}
-                  </td>
+                  {editingUser && editingUser.id === userItem.id ? (
+                    // Inline editing form
+                    <>
+                      <td colSpan="6">
+                        <div className="form-container inline-edit-form">
+                          <div className="inline-edit-header">
+                            <h4>ערוך משתמש</h4>
+                            <button
+                              onClick={() => {
+                                setEditingUser(null);
+                                resetForm();
+                              }}
+                              className="btn btn-secondary btn-small"
+                            >
+                              חזרה
+                            </button>
+                          </div>
+                          
+                          <form onSubmit={handleSubmit}>
+                            <div className="form-grid">
+                              <div className="form-group">
+                                <label htmlFor={`username-${userItem.id}`}>שם משתמש *</label>
+                                <input
+                                  type="text"
+                                  id={`username-${userItem.id}`}
+                                  name="username"
+                                  value={formData.username}
+                                  onChange={handleInputChange}
+                                  required
+                                  disabled={true}
+                                />
+                                <small>שם משתמש ייחודי להתחברות</small>
+                              </div>
+
+                              <div className="form-group">
+                                <label htmlFor={`password-${userItem.id}`}>סיסמה</label>
+                                <input
+                                  type="password"
+                                  id={`password-${userItem.id}`}
+                                  name="password"
+                                  value={formData.password}
+                                  onChange={handleInputChange}
+                                  placeholder="השאר ריק אם אינך רוצה לשנות"
+                                />
+                                <small>השאר ריק אם אינך רוצה לשנות</small>
+                              </div>
+
+                              <div className="form-group">
+                                <label htmlFor={`name-${userItem.id}`}>שם מלא *</label>
+                                <input
+                                  type="text"
+                                  id={`name-${userItem.id}`}
+                                  name="name"
+                                  value={formData.name}
+                                  onChange={handleInputChange}
+                                  required
+                                />
+                                <small>שם מלא של המשתמש</small>
+                              </div>
+
+                              <div className="form-group">
+                                <label htmlFor={`role-${userItem.id}`}>תפקיד *</label>
+                                <select
+                                  id={`role-${userItem.id}`}
+                                  name="role"
+                                  value={formData.role}
+                                  onChange={handleInputChange}
+                                  required
+                                >
+                                  <option value="user">משתמש</option>
+                                  <option value="admin">מנהל</option>
+                                </select>
+                                <small>תפקיד המשתמש במערכת</small>
+                              </div>
+                            </div>
+
+                            <div className="form-group">
+                              <label>שערים מורשים</label>
+                              <div className="gates-checkbox-grid">
+                                {gates.map(gate => {
+                                  const gateId = gate.id || gate._id;
+                                  return (
+                                    <label key={gateId} className="gate-checkbox-item">
+                                      <input
+                                        type="checkbox"
+                                        name="authorizedGates"
+                                        value={gateId}
+                                        checked={formData.authorizedGates.some(id => 
+                                          (typeof id === 'object' && id.id ? id.id.toString() : id.toString()) === gateId.toString()
+                                        )}
+                                        onChange={handleInputChange}
+                                      />
+                                      <span className="gate-checkbox-label">{gate.name}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <small>בחר איזה שערים המשתמש יכול לפתוח</small>
+                            </div>
+
+                            <div className="form-actions">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingUser(null);
+                                  resetForm();
+                                }}
+                                className="btn btn-secondary"
+                              >
+                                ביטול
+                              </button>
+                              <button
+                                type="submit"
+                                className="btn btn-primary"
+                              >
+                                עדכן
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    // Normal user row display
+                    <>
+                      <td className="user-username">
+                        {userItem.username}
+                        {userItem.id === user.id && (
+                          <span className="current-user-badge">(אתה)</span>
+                        )}
+                      </td>
+                      <td className="user-name">{userItem.name}</td>
+                      <td className="user-role">
+                        <span className={`role-badge role-${userItem.role}`}>
+                          {userItem.role === 'admin' ? 'מנהל' : 'משתמש'}
+                        </span>
+                      </td>
+                      <td className="user-gates">
+                        {userItem.role === 'admin' ? (
+                          <span className="all-gates-badge">כל השערים</span>
+                        ) : userItem.authorizedGates && userItem.authorizedGates.length > 0 ? (
+                          <div className="user-gates-list">
+                            {userItem.authorizedGates.map(gateEntry => {
+                              const gateKey = (typeof gateEntry === 'object' && gateEntry.id != null) ? gateEntry.id : gateEntry;
+                              const gateFromList = gates.find(g => String(g.id) === String(gateKey) || String(g._id) === String(gateKey));
+                              const displayName = (typeof gateEntry === 'object' && gateEntry.name) 
+                                ? gateEntry.name 
+                                : (gateFromList ? gateFromList.name : `שער ${gateKey}`);
+                              const key = String(gateKey);
+                              return (
+                                <span key={key} className="gate-badge">
+                                  {displayName}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="no-gates-badge">אין הרשאות</span>
+                        )}
+                      </td>
+                      <td className="user-created">
+                        {new Date(userItem.createdAt).toLocaleDateString('he-IL')}
+                      </td>
+                      <td className="user-actions">
+                        {userItem.id !== user.id && (
+                          <div className="user-action-buttons">
+                            <button
+                              onClick={() => handleEdit(userItem)}
+                              className="btn btn-primary btn-small"
+                            >
+                              ערוך
+                            </button>
+                            <button
+                              onClick={() => handleDelete(userItem.id, userItem.username)}
+                              className="btn btn-danger btn-small"
+                            >
+                              מחק
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>

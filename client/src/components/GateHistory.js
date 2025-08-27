@@ -75,8 +75,13 @@ const GateHistory = ({ user, token }) => {
         url += `&gateName=${encodeURIComponent(filterValue)}`;
               } else if (filter === 'user' && filterValue) {
           url += `&username=${encodeURIComponent(filterValue)}`;
-        } else if (filter === 'date' && dateFilter.start && dateFilter.end) {
-        url += `&startDate=${dateFilter.start}&endDate=${dateFilter.end}`;
+        } else if (filter === 'date' && (dateFilter.start || dateFilter.end)) {
+          if (dateFilter.start) {
+            url += `&startDate=${dateFilter.start}`;
+          }
+          if (dateFilter.end) {
+            url += `&endDate=${dateFilter.end}`;
+          }
       }
 
       const response = await authenticatedFetch(url);
@@ -262,6 +267,27 @@ const GateHistory = ({ user, token }) => {
 
         {/* Filters */}
         <div className="history-filters">
+          {/* Active Filter Display */}
+          {filter !== 'all' && (
+            <div className="active-filter-info">
+              <span className="filter-label">
+                סינון פעיל: 
+                {filter === 'gate' && ` שער: ${filterValue}`}
+                {filter === 'user' && ` משתמש: ${filterValue}`}
+                {filter === 'date' && ` תאריך: ${dateFilter.start ? `מתאריך ${dateFilter.start}` : ''}${dateFilter.start && dateFilter.end ? ' ' : ''}${dateFilter.end ? `עד תאריך ${dateFilter.end}` : ''}`}
+              </span>
+              <button 
+                onClick={() => {
+                  setFilter('all');
+                  setFilterValue('');
+                  setDateFilter({ start: '', end: '' });
+                }}
+                className="btn btn-secondary btn-sm"
+              >
+                נקה סינון
+              </button>
+            </div>
+          )}
           <select
             value={filter}
             onChange={(e) => {
@@ -315,20 +341,26 @@ const GateHistory = ({ user, token }) => {
 
           {filter === 'date' && (
             <div className="date-filters">
-              <input
-                type="date"
-                value={dateFilter.start}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
-                className="form-input"
-                placeholder="מתאריך"
-              />
-              <input
-                type="date"
-                value={dateFilter.end}
-                onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
-                className="form-input"
-                placeholder="עד תאריך"
-              />
+              <div className="date-input-group">
+                <label htmlFor="start-date">מתאריך:</label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={dateFilter.start}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
+              <div className="date-input-group">
+                <label htmlFor="end-date">עד תאריך:</label>
+                <input
+                  id="end-date"
+                  type="date"
+                  value={dateFilter.end}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
             </div>
           )}
 

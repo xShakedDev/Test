@@ -313,48 +313,84 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   }
 });
 
-// Gate history endpoint (admin only) - MUST be before /gates/:id route
-router.get('/gates/history', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+// Gate history endpoint - admin sees all, regular users see only their own
+router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res) => {
   try {
-    const { limit = 100, gateId, gateName, userId, username } = req.query;
+    const { limit = 100, gateId, gateName, userId, username, startDate, endDate } = req.query;
     const limitNum = Math.min(parseInt(limit), 500); // Max 500 records
     
     let history;
+    let query = {};
+    
+    // For regular users, only show their own gate history
+    if (req.user.role !== 'admin') {
+      query.userId = req.user._id;
+    }
+    
+    // Build date filter if provided
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) {
+        query.timestamp.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        // Add 23:59:59 to end date to include the entire day
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        query.timestamp.$lte = endDateTime;
+      }
+    }
     if (gateName) {
-      history = await GateHistory.find({ gateName })
+      query.gateName = gateName;
+      history = await GateHistory.find(query)
         .sort({ timestamp: -1 })
         .limit(limitNum)
         .populate('userId', 'username name');
     } else if (gateId) {
       const numericGateId = parseInt(gateId, 10);
       if (!isNaN(numericGateId)) {
-        history = await GateHistory.findByGate(numericGateId, limitNum);
+        query.gateId = numericGateId;
+        history = await GateHistory.find(query)
+          .sort({ timestamp: -1 })
+          .limit(limitNum)
+          .populate('userId', 'username name');
       } else {
         // Backward compatibility: treat non-numeric gateId as gateName
-        history = await GateHistory.find({ gateName: gateId })
+        query.gateName = gateId;
+        history = await GateHistory.find(query)
           .sort({ timestamp: -1 })
           .limit(limitNum)
           .populate('userId', 'username name');
       }
     } else if (username) {
       // Filter by username
-      history = await GateHistory.find({ username })
+      query.username = username;
+      history = await GateHistory.find(query)
         .sort({ timestamp: -1 })
         .limit(limitNum)
         .populate('userId', 'username name');
     } else if (userId) {
       // Check if userId is a valid ObjectId or if it's actually a username
       if (mongoose.Types.ObjectId.isValid(userId)) {
-        history = await GateHistory.findByUser(userId, limitNum);
+        query.userId = userId;
+        history = await GateHistory.find(query)
+          .sort({ timestamp: -1 })
+          .limit(limitNum)
+          .populate('userId', 'username name');
       } else {
         // If userId is not a valid ObjectId, treat it as username
-        history = await GateHistory.find({ username: userId })
+        query.username = userId;
+        history = await GateHistory.find(query)
           .sort({ timestamp: -1 })
           .limit(limitNum)
           .populate('userId', 'username name');
       }
     } else {
-      history = await GateHistory.findAllHistory(limitNum);
+      // If only date filter is provided, use it
+      history = await GateHistory.find(query)
+        .sort({ timestamp: -1 })
+        .limit(limitNum)
+        .populate('userId', 'username name');
     }
     
     res.json({ 

@@ -128,7 +128,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
           </div>
           
           {/* Desktop Navigation - Hidden on mobile */}
-          {!isMobile && user?.role === 'admin' && (
+          {!isMobile && (
             <nav className="header-navigation desktop-navigation">
               <button
                 onClick={() => onViewChange('gates')}
@@ -137,12 +137,14 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                 שערים
               </button>
               
-              <button
-                onClick={() => onViewChange('users')}
-                className={`nav-button ${currentView === 'users' ? 'nav-button-active' : ''}`}
-              >
-                ניהול משתמשים
-              </button>
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => onViewChange('users')}
+                  className={`nav-button ${currentView === 'users' ? 'nav-button-active' : ''}`}
+                >
+                  ניהול משתמשים
+                </button>
+              )}
 
               <button
                 onClick={() => onViewChange('history')}
@@ -151,12 +153,14 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                 היסטוריית שערים
               </button>
 
-              <button
-                onClick={() => onViewChange('settings')}
-                className={`nav-button ${currentView === 'settings' ? 'nav-button-active' : ''}`}
-              >
-                הגדרות מנהל
-              </button>
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => onViewChange('settings')}
+                  className={`nav-button ${currentView === 'settings' ? 'nav-button-active' : ''}`}
+                >
+                  הגדרות מנהל
+                </button>
+              )}
             </nav>
           )}
         </div>
@@ -359,38 +363,40 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             </button>
           </div>
 
-          {/* Mobile Navigation Buttons - Only visible to admins */}
-          {user?.role === 'admin' && (
-            <div className="mobile-nav-buttons">
-              <button
-                onClick={() => handleMobileNavClick('gates')}
-                className={`mobile-nav-button ${currentView === 'gates' ? 'mobile-nav-button-active' : ''}`}
-              >
-                שערים
-              </button>
-              
+          {/* Mobile Navigation Buttons */}
+          <div className="mobile-nav-buttons">
+            <button
+              onClick={() => handleMobileNavClick('gates')}
+              className={`mobile-nav-button ${currentView === 'gates' ? 'mobile-nav-button-active' : ''}`}
+            >
+              שערים
+            </button>
+            
+            {user?.role === 'admin' && (
               <button
                 onClick={() => handleMobileNavClick('users')}
                 className={`mobile-nav-button ${currentView === 'users' ? 'mobile-nav-button-active' : ''}`}
               >
                 ניהול משתמשים
               </button>
+            )}
 
-              <button
-                onClick={() => handleMobileNavClick('history')}
-                className={`mobile-nav-button ${currentView === 'history' ? 'mobile-nav-button-active' : ''}`}
-              >
-                היסטוריית שערים
-              </button>
+            <button
+              onClick={() => handleMobileNavClick('history')}
+              className={`mobile-nav-button ${currentView === 'history' ? 'mobile-nav-button-active' : ''}`}
+            >
+              היסטוריית שערים
+            </button>
 
+            {user?.role === 'admin' && (
               <button
                 onClick={() => handleMobileNavClick('settings')}
                 className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
               >
                 הגדרות מנהל
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
