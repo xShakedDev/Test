@@ -38,7 +38,15 @@ export const isTokenExpired = (errorData) => {
  */
 export const refreshAccessToken = async () => {
   try {
-    const refreshToken = localStorage.getItem('refreshToken');
+    // Check localStorage first, then sessionStorage
+    let refreshToken = localStorage.getItem('refreshToken');
+    let storage = localStorage;
+    
+    if (!refreshToken) {
+      refreshToken = sessionStorage.getItem('refreshToken');
+      storage = sessionStorage;
+    }
+    
     if (!refreshToken) {
       return null;
     }
@@ -53,9 +61,9 @@ export const refreshAccessToken = async () => {
 
     if (response.ok) {
       const data = await response.json();
-      // Update tokens in localStorage
-      localStorage.setItem('authToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      // Update tokens in the same storage where refresh token was found
+      storage.setItem('authToken', data.accessToken);
+      storage.setItem('refreshToken', data.refreshToken);
       return data;
     }
     
@@ -70,10 +78,13 @@ export const refreshAccessToken = async () => {
  * Handle session expiration by redirecting to login
  */
 export const handleSessionExpiration = () => {
-  // Clear local storage
+  // Clear both localStorage and sessionStorage
   localStorage.removeItem('authToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
+  sessionStorage.removeItem('authToken');
+  sessionStorage.removeItem('refreshToken');
+  sessionStorage.removeItem('user');
   // Reload page to trigger login flow
   window.location.reload();
 };
@@ -91,7 +102,11 @@ export const authenticatedFetch = async (url, options = {}) => {
   }
   
   if (!options.headers.Authorization) {
-    const token = localStorage.getItem('authToken');
+    // Check localStorage first, then sessionStorage
+    let token = localStorage.getItem('authToken');
+    if (!token) {
+      token = sessionStorage.getItem('authToken');
+    }
     if (token) {
       options.headers.Authorization = `Bearer ${token}`;
     }

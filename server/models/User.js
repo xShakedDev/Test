@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema({
   lastLoginAt: {
     type: Date,
     default: null
+  },
+  gateOrderPreferences: {
+    type: Map,
+    of: Number,
+    default: {}
   }
 }, {
   timestamps: true,
@@ -54,8 +59,13 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 
-// Hash password before saving
+// Normalize username to lowercase before saving
 userSchema.pre('save', async function(next) {
+  // Always normalize username to lowercase for case-insensitive storage
+  if (this.isModified('username')) {
+    this.username = this.username.toLowerCase().trim();
+  }
+  
   // Only hash password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
   

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { authenticatedFetch } from '../utils/auth';
 
 const Login = ({ onLogin, isLoading }) => {
@@ -6,8 +6,18 @@ const Login = ({ onLogin, isLoading }) => {
     username: '',
     password: ''
   });
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Load saved username on component mount
+  useEffect(() => {
+    const savedUsername = localStorage.getItem('rememberedUsername');
+    if (savedUsername) {
+      setFormData(prev => ({ ...prev, username: savedUsername }));
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -49,10 +59,27 @@ const Login = ({ onLogin, isLoading }) => {
       const data = await response.json();
 
       if (response.ok) {
-        // Save tokens and user info
-        localStorage.setItem('authToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // If remember me is checked, save to localStorage (persistent)
+        // If not checked, save to sessionStorage (cleared when tab closes)
+        if (rememberMe) {
+          localStorage.setItem('authToken', data.accessToken);
+          localStorage.setItem('refreshToken', data.refreshToken);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('rememberedUsername', loginData.username);
+          // Clear sessionStorage to avoid conflicts
+          sessionStorage.removeItem('authToken');
+          sessionStorage.removeItem('refreshToken');
+          sessionStorage.removeItem('user');
+        } else {
+          sessionStorage.setItem('authToken', data.accessToken);
+          sessionStorage.setItem('refreshToken', data.refreshToken);
+          sessionStorage.setItem('user', JSON.stringify(data.user));
+          // Clear localStorage to avoid conflicts
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          localStorage.removeItem('rememberedUsername');
+        }
         
         // Show system notification if enabled
         if (window.showSystemNotification) {
@@ -93,10 +120,10 @@ const Login = ({ onLogin, isLoading }) => {
           </div>
         </div>
         <h2 className="login-title">
-          מערכת ניהול שערים
+          שערים
         </h2>
         <p className="login-subtitle">
-          התחברות למערכת הניהול
+          התחבר למערכת השערים של שקד
         </p>
       </div>
 
@@ -120,6 +147,7 @@ const Login = ({ onLogin, isLoading }) => {
                   disabled={loading}
                   className="form-input"
                   placeholder="הכנס שם משתמש"
+                  autoComplete="username"
                 />
                 <div className="input-icon">
                   <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,6 +173,7 @@ const Login = ({ onLogin, isLoading }) => {
                   disabled={loading}
                   className="form-input"
                   placeholder="הכנס סיסמה"
+                  autoComplete="current-password"
                 />
                 <div className="input-icon">
                   <svg className="icon-small" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,6 +181,20 @@ const Login = ({ onLogin, isLoading }) => {
                   </svg>
                 </div>
               </div>
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="form-group remember-me-group">
+              <label className="remember-me-label">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={loading}
+                  className="remember-me-checkbox"
+                />
+                <span className="remember-me-text">זכור אותי</span>
+              </label>
             </div>
 
             {/* Error Message */}
@@ -193,8 +236,12 @@ const Login = ({ onLogin, isLoading }) => {
           {/* Footer */}
           <div className="login-footer">
             <p className="footer-text">
-              מערכת מאובטחת עם ניהול משתמשים מתקדם
+              מערכת זו הינה פרטית!
+              <br/>
+              ליצירת משתמש אנא פנה לשקד.
+
             </p>
+
           </div>
         </div>
       </div>

@@ -359,6 +359,7 @@ const UserManagement = ({ user, token }) => {
                   onChange={handleInputChange}
                   required
                   placeholder="הזן סיסמה"
+                  autoComplete="new-password"
                 />
                 <small>סיסמה להתחברות</small>
               </div>
@@ -495,6 +496,7 @@ const UserManagement = ({ user, token }) => {
                                   value={formData.password}
                                   onChange={handleInputChange}
                                   placeholder="השאר ריק אם אינך רוצה לשנות"
+                                  autoComplete="new-password"
                                 />
                                 <small>השאר ריק אם אינך רוצה לשנות</small>
                               </div>

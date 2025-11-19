@@ -177,6 +177,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
               className="form-input"
               required
               disabled={isLoading}
+              autoComplete="current-password"
             />
           </div>
 
@@ -192,6 +193,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
               required
               disabled={isLoading}
               minLength="4"
+              autoComplete="new-password"
             />
             <small className="form-help">לפחות 4 תווים</small>
           </div>
@@ -207,6 +209,7 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, token }) => {
               className="form-input"
               required
               disabled={isLoading}
+              autoComplete="new-password"
             />
           </div>
 

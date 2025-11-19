@@ -51,12 +51,32 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
     
     // Admin sees all gates, regular users see only their authorized gates
     if (req.user.role === 'admin') {
-      gates = await Gate.findActive().sort({ createdAt: -1 });
+      gates = await Gate.findActive().sort({ order: 1, createdAt: -1 });
     } else {
       gates = await Gate.find({ 
         id: { $in: req.user.authorizedGates }, 
         isActive: true 
-      }).sort({ createdAt: -1 });
+      }).sort({ order: 1, createdAt: -1 });
+    }
+    
+    // Apply personal order preferences for all users (including admins)
+    if (req.user.gateOrderPreferences) {
+      // Convert Mongoose Map to plain object if needed
+      const userPreferences = req.user.gateOrderPreferences instanceof Map 
+        ? req.user.gateOrderPreferences 
+        : new Map(Object.entries(req.user.gateOrderPreferences || {}));
+      
+      if (userPreferences.size > 0) {
+        gates.sort((a, b) => {
+          const orderA = userPreferences.get(String(a.id)) ?? userPreferences.get(a.id) ?? a.order ?? 999;
+          const orderB = userPreferences.get(String(b.id)) ?? userPreferences.get(b.id) ?? b.order ?? 999;
+          if (orderA !== orderB) {
+            return orderA - orderB;
+          }
+          // If same order, sort by createdAt
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+      }
     }
     
     res.json({ 
@@ -88,10 +108,11 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         if (!isNaN(balanceNumeric) && balanceNumeric < (adminSettings.twilioBalanceThreshold || 5)) {
           // Log blocked attempt due to low balance
           try {
-            const gateForLog = await Gate.findOne({ id: parseInt(id) });
+            const gateIdForLog = parseInt(id, 10);
+            const gateForLog = isNaN(gateIdForLog) ? null : await Gate.findOne({ id: gateIdForLog });
             await new GateHistory({
               userId: req.user._id,
-              gateId: gateForLog?.id || (isNaN(parseInt(id, 10)) ? -1 : parseInt(id, 10)),
+              gateId: gateForLog?.id || (isNaN(gateIdForLog) ? -1 : gateIdForLog),
               username: req.user.username,
               gateName: gateForLog?.name || 'Unknown',
               success: false,
@@ -117,7 +138,13 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       });
     }
     
-    const gate = await Gate.findOne({ id: parseInt(id) });
+    // Validate and parse the ID
+    const gateId = parseInt(id, 10);
+    if (isNaN(gateId)) {
+      return res.status(400).json({ error: 'מזהה השער לא תקין' });
+    }
+    
+    const gate = await Gate.findOne({ id: gateId });
     
     if (!gate || !gate.isActive) {
         // Log failed gate opening attempt - gate not found
@@ -300,7 +327,13 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
     const { id } = req.params;
     const { CallStatus, CallDuration } = req.body;
     
-    const gate = await Gate.findOne({ id: parseInt(id) });
+    // Validate and parse the ID
+    const gateId = parseInt(id, 10);
+    if (isNaN(gateId)) {
+      return res.status(400).json({ error: 'מזהה השער לא תקין' });
+    }
+    
+    const gate = await Gate.findOne({ id: gateId });
     
     if (gate) {
       await gate.updateCallStatus(CallStatus, CallDuration);
@@ -316,10 +349,11 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
 // Gate history endpoint - admin sees all, regular users see only their own
 router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res) => {
   try {
-    const { limit = 100, gateId, gateName, userId, username, startDate, endDate } = req.query;
-    const limitNum = Math.min(parseInt(limit), 500); // Max 500 records
+    const { limit = 50, page = 1, gateId, gateName, userId, username, startDate, endDate } = req.query;
+    const limitNum = Math.min(parseInt(limit), 500); // Max 500 records per page
+    const pageNum = Math.max(parseInt(page), 1); // Minimum page is 1
+    const skip = (pageNum - 1) * limitNum;
     
-    let history;
     let query = {};
     
     // For regular users, only show their own gate history
@@ -340,62 +374,52 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
         query.timestamp.$lte = endDateTime;
       }
     }
+    
+    // Build query based on filters
     if (gateName) {
       query.gateName = gateName;
-      history = await GateHistory.find(query)
-        .sort({ timestamp: -1 })
-        .limit(limitNum)
-        .populate('userId', 'username name');
     } else if (gateId) {
       const numericGateId = parseInt(gateId, 10);
       if (!isNaN(numericGateId)) {
         query.gateId = numericGateId;
-        history = await GateHistory.find(query)
-          .sort({ timestamp: -1 })
-          .limit(limitNum)
-          .populate('userId', 'username name');
       } else {
         // Backward compatibility: treat non-numeric gateId as gateName
         query.gateName = gateId;
-        history = await GateHistory.find(query)
-          .sort({ timestamp: -1 })
-          .limit(limitNum)
-          .populate('userId', 'username name');
       }
     } else if (username) {
       // Filter by username
       query.username = username;
-      history = await GateHistory.find(query)
-        .sort({ timestamp: -1 })
-        .limit(limitNum)
-        .populate('userId', 'username name');
     } else if (userId) {
       // Check if userId is a valid ObjectId or if it's actually a username
       if (mongoose.Types.ObjectId.isValid(userId)) {
         query.userId = userId;
-        history = await GateHistory.find(query)
-          .sort({ timestamp: -1 })
-          .limit(limitNum)
-          .populate('userId', 'username name');
       } else {
         // If userId is not a valid ObjectId, treat it as username
         query.username = userId;
-        history = await GateHistory.find(query)
-          .sort({ timestamp: -1 })
-          .limit(limitNum)
-          .populate('userId', 'username name');
       }
-    } else {
-      // If only date filter is provided, use it
-      history = await GateHistory.find(query)
-        .sort({ timestamp: -1 })
-        .limit(limitNum)
-        .populate('userId', 'username name');
     }
+    
+    // Get total count for pagination
+    const totalCount = await GateHistory.countDocuments(query);
+    
+    // Get paginated history
+    const history = await GateHistory.find(query)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('userId', 'username name');
+    
+    const totalPages = Math.ceil(totalCount / limitNum);
     
     res.json({ 
       history: history.map(record => record.toJSON()),
       count: history.length,
+      totalCount: totalCount,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: totalPages,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -483,14 +507,21 @@ router.delete('/gates/history/delete-all', requireMongoDB, authenticateToken, re
 router.get('/gates/:id', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const gate = await Gate.findOne({ id: parseInt(id) });
+    
+    // Validate and parse the ID
+    const gateId = parseInt(id, 10);
+    if (isNaN(gateId)) {
+      return res.status(400).json({ error: 'מזהה השער לא תקין' });
+    }
+    
+    const gate = await Gate.findOne({ id: gateId });
     
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
     
     // Check if user has permission to view this gate
-    if (req.user.role !== 'admin' && !req.user.canAccessGate(id)) {
+    if (req.user.role !== 'admin' && !req.user.canAccessGate(gateId)) {
       return res.status(403).json({ error: 'אין הרשאה לצפות בשער זה' });
     }
     
@@ -522,12 +553,17 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
     // Get the next available numeric ID
     const nextId = await Gate.getNextId();
     
+    // Get the highest order value and add 1 for the new gate
+    const lastGate = await Gate.findOne().sort({ order: -1 });
+    const nextOrder = lastGate ? (lastGate.order || 0) + 1 : 0;
+    
     const newGate = new Gate({
       id: nextId,
       name,
       phoneNumber,
       authorizedNumber,
-      password: password || null
+      password: password || null,
+      order: nextOrder
     });
     
     const savedGate = await newGate.save();
@@ -549,12 +585,106 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
   }
 });
 
+// Reorder gates endpoint - MUST be before /gates/:id route to avoid route matching conflict
+// Allow all authenticated users to reorder gates (not just admins)
+router.put('/gates/reorder', requireMongoDB, authenticateToken, async (req, res) => {
+  try {
+    const { gateOrders } = req.body; // Array of { gateId: number, order: number }
+    
+    // Validate request body
+    if (!gateOrders) {
+      return res.status(400).json({ error: 'gateOrders חסר בבקשה' });
+    }
+    
+    if (!Array.isArray(gateOrders)) {
+      return res.status(400).json({ error: 'gateOrders חייב להיות מערך' });
+    }
+    
+    if (gateOrders.length === 0) {
+      return res.status(400).json({ error: 'gateOrders לא יכול להיות ריק' });
+    }
+    
+    // Validate and filter valid entries
+    const validUpdates = [];
+    
+    for (const item of gateOrders) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+      
+      // Get values - they should already be numbers from the client
+      const gateId = item.gateId;
+      const order = item.order;
+      
+      // Convert to numbers if needed
+      let parsedGateId = gateId;
+      let parsedOrder = order;
+      
+      if (typeof gateId !== 'number') {
+        parsedGateId = parseInt(gateId, 10);
+      }
+      
+      if (typeof order !== 'number') {
+        parsedOrder = parseInt(order, 10);
+      }
+      
+      // Validate
+      if (isNaN(parsedGateId) || isNaN(parsedOrder)) {
+        continue;
+      }
+      
+      validUpdates.push({
+        gateId: parsedGateId,
+        order: parsedOrder
+      });
+    }
+    
+    if (validUpdates.length === 0) {
+      return res.status(400).json({ error: 'מזהה השער לא תקין' });
+    }
+    
+    // Update personal gate order preferences for all users (including admins)
+    // Mongoose Map needs to be initialized if it doesn't exist
+    if (!req.user.gateOrderPreferences) {
+      req.user.gateOrderPreferences = new Map();
+    }
+    
+    // Ensure it's a Map instance
+    const preferences = req.user.gateOrderPreferences instanceof Map 
+      ? req.user.gateOrderPreferences 
+      : new Map(Object.entries(req.user.gateOrderPreferences || {}));
+    
+    validUpdates.forEach(({ gateId, order }) => {
+      preferences.set(String(gateId), order);
+    });
+    
+    // Mongoose will automatically convert Map to object for storage
+    req.user.gateOrderPreferences = preferences;
+    await req.user.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'סדר השערים עודכן בהצלחה'
+    });
+    
+  } catch (error) {
+    console.error('שגיאה בעדכון סדר שערים:', error);
+    res.status(500).json({ error: 'נכשל בעדכון סדר השערים' });
+  }
+});
+
 router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, phoneNumber, authorizedNumber, password } = req.body;
     
-    const gate = await Gate.findOne({ id: parseInt(id) });
+    // Validate and parse the ID
+    const gateId = parseInt(id, 10);
+    if (isNaN(gateId)) {
+      return res.status(400).json({ error: 'מזהה השער לא תקין' });
+    }
+    
+    const gate = await Gate.findOne({ id: gateId });
     
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
@@ -565,7 +695,7 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
       const existingGate = await Gate.findOne({ 
         phoneNumber, 
         isActive: true,
-        id: { $ne: parseInt(id) }
+        id: { $ne: gateId }
       });
       if (existingGate) {
         return res.status(409).json({ error: 'שער אחר עם מספר טלפון זה כבר קיים' });
@@ -602,7 +732,14 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
 router.delete('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const gate = await Gate.findOne({ id: parseInt(id) });
+    
+    // Validate and parse the ID
+    const gateId = parseInt(id, 10);
+    if (isNaN(gateId)) {
+      return res.status(400).json({ error: 'מזהה השער לא תקין' });
+    }
+    
+    const gate = await Gate.findOne({ id: gateId });
     
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });

@@ -251,31 +251,23 @@ const CallerIdValidation = ({ token, onClose }) => {
 
   if (isLoading) {
     return (
-      <div className="modal-overlay">
-        <div className="modal-content">
-          <div className="loading">
-            <div className="loading-spinner"></div>
-            <p>טוען מספרי טלפון מורשים...</p>
-          </div>
+      <div className="form-container">
+        <div className="loading">
+          <div className="loading-spinner"></div>
+          <p>טוען מספרי טלפון מורשים...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content caller-id-validation-modal">
-        <div className="modal-header">
-          <h2>אימות מספרי טלפון</h2>
-          <button onClick={handleClose} className="modal-close-btn">✕</button>
-        </div>
-
-        <div className="modal-body">
-          <p className="modal-description">
-            ניהול מספרי טלפון מורשים לשיחות יוצאות ב-Twilio. 
-            מספרים חדשים דורשים אימות לפני שימוש.
-          </p>
-
+    <div className="form-container">
+      <div>
+        <h3>אימות מספרי טלפון</h3>
+        <p style={{ color: '#6b7280', marginBottom: '2rem' }}>ניהול מספרי טלפון מורשים לשיחות יוצאות ב-Twilio. מספרים חדשים דורשים אימות לפני שימוש.</p>
+      </div>
+      
+      <div>
           {/* Error Message - Only show if notifications are disabled */}
           {error && !notificationsEnabled && (
             <div className="error-message">
@@ -491,12 +483,15 @@ const CallerIdValidation = ({ token, onClose }) => {
             )}
           </div>
         </div>
-
-        <div className="modal-footer">
-          <button onClick={handleClose} className="btn btn-secondary">
-            סגור
-          </button>
-        </div>
+      
+      {/* Close Button at Bottom */}
+      <div className="form-actions" style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid rgba(229, 231, 235, 0.8)' }}>
+        <button 
+          onClick={handleClose} 
+          className="btn btn-secondary"
+        >
+          סגור
+        </button>
       </div>
     </div>
   );

@@ -70,6 +70,66 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Initialize admin user route (only if no users exist)
+router.post('/init-admin', async (req, res) => {
+  try {
+    // Check if MongoDB is connected
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'מסד הנתונים לא זמין. אנא נסה שוב מאוחר יותר.' });
+    }
+
+    // Check if any users exist
+    const userCount = await User.countDocuments();
+    if (userCount > 0) {
+      return res.status(400).json({ error: 'משתמשים כבר קיימים במערכת. השתמש ב-login רגיל.' });
+    }
+
+    const { username, password, name } = req.body;
+
+    if (!username || !password || !name) {
+      return res.status(400).json({ error: 'נדרש שם משתמש, סיסמה ושם מלא' });
+    }
+
+    // Create admin user
+    const adminUser = new User({
+      username: username.toLowerCase().trim(),
+      password,
+      name: name.trim(),
+      role: 'admin',
+      authorizedGates: [],
+      isActive: true
+    });
+
+    await adminUser.save();
+
+    console.log(`Initial admin user created: ${adminUser.username}`);
+
+    // Generate token pair
+    const tokens = generateTokenPair(adminUser);
+
+    res.status(201).json({
+      message: 'משתמש מנהל ראשוני נוצר בהצלחה',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: adminUser._id,
+        username: adminUser.username,
+        name: adminUser.name,
+        role: adminUser.role,
+        authorizedGates: []
+      }
+    });
+
+  } catch (error) {
+    console.error('Init admin error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'שם המשתמש כבר קיים' });
+    }
+    res.status(500).json({ error: 'שגיאה ביצירת משתמש מנהל' });
+  }
+});
+
 // Login route
 router.post('/login', async (req, res) => {
   try {
@@ -79,10 +139,19 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'נדרש שם משתמש וסיסמה' });
     }
 
-    // Find user
-    const user = await User.findOne({ username, isActive: true }).populate('authorizedGates');
+    // Check if MongoDB is connected
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      console.error('MongoDB not connected during login attempt');
+      return res.status(503).json({ error: 'מסד הנתונים לא זמין. אנא נסה שוב מאוחר יותר.' });
+    }
+
+    // Find user - normalize username to lowercase for case-insensitive search
+    const normalizedUsername = username.toLowerCase().trim();
+    const user = await User.findOne({ username: normalizedUsername, isActive: true });
     
     if (!user) {
+      console.log(`Login attempt failed: User '${normalizedUsername}' not found or inactive`);
       return res.status(401).json({ error: 'שם משתמש או סיסמה שגויים' });
     }
 
@@ -90,6 +159,7 @@ router.post('/login', async (req, res) => {
     const isValidPassword = await user.comparePassword(password);
     
     if (!isValidPassword) {
+      console.log(`Login attempt failed: Invalid password for user '${normalizedUsername}'`);
       return res.status(401).json({ error: 'שם משתמש או סיסמה שגויים' });
     }
 
@@ -98,6 +168,8 @@ router.post('/login', async (req, res) => {
 
     // Generate token pair
     const tokens = generateTokenPair(user);
+    
+    console.log(`Login successful for user: ${normalizedUsername} (${user.role})`);
     
     res.json({
       message: 'התחברות הצליחה',
@@ -117,6 +189,13 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Check if it's a MongoDB connection error
+    if (error.name === 'MongoServerError' || error.message.includes('MongoDB')) {
+      return res.status(503).json({ error: 'מסד הנתונים לא זמין. אנא נסה שוב מאוחר יותר.' });
+    }
+    
     res.status(500).json({ error: 'שגיאה בהתחברות' });
   }
 });
@@ -234,8 +313,11 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'נדרש שם משתמש וסיסמה ושם מלא' });
     }
 
-    // Check if username already exists
-    const existingUser = await User.findOne({ username });
+    // Normalize username to lowercase for case-insensitive storage
+    const normalizedUsername = username.toLowerCase().trim();
+    
+    // Check if username already exists (case-insensitive)
+    const existingUser = await User.findOne({ username: normalizedUsername });
     if (existingUser) {
       return res.status(400).json({ error: 'שם המשתמש כבר קיים' });
     }
@@ -311,13 +393,16 @@ router.put('/users/:userId', authenticateToken, requireAdmin, async (req, res) =
       return res.status(404).json({ error: 'משתמש לא נמצא' });
     }
 
-    // Check if new username already exists (if changing username)
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({ username: username.toLowerCase() });
-      if (existingUser) {
-        return res.status(400).json({ error: 'שם המשתמש כבר קיים' });
+    // Check if new username already exists (if changing username) - case-insensitive
+    if (username) {
+      const normalizedUsername = username.toLowerCase().trim();
+      if (normalizedUsername !== user.username.toLowerCase()) {
+        const existingUser = await User.findOne({ username: normalizedUsername });
+        if (existingUser) {
+          return res.status(400).json({ error: 'שם המשתמש כבר קיים' });
+        }
+        user.username = normalizedUsername;
       }
-      user.username = username.toLowerCase();
     }
 
     // Update fields

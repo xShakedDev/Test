@@ -13,6 +13,14 @@ const GateHistory = ({ user, token }) => {
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [selectedLogs, setSelectedLogs] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    totalCount: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
   
   // Refs for scrolling to messages
   const errorRef = useRef(null);
@@ -25,7 +33,7 @@ const GateHistory = ({ user, token }) => {
     } else if (filter === 'user') {
       fetchUsers();
     }
-  }, [filter, filterValue, dateFilter, token]);
+  }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit]);
 
   // Function to scroll to messages
   const scrollToMessage = (type) => {
@@ -70,18 +78,18 @@ const GateHistory = ({ user, token }) => {
       setIsLoading(true);
       setError('');
       
-      let url = '/api/gates/history?limit=100';
+      let url = `/api/gates/history?limit=${pagination.limit}&page=${pagination.page}`;
       if (filter === 'gate' && filterValue) {
         url += `&gateName=${encodeURIComponent(filterValue)}`;
-              } else if (filter === 'user' && filterValue) {
-          url += `&username=${encodeURIComponent(filterValue)}`;
-        } else if (filter === 'date' && (dateFilter.start || dateFilter.end)) {
-          if (dateFilter.start) {
-            url += `&startDate=${dateFilter.start}`;
-          }
-          if (dateFilter.end) {
-            url += `&endDate=${dateFilter.end}`;
-          }
+      } else if (filter === 'user' && filterValue) {
+        url += `&username=${encodeURIComponent(filterValue)}`;
+      } else if (filter === 'date' && (dateFilter.start || dateFilter.end)) {
+        if (dateFilter.start) {
+          url += `&startDate=${dateFilter.start}`;
+        }
+        if (dateFilter.end) {
+          url += `&endDate=${dateFilter.end}`;
+        }
       }
 
       const response = await authenticatedFetch(url);
@@ -89,6 +97,14 @@ const GateHistory = ({ user, token }) => {
       if (response.ok) {
         const data = await response.json();
         setHistory(data.history || []);
+        setPagination({
+          page: data.page || 1,
+          limit: data.limit || 50,
+          totalCount: data.totalCount || 0,
+          totalPages: data.totalPages || 1,
+          hasNextPage: data.hasNextPage || false,
+          hasPrevPage: data.hasPrevPage || false
+        });
         setSelectedLogs([]);
         setSelectAll(false);
       } else {
@@ -240,6 +256,19 @@ const GateHistory = ({ user, token }) => {
     }
   };
 
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setPagination(prev => ({ ...prev, limit: parseInt(newLimit), page: 1 }));
+  };
+
+  const handleFilterChange = () => {
+    // Reset to page 1 when filter changes
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
   return (
     <div className="history-page">
       <div className="history-container">
@@ -281,6 +310,7 @@ const GateHistory = ({ user, token }) => {
                   setFilter('all');
                   setFilterValue('');
                   setDateFilter({ start: '', end: '' });
+                  handleFilterChange();
                 }}
                 className="btn btn-secondary btn-sm"
               >
@@ -294,6 +324,7 @@ const GateHistory = ({ user, token }) => {
               setFilter(e.target.value);
               setFilterValue('');
               setDateFilter({ start: '', end: '' });
+              handleFilterChange();
             }}
             className="form-input"
           >
@@ -365,13 +396,71 @@ const GateHistory = ({ user, token }) => {
           )}
 
           <button
-            onClick={fetchHistory}
+            onClick={() => {
+              handleFilterChange();
+              fetchHistory();
+            }}
             className="btn btn-primary"
             disabled={isLoading}
           >
             {isLoading ? 'טוען...' : 'סנן'}
           </button>
         </div>
+
+        {/* Pagination Controls */}
+        {history.length > 0 && (
+          <div className="pagination-controls">
+            <div className="pagination-info">
+              <span>
+                מציג {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.totalCount)} מתוך {pagination.totalCount} רשומות
+              </span>
+              <select
+                value={pagination.limit}
+                onChange={(e) => handleLimitChange(e.target.value)}
+                className="form-input pagination-limit"
+                disabled={isLoading}
+              >
+                <option value={25}>25 שורות</option>
+                <option value={50}>50 שורות</option>
+                <option value={100}>100 שורות</option>
+                <option value={200}>200 שורות</option>
+              </select>
+            </div>
+            <div className="pagination-buttons">
+              <button
+                onClick={() => handlePageChange(1)}
+                className="btn btn-secondary btn-sm"
+                disabled={!pagination.hasPrevPage || isLoading}
+              >
+                ראשון
+              </button>
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                className="btn btn-secondary btn-sm"
+                disabled={!pagination.hasPrevPage || isLoading}
+              >
+                קודם
+              </button>
+              <span className="pagination-page-info">
+                עמוד {pagination.page} מתוך {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                className="btn btn-secondary btn-sm"
+                disabled={!pagination.hasNextPage || isLoading}
+              >
+                הבא
+              </button>
+              <button
+                onClick={() => handlePageChange(pagination.totalPages)}
+                className="btn btn-secondary btn-sm"
+                disabled={!pagination.hasNextPage || isLoading}
+              >
+                אחרון
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Bulk Actions */}
         {history.length > 0 && (

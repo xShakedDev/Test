@@ -6,6 +6,7 @@ import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
 import { isSessionExpired, authenticatedFetch } from './utils/auth';
+import './styles/design-system.css';
 import './App.css';
 
 function App() {
@@ -47,9 +48,13 @@ function App() {
     setUser(null);
     setToken(null);
     setCurrentView('gates');
+    // Clear both localStorage and sessionStorage
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('user');
   }, []);
 
   // Check maintenance status
@@ -90,7 +95,9 @@ function App() {
         const data = await response.json();
         if (JSON.stringify(data.user) !== JSON.stringify(userData)) {
           setUser(data.user);
-          localStorage.setItem('user', JSON.stringify(data.user));
+          // Save to the same storage where token was found
+          const storage = localStorage.getItem('authToken') ? localStorage : sessionStorage;
+          storage.setItem('user', JSON.stringify(data.user));
         }
       }
     } catch (error) {
@@ -104,8 +111,7 @@ function App() {
   const handleLogin = (userData, tokens) => {
     setUser(userData);
     setToken(tokens.accessToken);
-    // Store refresh token in localStorage
-    localStorage.setItem('refreshToken', tokens.refreshToken);
+    // Tokens are already stored in Login.js (localStorage or sessionStorage based on rememberMe)
     setCurrentView('gates'); // Default to gates view after login
   };
 
@@ -115,8 +121,15 @@ function App() {
 
   // Check for saved authentication on app load
   useEffect(() => {
-    const savedToken = localStorage.getItem('authToken');
-    const savedUser = localStorage.getItem('user');
+    // Check localStorage first (remember me), then sessionStorage (session only)
+    let savedToken = localStorage.getItem('authToken');
+    let savedUser = localStorage.getItem('user');
+    
+    // If not in localStorage, check sessionStorage
+    if (!savedToken || !savedUser) {
+      savedToken = sessionStorage.getItem('authToken');
+      savedUser = sessionStorage.getItem('user');
+    }
     
     if (savedToken && savedUser) {
       try {
@@ -135,7 +148,7 @@ function App() {
     checkMaintenanceStatus();
     
     setIsLoading(false);
-  }, [verifyToken, handleLogout, checkMaintenanceStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [verifyToken, handleLogout, checkMaintenanceStatus]);
 
   // Auto-refresh token every hour
   useEffect(() => {
@@ -143,7 +156,15 @@ function App() {
     
     const refreshInterval = setInterval(async () => {
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
+        // Check localStorage first, then sessionStorage
+        let refreshToken = localStorage.getItem('refreshToken');
+        let storage = localStorage;
+        
+        if (!refreshToken) {
+          refreshToken = sessionStorage.getItem('refreshToken');
+          storage = sessionStorage;
+        }
+        
         if (refreshToken) {
           const response = await authenticatedFetch('/api/auth/refresh', {
             method: 'POST',
@@ -156,8 +177,9 @@ function App() {
           if (response.ok) {
             const data = await response.json();
             setToken(data.accessToken);
-            localStorage.setItem('authToken', data.accessToken);
-            localStorage.setItem('refreshToken', data.refreshToken);
+            // Save to the same storage where refresh token was found
+            storage.setItem('authToken', data.accessToken);
+            storage.setItem('refreshToken', data.refreshToken);
           }
         }
       } catch (error) {
@@ -235,6 +257,9 @@ function App() {
           />
         )}
       </main>
+      <footer className="app-footer">
+        <p>כל הזכויות שמורות לשקד יוסף</p>
+      </footer>
     </div>
   );
 }

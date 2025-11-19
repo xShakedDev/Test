@@ -53,6 +53,10 @@ const gateSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  order: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true, // adds createdAt and updatedAt automatically
@@ -67,7 +71,7 @@ const gateSchema = new mongoose.Schema({
 });
 
 // Index for better query performance
-gateSchema.index({ id: 1 });
+// Note: id field already has unique: true which creates an index automatically
 gateSchema.index({ phoneNumber: 1 });
 gateSchema.index({ authorizedNumber: 1 });
 gateSchema.index({ isActive: 1 });

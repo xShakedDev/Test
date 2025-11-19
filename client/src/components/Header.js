@@ -12,6 +12,8 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   const mobileNavContentRef = useRef(null);
   const mobileMenuToggleRef = useRef(null);
   const [mobileNavMaxHeight, setMobileNavMaxHeight] = useState('80vh');
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
 
   // Fetch Twilio balance for admin users
   useEffect(() => {
@@ -59,7 +61,49 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   useEffect(() => {
     if (!isMobileMenuOpen) return;
 
+    let touchStartY = null;
+    let isScrolling = false;
+
     const handlePointerDown = (e) => {
+      // Store initial touch position for scroll detection
+      if (e.type === 'touchstart') {
+        touchStartY = e.touches[0].clientY;
+        isScrolling = false;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      // If touch moves significantly, it's a scroll, not a click
+      if (touchStartY !== null) {
+        const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+        if (deltaY > 10) {
+          isScrolling = true;
+        }
+      }
+    };
+
+    const handlePointerUp = (e) => {
+      // Only close menu if it wasn't a scroll
+      if (isScrolling) {
+        touchStartY = null;
+        isScrolling = false;
+        return;
+      }
+
+      const menuEl = mobileNavContentRef.current;
+      const toggleEl = mobileMenuToggleRef.current;
+      if (!menuEl) return;
+      const clickedInsideMenu = menuEl.contains(e.target);
+      const clickedToggle = toggleEl && toggleEl.contains(e.target);
+      if (!clickedInsideMenu && !clickedToggle) {
+        setIsMobileMenuOpen(false);
+      }
+      
+      touchStartY = null;
+      isScrolling = false;
+    };
+
+    const handleMouseDown = (e) => {
       const menuEl = mobileNavContentRef.current;
       const toggleEl = mobileMenuToggleRef.current;
       if (!menuEl) return;
@@ -70,12 +114,58 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
+    // For touch devices: use touch events with scroll detection
     document.addEventListener('touchstart', handlePointerDown, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handlePointerUp, { passive: true });
+    
+    // For mouse devices: use mousedown
+    document.addEventListener('mousedown', handleMouseDown);
+    
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handlePointerUp);
+      document.removeEventListener('mousedown', handleMouseDown);
     };
+  }, [isMobileMenuOpen]);
+
+  // Handle header visibility on scroll
+  useEffect(() => {
+    let ticking = false;
+    
+    const handleScroll = () => {
+      // Don't hide header if mobile menu is open
+      if (isMobileMenuOpen) {
+        setIsHeaderVisible(true);
+        return;
+      }
+      
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          
+          // Always show header at the top of the page
+          if (currentScrollY < 10) {
+            setIsHeaderVisible(true);
+          } else if (currentScrollY < lastScrollY.current - 5) {
+            // Scrolling up (with threshold to avoid flickering)
+            setIsHeaderVisible(true);
+          } else if (currentScrollY > lastScrollY.current + 5) {
+            // Scrolling down (with threshold to avoid flickering)
+            setIsHeaderVisible(false);
+          }
+          
+          lastScrollY.current = currentScrollY;
+          ticking = false;
+        });
+        
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [isMobileMenuOpen]);
 
   const fetchTwilioBalance = async () => {
@@ -116,7 +206,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   };
 
   return (
-    <header className="app-header">
+    <header className={`app-header ${isHeaderVisible ? 'header-visible' : 'header-hidden'}`}>
       <div className="header-content">
         {/* Left side - Logo and Navigation */}
         <div className="header-left">
@@ -124,7 +214,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             <svg className="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            מערכת ניהול שערים
+           מערכת שערים
           </div>
           
           {/* Desktop Navigation - Hidden on mobile */}
