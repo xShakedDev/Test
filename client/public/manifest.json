@@ -1,0 +1,28 @@
+{
+  "short_name": "Shaked Gates",
+  "name": "Shaked Gates",
+  "description": "פתיחת שערים חכמה",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#001A4D",
+  "background_color": "#001A4D",
+  "orientation": "portrait",
+  "scope": "/",
+  "dir": "rtl",
+  "lang": "he"
+}
+
