@@ -21,7 +21,7 @@ import CallerIdValidation from './CallerIdValidation';
 import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
 // Sortable Gate Card Component
-const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect }) => {
+const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode }) => {
   const {
     attributes,
     listeners,
@@ -29,7 +29,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: String(gate.id), disabled: !!editingGate });
+  } = useSortable({ id: String(gate.id), disabled: !!editingGate || !isEditMode });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -47,27 +47,29 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
       {isMobile ? (
         // Mobile: Compact card with just gate name
         <div className="gate-card-mobile-content">
-          {/* Row 1: Drag handle */}
-          <div 
-            className="gate-drag-handle-mobile" 
-            {...attributes} 
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              // Prevent scrolling while dragging
-              document.body.style.overflow = 'hidden';
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
-              // Re-enable scrolling after drag
-              document.body.style.overflow = '';
-            }}
-          >
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-            </svg>
-          </div>
+          {/* Row 1: Drag handle - Only show in edit mode */}
+          {isEditMode && (
+            <div 
+              className="gate-drag-handle-mobile" 
+              {...attributes} 
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                // Prevent scrolling while dragging
+                document.body.style.overflow = 'hidden';
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                // Re-enable scrolling after drag
+                document.body.style.overflow = '';
+              }}
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </div>
+          )}
           
           {/* Row 2: Gate name */}
           <div className="gate-name-mobile-row">
@@ -198,25 +200,27 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
               <div className="gate-header">
                 <h3>{gate.name}</h3>
                 <div className="gate-actions-header">
-                  <div 
-                    className="gate-drag-handle" 
-                    {...attributes} 
-                    {...listeners} 
-                    title="גרור לשינוי סדר"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => {
-                      // Prevent scrolling while dragging
-                      document.body.style.overflow = 'hidden';
-                    }}
-                    onMouseUp={(e) => {
-                      // Re-enable scrolling after drag
-                      document.body.style.overflow = '';
-                    }}
-                  >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                    </svg>
-                  </div>
+                  {isEditMode && (
+                    <div 
+                      className="gate-drag-handle" 
+                      {...attributes} 
+                      {...listeners} 
+                      title="גרור לשינוי סדר"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => {
+                        // Prevent scrolling while dragging
+                        document.body.style.overflow = 'hidden';
+                      }}
+                      onMouseUp={(e) => {
+                        // Re-enable scrolling after drag
+                        document.body.style.overflow = '';
+                      }}
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                      </svg>
+                    </div>
+                  )}
                   {user?.role === 'admin' && (
                     <>
                       <button
@@ -341,6 +345,7 @@ const GateDashboard = ({ user, token }) => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [selectedGate, setSelectedGate] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   // Refs for scrolling to errors
   const errorRef = useRef(null);
@@ -908,12 +913,25 @@ const GateDashboard = ({ user, token }) => {
             <p>
               {user?.role === 'admin' 
                 ? 'ניהול שערים במערכת - הוסף, ערוך ומחק שערים' 
-                : 'לשינוי סדר השערים גרור את השער דרך הסימון למעלה'
+                : isEditMode 
+                  ? 'גרור את השערים כדי לשנות את הסדר שלהם'
+                  : 'לשינוי סדר השערים לחץ על כפתור "עריכה" למעלה'
               }
             </p>
             
+            <div className="admin-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className={`btn ${isEditMode ? 'btn-secondary' : 'btn-primary'}`}
+              >
+                <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>{isEditMode ? 'סיים עריכה' : 'עריכה'}</span>
+              </button>
+            
             {user?.role === 'admin' && (
-              <div className="admin-actions">
+              <>
                 <button
                   onClick={() => {
                     setEditingGate(null);
@@ -937,8 +955,9 @@ const GateDashboard = ({ user, token }) => {
                   </svg>
                   <span>אימות מספרי טלפון</span>
                 </button>
-              </div>
+              </>
             )}
+            </div>
           </div>
         </div>
       )}
@@ -1309,6 +1328,7 @@ const GateDashboard = ({ user, token }) => {
                   handleEdit={handleEdit}
                   handleDelete={handleDelete}
                   handleGateSelect={handleGateSelect}
+                  isEditMode={isEditMode}
                 />
               ))}
             </div>

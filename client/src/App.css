@@ -116,12 +116,20 @@ body::before {
   align-items: center;
   gap: 0.75rem;
   margin: 0;
+  margin-left: 2rem;
 }
 
 .header-icon {
   width: 2rem;
   height: 2rem;
   color: white;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.header-logo-img {
+  width: 8rem;
+  height: 8rem;
+  object-fit: contain;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
@@ -223,7 +231,6 @@ body::before {
 .mobile-navigation {
   display: none;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
-  margin-top: 1.5rem;
   padding-top: 1.5rem;
   border-top: 2px solid rgba(255, 255, 255, 0.3);
 }
@@ -1561,25 +1568,40 @@ body::before {
 /* Mobile landscape */
 @media (max-width: 768px) {
   .app-header {
-    padding: 0.5rem 0;
+    padding: 0.25rem 0;
   }
 
   .header-content {
     padding: 0 1rem;
     flex-direction: column;
-    gap: 1rem;
     text-align: center;
   }
 
   .header-left {
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
   }
 
   .header-left .app-title {
     font-size: 1.5rem;
     justify-content: center;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .header-logo-img {
+    width: 10rem;
+    height: 10rem;
+    margin: 0;
+    padding: 0;
+    display: block;
   }
 
   .desktop-navigation {
@@ -1608,8 +1630,8 @@ body::before {
 
   .mobile-navigation {
     display: block;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
+    margin-top: 0;
+    padding-top: 0.5rem;
     border-top: 2px solid rgba(255, 255, 255, 0.3);
   }
 
@@ -1736,7 +1758,6 @@ body::before {
 
   .header-content {
     padding: 0 0.75rem;
-    gap: 1.25rem;
   }
 
   .header-left {
@@ -1752,7 +1773,6 @@ body::before {
   }
 
   .mobile-navigation {
-    margin-top: 2rem;
     padding-top: 2rem;
     border-top: 2px solid rgba(255, 255, 255, 0.4);
   }
@@ -3256,32 +3276,46 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 0;
   direction: rtl;
 }
 
 .login-header {
   text-align: center;
   margin-bottom: 2rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  padding: 2rem;
+  border-radius: 0;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .login-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
 }
 
 .logo-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--radius-lg);
+  width: 200px;
+  height: 200px;
+  border-radius: 0;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: var(--shadow-lg);
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  box-shadow: none;
   color: white;
+  padding: 0;
+}
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
 }
 
 .logo-svg {
@@ -3368,7 +3402,7 @@ body::before {
 /* Mobile Login Page */
 @media (max-width: 768px) {
   .login-page {
-    padding: 1rem;
+    padding: 0;
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -3376,7 +3410,12 @@ body::before {
   }
 
   .login-logo {
-    margin-bottom: 1rem;
+    margin-bottom: 0;
+  }
+
+  .logo-icon {
+    width: 250px;
+    height: 250px;
   }
 
   .login-form-container {
@@ -3403,11 +3442,16 @@ body::before {
 
 @media (max-width: 480px) {
   .login-page {
-    padding: 0.75rem;
+    padding: 0;
   }
 
   .login-title {
     font-size: 1.6rem;
+  }
+
+  .logo-icon {
+    width: 200px;
+    height: 200px;
   }
 
   .login-submit-btn {
