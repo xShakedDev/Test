@@ -131,7 +131,14 @@ const GateHistory = ({ user, token }) => {
   const formatDate = (dateString) => {
     if (!dateString) return 'לא ידוע';
     const date = new Date(dateString);
-    return date.toLocaleString('he-IL');
+    const dateStr = date.toLocaleDateString('he-IL');
+    const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    return (
+      <span className="date-time-wrapper">
+        <span className="date-part">{dateStr}</span>
+        <span className="time-part">{timeStr}</span>
+      </span>
+    );
   };
 
   const handleSelectLog = (logId) => {
@@ -312,7 +319,7 @@ const GateHistory = ({ user, token }) => {
                   setDateFilter({ start: '', end: '' });
                   handleFilterChange();
                 }}
-                className="btn btn-secondary btn-sm"
+                className="btn btn-primary btn-sm"
               >
                 נקה סינון
               </button>
@@ -429,14 +436,14 @@ const GateHistory = ({ user, token }) => {
             <div className="pagination-buttons">
               <button
                 onClick={() => handlePageChange(1)}
-                className="btn btn-secondary btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={!pagination.hasPrevPage || isLoading}
               >
                 ראשון
               </button>
               <button
                 onClick={() => handlePageChange(pagination.page - 1)}
-                className="btn btn-secondary btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={!pagination.hasPrevPage || isLoading}
               >
                 קודם
@@ -446,14 +453,14 @@ const GateHistory = ({ user, token }) => {
               </span>
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
-                className="btn btn-secondary btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={!pagination.hasNextPage || isLoading}
               >
                 הבא
               </button>
               <button
                 onClick={() => handlePageChange(pagination.totalPages)}
-                className="btn btn-secondary btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={!pagination.hasNextPage || isLoading}
               >
                 אחרון
@@ -514,10 +521,10 @@ const GateHistory = ({ user, token }) => {
                         onChange={handleSelectAll}
                       />
                     </th>
-                    <th>תאריך</th>
-                    <th>שער</th>
                     <th>משתמש</th>
+                    <th>שער</th>
                     <th>סטטוס</th>
+                    <th>תאריך</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -530,9 +537,8 @@ const GateHistory = ({ user, token }) => {
                           onChange={() => handleSelectLog(log.id)}
                         />
                       </td>
-                      <td className="history-date">{formatDate(log.timestamp)}</td>
-                      <td className="history-gate">{log.gateName || 'לא ידוע'}</td>
                       <td className="history-user">{log.userName || log.username || (log.userId && (log.userId.name || log.userId.username)) || 'לא ידוע'}</td>
+                      <td className="history-gate">{log.gateName || 'לא ידוע'}</td>
                       <td className="history-status">
                         {(() => {
                           const isSuccess = (log.success === true) || (log.status === 'success');
@@ -543,6 +549,7 @@ const GateHistory = ({ user, token }) => {
                           );
                         })()}
                       </td>
+                      <td className="history-date">{formatDate(log.timestamp)}</td>
                     </tr>
                   ))}
                 </tbody>

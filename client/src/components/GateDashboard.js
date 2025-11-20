@@ -906,61 +906,68 @@ const GateDashboard = ({ user, token }) => {
   return (
     <div className="dashboard-container">
       {/* Dashboard Header */}
-      {!showCallerIdValidation && (
-        <div className="dashboard-header">
-          <div>
-            <h1>שערים</h1>
-            <p>
-              {user?.role === 'admin' 
-                ? 'ניהול שערים במערכת - הוסף, ערוך ומחק שערים' 
-                : isEditMode 
-                  ? 'גרור את השערים כדי לשנות את הסדר שלהם'
-                  : 'לשינוי סדר השערים לחץ על כפתור "עריכה"'
-              }
-            </p>
-            
-            <div className="admin-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`btn ${isEditMode ? 'btn-secondary' : 'btn-primary'}`}
-              >
-                <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span>{isEditMode ? 'סיים עריכה' : 'עריכה'}</span>
-              </button>
-            
-            {user?.role === 'admin' && (
-              <>
-                <button
-                  onClick={() => {
-                    setEditingGate(null);
-                    setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '', password: '' });
-                    setShowAddGate(true);
-                  }}
-                  className="btn btn-primary"
-                >
-                  <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span>הוסף שער חדש</span>
-                </button>
-                
-                <button
-                  onClick={() => setShowCallerIdValidation(true)}
-                  className="btn btn-primary"
-                >
-                  <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <span>אימות מספרי טלפון</span>
-                </button>
-              </>
-            )}
-            </div>
-          </div>
+      <div className="dashboard-header">
+        <div>
+          <h1>שערים</h1>
+          <p>
+            {user?.role === 'admin' 
+              ? 'ניהול שערים במערכת - הוסף, ערוך ומחק שערים' 
+              : isEditMode 
+                ? 'גרור את השערים כדי לשנות את הסדר שלהם'
+                : 'לשינוי סדר השערים לחץ על כפתור "עריכה"'
+            }
+          </p>
         </div>
-      )}
+      </div>
+
+      {/* Action Buttons - Outside header, above gates */}
+      <div className="dashboard-actions-bar">
+        <div className="admin-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={`btn ${isEditMode ? 'btn-secondary' : 'btn-primary'}`}
+            disabled={showAddGate || showCallerIdValidation}
+          >
+            <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>{isEditMode ? 'סיים עריכה' : 'עריכה'}</span>
+          </button>
+        
+        {user?.role === 'admin' && (
+          <>
+            <button
+              onClick={() => {
+                setShowAddGate(false);
+                setEditingGate(null);
+                setShowCallerIdValidation(true);
+              }}
+              className={`btn ${showCallerIdValidation ? 'btn-secondary' : 'btn-primary'}`}
+            >
+              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <span>אימות מספר</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                setEditingGate(null);
+                setNewGateData({ name: '', phoneNumber: '', authorizedNumber: '', password: '' });
+                setShowCallerIdValidation(false);
+                setShowAddGate(true);
+              }}
+              className={`btn ${showAddGate ? 'btn-secondary' : 'btn-primary'}`}
+            >
+              <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>הוסף שער</span>
+            </button>
+          </>
+        )}
+        </div>
+      </div>
 
       {/* Error Message - Only show if notifications are disabled */}
       {error && !notificationsEnabled && (
