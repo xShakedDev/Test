@@ -32,6 +32,17 @@ export const isTokenExpired = (errorData) => {
   );
 };
 
+// Global callback to update token in App.js state
+let tokenUpdateCallback = null;
+
+/**
+ * Set callback to update token in App.js state
+ * @param {Function} callback - Function to call when token is updated
+ */
+export const setTokenUpdateCallback = (callback) => {
+  tokenUpdateCallback = callback;
+};
+
 /**
  * Refresh the access token using the refresh token
  * @returns {Promise<Object>} - New tokens or null if refresh failed
@@ -64,6 +75,21 @@ export const refreshAccessToken = async () => {
       // Update tokens in the same storage where refresh token was found
       storage.setItem('authToken', data.accessToken);
       storage.setItem('refreshToken', data.refreshToken);
+      
+      // Notify App.js to update token state
+      if (tokenUpdateCallback) {
+        tokenUpdateCallback(data.accessToken);
+      }
+      
+      // Also dispatch custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('customStorageChange', {
+        detail: {
+          key: 'authToken',
+          newValue: data.accessToken,
+          oldValue: storage.getItem('authToken')
+        }
+      }));
+      
       return data;
     }
     

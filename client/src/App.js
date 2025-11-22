@@ -5,7 +5,7 @@ import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
-import { isSessionExpired, authenticatedFetch } from './utils/auth';
+import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback } from './utils/auth';
 import './styles/design-system.css';
 import './App.css';
 
@@ -38,6 +38,53 @@ function App() {
       };
     }
   }, []);
+
+  // Set up token update callback for when token is refreshed
+  useEffect(() => {
+    setTokenUpdateCallback((newToken) => {
+      setToken(newToken);
+    });
+    
+    return () => {
+      setTokenUpdateCallback(null);
+    };
+  }, []);
+
+  // Listen for storage changes to sync token state
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      // Only handle authToken changes
+      if (e.key === 'authToken') {
+        const newToken = e.newValue;
+        if (newToken && newToken !== token) {
+          setToken(newToken);
+        } else if (!newToken && token) {
+          // Token was removed, but don't logout here as handleLogout handles it
+          setToken(null);
+        }
+      }
+    };
+
+    // Listen to both localStorage and sessionStorage changes
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen to custom storage events (for same-tab updates)
+    const handleCustomStorageChange = (e) => {
+      if (e.detail && e.detail.key === 'authToken') {
+        const newToken = e.detail.newValue;
+        if (newToken && newToken !== token) {
+          setToken(newToken);
+        }
+      }
+    };
+    
+    window.addEventListener('customStorageChange', handleCustomStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('customStorageChange', handleCustomStorageChange);
+    };
+  }, [token]);
 
   const handleLogout = useCallback(() => {
     // Show system notification if enabled
@@ -203,8 +250,38 @@ function App() {
   }
 
   // Show login page if not authenticated
-  if (!user || !token) {
+  // Check both state and storage to handle token refresh scenarios
+  const hasTokenInState = !!(user && token);
+  const hasTokenInStorage = !!(localStorage.getItem('authToken') || sessionStorage.getItem('authToken'));
+  
+  if (!hasTokenInState && !hasTokenInStorage) {
     return <Login onLogin={handleLogin} isLoading={isLoading} />;
+  }
+  
+  // If token exists in storage but not in state, try to reload it
+  if (!hasTokenInState && hasTokenInStorage) {
+    const savedToken = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+    const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+    
+    if (savedToken && savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setToken(savedToken);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+      }
+    }
+    
+    // Show loading while syncing
+    return (
+      <div className="loading">
+        <div className="loading-content">
+          <div className="loading-spinner"></div>
+          <p>טוען...</p>
+        </div>
+      </div>
+    );
   }
 
   // Main application for authenticated users

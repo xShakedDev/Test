@@ -160,6 +160,21 @@ const initializeServer = async () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`   Storage: MongoDB`);
+      
+      // Check JWT_SECRET configuration
+      if (process.env.NODE_ENV === 'production') {
+        if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your-secret-jwt-key-change-in-production') {
+          console.error('');
+          console.error('═══════════════════════════════════════════════════════════');
+          console.error('⚠️  CRITICAL: JWT_SECRET not properly configured!');
+          console.error('⚠️  Users will be logged out on every deployment!');
+          console.error('⚠️  Set JWT_SECRET in Google Cloud Run environment variables.');
+          console.error('═══════════════════════════════════════════════════════════');
+          console.error('');
+        } else {
+          console.log(`   JWT_SECRET: ✓ Configured`);
+        }
+      }
     });
 
     // Graceful shutdown

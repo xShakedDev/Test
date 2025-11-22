@@ -8,6 +8,21 @@ const router = express.Router();
 // JWT secret key
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-jwt-key-change-in-production';
 
+// Warn if using default JWT_SECRET in production
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'your-secret-jwt-key-change-in-production') {
+  console.error('⚠️  WARNING: Using default JWT_SECRET in production!');
+  console.error('⚠️  This will cause all users to be logged out on each deployment.');
+  console.error('⚠️  Please set JWT_SECRET environment variable in Google Cloud Service.');
+  console.error('⚠️  Go to: Cloud Run > Your Service > Variables & Secrets > Add Variable');
+}
+
+// Warn if JWT_SECRET is not set
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  WARNING: JWT_SECRET not set in environment variables!');
+  console.warn('⚠️  Using default secret. This will cause authentication issues.');
+  console.warn('⚠️  Set JWT_SECRET in Google Cloud Service environment variables.');
+}
+
 // Token expiration times
 const ACCESS_TOKEN_EXPIRY = '1h'; // Short-lived access token
 const REFRESH_TOKEN_EXPIRY = '7d'; // Long-lived refresh token
