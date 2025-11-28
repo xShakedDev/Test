@@ -34,7 +34,7 @@ function getTwilioClient() {
 // Middleware to check MongoDB connection
 const requireMongoDB = (req, res, next) => {
   if (!isConnected()) {
-    return res.status(503).json({ 
+    return res.status(503).json({
       error: 'שירות הנתונים לא זמין',
       details: 'MongoDB לא מחובר'
     });
@@ -48,24 +48,24 @@ const requireMongoDB = (req, res, next) => {
 router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     let gates;
-    
+
     // Admin sees all gates, regular users see only their authorized gates
     if (req.user.role === 'admin') {
       gates = await Gate.findActive().sort({ order: 1, createdAt: -1 });
     } else {
-      gates = await Gate.find({ 
-        id: { $in: req.user.authorizedGates }, 
-        isActive: true 
+      gates = await Gate.find({
+        id: { $in: req.user.authorizedGates },
+        isActive: true
       }).sort({ order: 1, createdAt: -1 });
     }
-    
+
     // Apply personal order preferences for all users (including admins)
     if (req.user.gateOrderPreferences) {
       // Convert Mongoose Map to plain object if needed
-      const userPreferences = req.user.gateOrderPreferences instanceof Map 
-        ? req.user.gateOrderPreferences 
+      const userPreferences = req.user.gateOrderPreferences instanceof Map
+        ? req.user.gateOrderPreferences
         : new Map(Object.entries(req.user.gateOrderPreferences || {}));
-      
+
       if (userPreferences.size > 0) {
         gates.sort((a, b) => {
           const orderA = userPreferences.get(String(a.id)) ?? userPreferences.get(a.id) ?? a.order ?? 999;
@@ -78,8 +78,8 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
         });
       }
     }
-    
-    res.json({ 
+
+    res.json({
       gates: gates.map(gate => gate.toJSON()),
       count: gates.length,
       timestamp: new Date().toISOString()
@@ -95,10 +95,10 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
   try {
     const { id } = req.params;
     const { password } = req.body;
-    
+
     // Get current admin settings
     const adminSettings = await AdminSettings.getCurrentSettings();
-    
+
     // If not admin, block opening when Twilio balance is below threshold
     if (req.user.role !== 'admin' && adminSettings.blockIfLowTwilioBalance) {
       try {
@@ -118,7 +118,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
               success: false,
               errorMessage: 'חסימת פתיחת שערים - יתרת Twilio נמוכה'
             }).save();
-          } catch (_) {}
+          } catch (_) { }
           return res.status(402).json({
             error: 'יתרת Twilio נמוכה',
             message: 'לשקד תכף נגמר הכסף תפקידו לו'
@@ -132,22 +132,22 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 
     // Check if system is in maintenance mode
     if (adminSettings.systemMaintenance) {
-      return res.status(503).json({ 
-        error: 'המערכת בתחזוקה', 
+      return res.status(503).json({
+        error: 'המערכת בתחזוקה',
         message: adminSettings.maintenanceMessage || 'המערכת בתחזוקה כרגע'
       });
     }
-    
+
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
     if (isNaN(gateId)) {
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
-    
+
     const gate = await Gate.findOne({ id: gateId });
-    
+
     if (!gate || !gate.isActive) {
-        // Log failed gate opening attempt - gate not found
+      // Log failed gate opening attempt - gate not found
       try {
         await new GateHistory({
           userId: req.user._id,
@@ -160,10 +160,10 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       } catch (logError) {
         console.error('שגיאה ברישום היסטוריית כישלון:', logError);
       }
-      
+
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
-    
+
     // Check if user has permission to open this gate
     if (req.user.role !== 'admin' && !req.user.canAccessGate(id)) {
       // Log failed gate opening attempt - no permission
@@ -179,17 +179,17 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       } catch (logError) {
         console.error('שגיאה ברישום היסטוריית כישלון:', logError);
       }
-      
+
       return res.status(403).json({ error: 'אין הרשאה לפתוח שער זה' });
     }
-    
+
     // Check cooldown for this gate
     const now = new Date();
     const cooldownMs = adminSettings.gateCooldownSeconds * 1000;
-    
+
     if (gate.lastOpenedAt && (now - new Date(gate.lastOpenedAt)) < cooldownMs) {
       const remainingTime = Math.ceil((cooldownMs - (now - new Date(gate.lastOpenedAt))) / 1000);
-      
+
       // Log failed attempt due to cooldown
       try {
         await new GateHistory({
@@ -203,23 +203,23 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       } catch (logError) {
         console.error('שגיאה ברישום היסטוריית כישלון:', logError);
       }
-      
-      return res.status(429).json({ 
-        error: 'דילאי פעיל', 
+
+      return res.status(429).json({
+        error: 'דילאי פעיל',
         message: `נסה שוב בעוד ${remainingTime} שניות`,
         remainingTime
       });
     }
-    
+
     // Check retry limit for this user and gate
     const recentAttempts = await GateHistory.find({
       userId: req.user._id,
       gateId: gate.id,
       timestamp: { $gte: new Date(now - 24 * 60 * 60 * 1000) } // Last 24 hours
     });
-    
+
     const failedAttempts = recentAttempts.filter(attempt => !attempt.success).length;
-    
+
     if (failedAttempts >= adminSettings.maxRetries) {
       // Log failed attempt due to retry limit
       try {
@@ -234,13 +234,13 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       } catch (logError) {
         console.error('שגיאה ברישום היסטוריית כישלון:', logError);
       }
-      
-      return res.status(429).json({ 
-        error: 'חריגה ממספר הניסיונות', 
+
+      return res.status(429).json({
+        error: 'חריגה ממספר הניסיונות',
         message: `חריגה ממספר הניסיונות המותר (${adminSettings.maxRetries}). נסה שוב מחר.`
       });
     }
-    
+
     // Check if gate requires password
     if (gate.password && gate.password !== password) {
       // Log failed gate opening attempt due to wrong password
@@ -256,10 +256,10 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       } catch (logError) {
         console.error('שגיאה ברישום היסטוריית כישלון:', logError);
       }
-      
+
       return res.status(401).json({ error: 'סיסמה שגויה' });
     }
-    
+
     const client = getTwilioClient();
     const call = await client.calls.create({
       url: 'http://demo.twilio.com/docs/voice.xml',
@@ -269,10 +269,10 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       statusCallbackEvent: ['completed'],
       statusCallbackMethod: 'POST'
     });
-    
+
     // Update gate with last opened time
     await gate.markAsOpened();
-    
+
     // Log successful gate opening
     await new GateHistory({
       userId: req.user._id,
@@ -282,17 +282,17 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       success: true,
       callSid: call.sid
     }).save();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `פותח שער "${gate.name}" באמצעות שיחת טלפון ל-${gate.phoneNumber}`,
       callSid: call.sid,
       gate: gate.toJSON()
     });
-    
+
   } catch (error) {
     console.error('שגיאה בפתיחת השער:', error);
-    
+
     // Log failed gate opening attempt
     try {
       await new GateHistory({
@@ -306,7 +306,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     } catch (logError) {
       console.error('שגיאה ברישום היסטוריית כישלון:', logError);
     }
-    
+
     // Provide more specific error messages
     if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
       res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
@@ -326,23 +326,91 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
     const { id } = req.params;
     const { CallStatus, CallDuration } = req.body;
-    
+
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
     if (isNaN(gateId)) {
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
-    
+
     const gate = await Gate.findOne({ id: gateId });
-    
+
     if (gate) {
       await gate.updateCallStatus(CallStatus, CallDuration);
     }
-    
+
     res.sendStatus(200);
   } catch (error) {
     console.error('שגיאה בעדכון סטטוס שיחה:', error);
     res.sendStatus(200); // Still return 200 to Twilio to avoid retries
+  }
+});
+
+// Gate statistics endpoint (admin only)
+router.get('/gates/stats', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const matchStage = {};
+
+    if (startDate || endDate) {
+      matchStage.timestamp = {};
+      if (startDate) matchStage.timestamp.$gte = new Date(startDate);
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        matchStage.timestamp.$lte = endDateTime;
+      }
+    }
+
+    // Get list of active gate IDs to filter statistics
+    const activeGates = await Gate.find({ isActive: true }).select('id name');
+    const activeGateIds = activeGates.map(g => g.id);
+
+    // Add filter for active gates only
+    matchStage.gateId = { $in: activeGateIds };
+
+    // Top Gates
+    const topGates = await GateHistory.aggregate([
+      { $match: matchStage },
+      { $group: { _id: "$gateName", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Top Users
+    const topUsers = await GateHistory.aggregate([
+      { $match: matchStage },
+      { $group: { _id: "$username", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Hourly Activity
+    const hourlyActivity = await GateHistory.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: { $hour: { date: "$timestamp", timezone: "Asia/Jerusalem" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id": 1 } }
+    ]);
+
+    // Fill in missing hours
+    const fullHourlyActivity = Array.from({ length: 24 }, (_, i) => {
+      const found = hourlyActivity.find(h => h._id === i);
+      return { hour: i, count: found ? found.count : 0 };
+    });
+
+    res.json({
+      topGates,
+      topUsers,
+      hourlyActivity: fullHourlyActivity
+    });
+  } catch (error) {
+    console.error('שגיאה בטעינת סטטיסטיקות:', error);
+    res.status(500).json({ error: 'נכשל בטעינת סטטיסטיקות' });
   }
 });
 
@@ -353,14 +421,14 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
     const limitNum = Math.min(parseInt(limit), 500); // Max 500 records per page
     const pageNum = Math.max(parseInt(page), 1); // Minimum page is 1
     const skip = (pageNum - 1) * limitNum;
-    
+
     let query = {};
-    
+
     // For regular users, only show their own gate history
     if (req.user.role !== 'admin') {
       query.userId = req.user._id;
     }
-    
+
     // Build date filter if provided
     if (startDate || endDate) {
       query.timestamp = {};
@@ -374,7 +442,7 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
         query.timestamp.$lte = endDateTime;
       }
     }
-    
+
     // Build query based on filters
     if (gateName) {
       query.gateName = gateName;
@@ -398,20 +466,20 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
         query.username = userId;
       }
     }
-    
+
     // Get total count for pagination
     const totalCount = await GateHistory.countDocuments(query);
-    
+
     // Get paginated history
     const history = await GateHistory.find(query)
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limitNum)
       .populate('userId', 'username name');
-    
+
     const totalPages = Math.ceil(totalCount / limitNum);
-    
-    res.json({ 
+
+    res.json({
       history: history.map(record => record.toJSON()),
       count: history.length,
       totalCount: totalCount,
@@ -432,13 +500,13 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
 router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { logIds } = req.body;
-    
+
     console.log('Bulk delete request received:', { logIds, count: logIds?.length });
-    
+
     if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
       return res.status(400).json({ error: 'רשימת מזההי רשומות נדרשת' });
     }
-    
+
     // Process IDs - GateHistory only has _id field, so we expect ObjectId strings
     const processedIds = logIds.map(id => {
       if (mongoose.Types.ObjectId.isValid(id)) {
@@ -448,29 +516,29 @@ router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, r
         return null; // Invalid ID
       }
     }).filter(id => id !== null); // Remove invalid IDs
-    
-    console.log('Processed IDs:', { 
-      original: logIds, 
+
+    console.log('Processed IDs:', {
+      original: logIds,
       processed: processedIds,
       validCount: processedIds.length,
       invalidCount: logIds.length - processedIds.length
     });
-    
+
     if (processedIds.length === 0) {
       return res.status(400).json({ error: 'לא נמצאו מזההי רשומות תקינים' });
     }
-    
+
     // Query by _id only since GateHistory only has _id field
     const query = { _id: { $in: processedIds } };
-    
+
     console.log('Delete query:', JSON.stringify(query, null, 2));
-    
+
     const result = await GateHistory.deleteMany(query);
-    
+
     console.log('Delete result:', result);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `${result.deletedCount} רשומות נמחקו בהצלחה`,
       deletedCount: result.deletedCount,
       requestedCount: logIds.length,
@@ -492,9 +560,9 @@ router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, r
 router.delete('/gates/history/delete-all', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const result = await GateHistory.deleteMany({});
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'כל ההיסטוריה נמחקה בהצלחה',
       deletedCount: result.deletedCount
     });
@@ -507,24 +575,24 @@ router.delete('/gates/history/delete-all', requireMongoDB, authenticateToken, re
 router.get('/gates/:id', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
     if (isNaN(gateId)) {
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
-    
+
     const gate = await Gate.findOne({ id: gateId });
-    
+
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
-    
+
     // Check if user has permission to view this gate
     if (req.user.role !== 'admin' && !req.user.canAccessGate(gateId)) {
       return res.status(403).json({ error: 'אין הרשאה לצפות בשער זה' });
     }
-    
+
     res.json({ gate: gate.toJSON() });
   } catch (error) {
     console.error('שגיאה בטעינת שער:', error);
@@ -539,24 +607,24 @@ router.get('/gates/:id', requireMongoDB, authenticateToken, async (req, res) => 
 router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { name, phoneNumber, authorizedNumber, password } = req.body;
-    
+
     if (!name || !phoneNumber || !authorizedNumber) {
       return res.status(400).json({ error: 'חסרים שדות נדרשים: name, phoneNumber, authorizedNumber' });
     }
-    
+
     // Check if gate with same phone number already exists
     const existingGate = await Gate.findOne({ phoneNumber, isActive: true });
     if (existingGate) {
       return res.status(409).json({ error: 'שער עם מספר טלפון זה כבר קיים' });
     }
-    
+
     // Get the next available numeric ID
     const nextId = await Gate.getNextId();
-    
+
     // Get the highest order value and add 1 for the new gate
     const lastGate = await Gate.findOne().sort({ order: -1 });
     const nextOrder = lastGate ? (lastGate.order || 0) + 1 : 0;
-    
+
     const newGate = new Gate({
       id: nextId,
       name,
@@ -565,15 +633,15 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
       password: password || null,
       order: nextOrder
     });
-    
+
     const savedGate = await newGate.save();
-    
-    res.status(201).json({ 
-      success: true, 
+
+    res.status(201).json({
+      success: true,
       gate: savedGate.toJSON(),
       message: `שער "${name}" נוצר בהצלחה`
     });
-    
+
   } catch (error) {
     console.error('שגיאה ביצירת שער:', error);
     if (error.name === 'ValidationError') {
@@ -590,83 +658,83 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
 router.put('/gates/reorder', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { gateOrders } = req.body; // Array of { gateId: number, order: number }
-    
+
     // Validate request body
     if (!gateOrders) {
       return res.status(400).json({ error: 'gateOrders חסר בבקשה' });
     }
-    
+
     if (!Array.isArray(gateOrders)) {
       return res.status(400).json({ error: 'gateOrders חייב להיות מערך' });
     }
-    
+
     if (gateOrders.length === 0) {
       return res.status(400).json({ error: 'gateOrders לא יכול להיות ריק' });
     }
-    
+
     // Validate and filter valid entries
     const validUpdates = [];
-    
+
     for (const item of gateOrders) {
       if (!item || typeof item !== 'object') {
         continue;
       }
-      
+
       // Get values - they should already be numbers from the client
       const gateId = item.gateId;
       const order = item.order;
-      
+
       // Convert to numbers if needed
       let parsedGateId = gateId;
       let parsedOrder = order;
-      
+
       if (typeof gateId !== 'number') {
         parsedGateId = parseInt(gateId, 10);
       }
-      
+
       if (typeof order !== 'number') {
         parsedOrder = parseInt(order, 10);
       }
-      
+
       // Validate
       if (isNaN(parsedGateId) || isNaN(parsedOrder)) {
         continue;
       }
-      
+
       validUpdates.push({
         gateId: parsedGateId,
         order: parsedOrder
       });
     }
-    
+
     if (validUpdates.length === 0) {
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
-    
+
     // Update personal gate order preferences for all users (including admins)
     // Mongoose Map needs to be initialized if it doesn't exist
     if (!req.user.gateOrderPreferences) {
       req.user.gateOrderPreferences = new Map();
     }
-    
+
     // Ensure it's a Map instance
-    const preferences = req.user.gateOrderPreferences instanceof Map 
-      ? req.user.gateOrderPreferences 
+    const preferences = req.user.gateOrderPreferences instanceof Map
+      ? req.user.gateOrderPreferences
       : new Map(Object.entries(req.user.gateOrderPreferences || {}));
-    
+
     validUpdates.forEach(({ gateId, order }) => {
       preferences.set(String(gateId), order);
     });
-    
+
     // Mongoose will automatically convert Map to object for storage
     req.user.gateOrderPreferences = preferences;
     await req.user.save();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'סדר השערים עודכן בהצלחה'
     });
-    
+
   } catch (error) {
     console.error('שגיאה בעדכון סדר שערים:', error);
     res.status(500).json({ error: 'נכשל בעדכון סדר השערים' });
@@ -677,45 +745,45 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
   try {
     const { id } = req.params;
     const { name, phoneNumber, authorizedNumber, password } = req.body;
-    
+
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
     if (isNaN(gateId)) {
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
-    
+
     const gate = await Gate.findOne({ id: gateId });
-    
+
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
-    
+
     // Check if changing phone number conflicts with existing gate
     if (phoneNumber && phoneNumber !== gate.phoneNumber) {
-      const existingGate = await Gate.findOne({ 
-        phoneNumber, 
+      const existingGate = await Gate.findOne({
+        phoneNumber,
         isActive: true,
         id: { $ne: gateId }
       });
       if (existingGate) {
         return res.status(409).json({ error: 'שער אחר עם מספר טלפון זה כבר קיים' });
+      }
     }
-    }
-    
+
     // Update fields
     if (name) gate.name = name;
     if (phoneNumber) gate.phoneNumber = phoneNumber;
     if (authorizedNumber) gate.authorizedNumber = authorizedNumber;
     if (password !== undefined) gate.password = password || null;
-    
+
     const updatedGate = await gate.save();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       gate: updatedGate.toJSON(),
       message: `שער "${updatedGate.name}" עודכן בהצלחה`
     });
-    
+
   } catch (error) {
     console.error('שגיאה בעדכון שער:', error);
     if (error.name === 'CastError') {
@@ -732,29 +800,32 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
 router.delete('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
     if (isNaN(gateId)) {
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
-    
+
     const gate = await Gate.findOne({ id: gateId });
-    
+
     if (!gate || !gate.isActive) {
       return res.status(404).json({ error: 'השער לא נמצא' });
     }
-    
+
     // Soft delete - mark as inactive instead of removing
     gate.isActive = false;
     await gate.save();
-    
-    res.json({ 
-      success: true, 
+
+    // Delete all history records for this gate
+    await GateHistory.deleteMany({ gateId: gate.id });
+
+    res.json({
+      success: true,
       message: `השער "${gate.name}" נמחק בהצלחה`,
       gate: gate.toJSON()
     });
-    
+
   } catch (error) {
     console.error('שגיאה במחיקת שער:', error);
     if (error.name === 'CastError') {
@@ -773,7 +844,7 @@ router.get('/database/status', async (req, res) => {
     const { getConnectionStatus } = require('../config/database');
     const status = getConnectionStatus();
     const gateCount = isConnected() ? await Gate.countDocuments({ isActive: true }) : 0;
-    
+
     res.json({
       database: status,
       connected: isConnected(),
@@ -791,15 +862,15 @@ router.get('/twilio/balance', authenticateToken, requireAdmin, async (req, res) 
   try {
     const client = getTwilioClient();
     const balanceData = await client.balance.fetch();
-    
-    res.json({ 
+
+    res.json({
       balance: balanceData.balance,
       currency: balanceData.currency
     });
-    
+
   } catch (error) {
     console.error('שגיאה בהבאת יתרת Twilio:', error);
-    
+
     if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
       res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
     } else if (error.code === 'ENOTFOUND') {
@@ -817,7 +888,7 @@ router.get('/twilio/verified-callers', authenticateToken, requireAdmin, async (r
 
     const client = getTwilioClient();
     const verifiedCallers = await client.outgoingCallerIds.list();
-    
+
     const callerIds = verifiedCallers.map(caller => ({
       id: caller.sid,
       phoneNumber: caller.phoneNumber,
@@ -834,7 +905,7 @@ router.get('/twilio/verified-callers', authenticateToken, requireAdmin, async (r
 router.post('/twilio/validate-phone', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { phoneNumber, friendlyName } = req.body;
-    
+
     if (!phoneNumber) {
       return res.status(400).json({ error: 'מספר טלפון נדרש' });
     }
@@ -844,19 +915,19 @@ router.post('/twilio/validate-phone', authenticateToken, requireAdmin, async (re
       friendlyName: friendlyName || phoneNumber,
       phoneNumber: phoneNumber
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `בקשת אימות נשלחה ל-${phoneNumber}`,
       validationSid: validationRequest.sid,
       phoneNumber: phoneNumber,
       status: validationRequest.status,
       validationCode: validationRequest.validationCode
     });
-    
+
   } catch (error) {
     console.error('שגיאה ביצירת בקשת אימות:', error);
-    
+
     if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
       res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
     } else if (error.code === 'ENOTFOUND') {
@@ -874,15 +945,15 @@ router.post('/twilio/validate-phone', authenticateToken, requireAdmin, async (re
 router.get('/twilio/validation-status/:sid', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { sid } = req.params;
-    
+
     if (!sid) {
       return res.status(400).json({ error: 'SID של בקשת האימות נדרש' });
     }
 
     const client = getTwilioClient();
     const validationRequest = await client.validationRequests(sid).fetch();
-    
-    res.json({ 
+
+    res.json({
       success: true,
       validationSid: validationRequest.sid,
       phoneNumber: validationRequest.phoneNumber,
@@ -891,10 +962,10 @@ router.get('/twilio/validation-status/:sid', authenticateToken, requireAdmin, as
       callSid: validationRequest.callSid,
       codeLength: validationRequest.codeLength
     });
-    
+
   } catch (error) {
     console.error('שגיאה בבדיקת סטטוס בקשת אימות:', error);
-    
+
     if (error.code === 20404) {
       res.status(404).json({ error: 'בקשת האימות לא נמצאה' });
     } else {
@@ -907,8 +978,8 @@ router.get('/twilio/validation-status/:sid', authenticateToken, requireAdmin, as
 router.get('/settings/current', async (req, res) => {
   try {
     const settings = await AdminSettings.getCurrentSettings();
-    
-    res.json({ 
+
+    res.json({
       settings: settings.toJSON(),
       lastUpdated: settings.lastUpdated
     });
@@ -929,7 +1000,7 @@ router.get('/settings/current', async (req, res) => {
       blockIfLowTwilioBalance: true,
       twilioBalanceThreshold: 5
     };
-    res.status(200).json({ 
+    res.status(200).json({
       settings: fallbackSettings,
       lastUpdated: null,
       warning: 'מוחזרות הגדרות ברירת מחדל עקב שגיאה במסד הנתונים'
@@ -941,7 +1012,7 @@ router.get('/settings/current', async (req, res) => {
 router.get('/settings/maintenance', async (req, res) => {
   try {
     const maintenanceStatus = await AdminSettings.isSystemInMaintenance();
-    
+
     res.json(maintenanceStatus);
   } catch (error) {
     console.error('שגיאה בבדיקת מצב תחזוקה:', error);
@@ -953,8 +1024,8 @@ router.get('/settings/maintenance', async (req, res) => {
 router.get('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const settings = await AdminSettings.getCurrentSettings();
-    
-    res.json({ 
+
+    res.json({
       settings: settings.toJSON(),
       lastUpdated: settings.lastUpdated,
       updatedBy: settings.updatedBy
@@ -968,23 +1039,23 @@ router.get('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
 router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { gateCooldownSeconds, maxRetries, enableNotifications, autoRefreshInterval, systemMaintenance, maintenanceMessage, blockIfLowTwilioBalance, twilioBalanceThreshold } = req.body;
-    
+
     // Validate input
     if (gateCooldownSeconds < 10 || gateCooldownSeconds > 300) {
       return res.status(400).json({ error: 'זמן דילאי חייב להיות בין 10 ל-300 שניות' });
     }
-    
+
     if (maxRetries < 1 || maxRetries > 10) {
       return res.status(400).json({ error: 'מספר ניסיונות חייב להיות בין 1 ל-10' });
     }
-    
+
     if (autoRefreshInterval < 1 || autoRefreshInterval > 60) {
       return res.status(400).json({ error: 'מרווח רענון חייב להיות בין 1 ל-60 דקות' });
     }
     if (twilioBalanceThreshold !== undefined && (isNaN(Number(twilioBalanceThreshold)) || Number(twilioBalanceThreshold) < 0)) {
       return res.status(400).json({ error: 'סף יתרת Twilio חייב להיות מספר אי-שלילי' });
     }
-    
+
     // Update settings in MongoDB
     const updatedSettings = await AdminSettings.updateSettings({
       gateCooldownSeconds,
@@ -996,8 +1067,8 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
       blockIfLowTwilioBalance: !!blockIfLowTwilioBalance,
       twilioBalanceThreshold: twilioBalanceThreshold !== undefined ? Number(twilioBalanceThreshold) : undefined
     }, req.user._id);
-    
-    res.json({ 
+
+    res.json({
       message: 'ההגדרות נשמרו בהצלחה',
       settings: updatedSettings.toJSON(),
       lastUpdated: updatedSettings.lastUpdated

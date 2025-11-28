@@ -499,6 +499,7 @@ body::before {
   display: block;
   margin: 0.25rem auto;
 }
+
 /* ========================================
    BUTTON STYLES
    ======================================== */
@@ -752,7 +753,7 @@ body::before {
   opacity: 0.7;
 }
 
-.form-input:disabled + small {
+.form-input:disabled+small {
   opacity: 0.7;
 }
 
@@ -879,12 +880,12 @@ body::before {
   transition: all 0.3s ease;
 }
 
-.form-checkbox:checked + .checkmark {
+.form-checkbox:checked+.checkmark {
   background: #667eea;
   border-color: var(--color-primary);
 }
 
-.form-checkbox:checked + .checkmark::after {
+.form-checkbox:checked+.checkmark::after {
   content: '✓';
   position: absolute;
   top: 50%;
@@ -1089,9 +1090,12 @@ body::before {
   color: #666;
   border-radius: 8px;
   transition: all 0.2s ease;
-  touch-action: none; /* Prevent default touch behaviors */
-  -webkit-touch-callout: none; /* Prevent iOS callout */
-  user-select: none; /* Prevent text selection */
+  touch-action: none;
+  /* Prevent default touch behaviors */
+  -webkit-touch-callout: none;
+  /* Prevent iOS callout */
+  user-select: none;
+  /* Prevent text selection */
   align-self: center;
   width: 100%;
   max-width: 60px;
@@ -1227,7 +1231,8 @@ body::before {
   justify-content: space-between;
   width: 100%;
   margin-bottom: 0.5rem;
-  min-width: 0; /* Prevent overflow */
+  min-width: 0;
+  /* Prevent overflow */
   flex: 1;
 }
 
@@ -1241,7 +1246,8 @@ body::before {
   font-weight: 600;
   color: var(--color-gray-900);
   flex: 1;
-  min-width: 0; /* Allow text to shrink */
+  min-width: 0;
+  /* Allow text to shrink */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1288,8 +1294,10 @@ body::before {
   position: relative;
   width: 100%;
   max-width: 100%;
-  min-width: 0; /* Prevent overflow */
-  overflow: hidden; /* Prevent content from overflowing */
+  min-width: 0;
+  /* Prevent overflow */
+  overflow: hidden;
+  /* Prevent content from overflowing */
   box-sizing: border-box;
 }
 
@@ -1586,6 +1594,7 @@ body::before {
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1597,6 +1606,7 @@ body::before {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1604,9 +1614,12 @@ body::before {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.7;
   }
@@ -1621,12 +1634,12 @@ body::before {
   .dashboard-container {
     padding: 1.5rem;
   }
-  
+
   .gates-grid {
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 1.5rem;
   }
-  
+
   .settings-container {
     padding: 2rem;
   }
@@ -1772,7 +1785,7 @@ body::before {
     width: 100%;
   }
 
-  .admin-actions > button {
+  .admin-actions>button {
     flex: 0 0 auto;
   }
 
@@ -1868,20 +1881,20 @@ body::before {
     border-radius: 12px;
     border: 1px solid rgba(229, 231, 235, 0.5);
   }
-  
+
   .checkbox-text {
     margin-right: 0;
     margin-bottom: 0.5rem;
     font-size: 1rem;
     line-height: 1.4;
   }
-  
+
   .form-checkbox {
     width: 1.5rem;
     height: 1.5rem;
     align-self: flex-end;
   }
-  
+
   .form-group .checkbox-container {
     margin-bottom: 1rem;
   }
@@ -1981,11 +1994,11 @@ body::before {
     padding: 0.75rem;
     gap: 0.5rem;
   }
-  
+
   .checkbox-text {
     font-size: 0.95rem;
   }
-  
+
   .form-checkbox {
     width: 1.25rem;
     height: 1.25rem;
@@ -2008,26 +2021,77 @@ body::before {
   text-align: left;
 }
 
-.mb-1 { margin-bottom: 0.25rem; }
-.mb-2 { margin-bottom: 0.5rem; }
-.mb-3 { margin-bottom: 0.75rem; }
-.mb-4 { margin-bottom: 1rem; }
-.mb-5 { margin-bottom: 1.25rem; }
-.mb-6 { margin-bottom: 1.5rem; }
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
 
-.mt-1 { margin-top: 0.25rem; }
-.mt-2 { margin-top: 0.5rem; }
-.mt-3 { margin-top: 0.75rem; }
-.mt-4 { margin-top: 1rem; }
-.mt-5 { margin-top: 1.25rem; }
-.mt-6 { margin-top: 1.5rem; }
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
 
-.p-1 { padding: 0.25rem; }
-.p-2 { padding: 0.5rem; }
-.p-3 { padding: 0.75rem; }
-.p-4 { padding: 1rem; }
-.p-5 { padding: 1.25rem; }
-.p-6 { padding: 1.5rem; }
+.mb-3 {
+  margin-bottom: 0.75rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mb-5 {
+  margin-bottom: 1.25rem;
+}
+
+.mb-6 {
+  margin-bottom: 1.5rem;
+}
+
+.mt-1 {
+  margin-top: 0.25rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mt-5 {
+  margin-top: 1.25rem;
+}
+
+.mt-6 {
+  margin-top: 1.5rem;
+}
+
+.p-1 {
+  padding: 0.25rem;
+}
+
+.p-2 {
+  padding: 0.5rem;
+}
+
+.p-3 {
+  padding: 0.75rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.p-5 {
+  padding: 1.25rem;
+}
+
+.p-6 {
+  padding: 1.5rem;
+}
 
 .hidden {
   display: none !important;
@@ -2437,17 +2501,17 @@ body::before {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .pagination-info {
     justify-content: space-between;
     width: 100%;
   }
-  
+
   .pagination-buttons {
     justify-content: center;
     width: 100%;
   }
-  
+
   .pagination-limit {
     width: 100%;
   }
@@ -2775,6 +2839,7 @@ body::before {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -2785,6 +2850,7 @@ body::before {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -3133,11 +3199,11 @@ body::before {
     overflow-x: hidden;
     box-sizing: border-box;
   }
-  
+
   .history-header h2 {
     font-size: 1.5rem;
   }
-  
+
   .history-filters {
     flex-direction: column;
     gap: 0.75rem;
@@ -3146,7 +3212,7 @@ body::before {
     max-width: 100%;
     box-sizing: border-box;
   }
-  
+
   .bulk-actions {
     flex-direction: column;
     gap: 0.75rem;
@@ -3155,12 +3221,12 @@ body::before {
     max-width: 100%;
     box-sizing: border-box;
   }
-  
+
   .bulk-actions .btn {
     height: 3rem;
     justify-content: center;
   }
-  
+
   .history-table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -3168,166 +3234,166 @@ body::before {
     max-width: 100%;
     margin: 0;
   }
-  
+
   .history-table {
     margin: 0;
     overflow-x: auto;
     width: 100%;
     max-width: 100%;
   }
-  
+
   .history-table table {
     min-width: 600px;
     width: 100%;
   }
-  
+
   .history-table td,
   .history-table th {
     font-size: 0.8rem;
     padding: 0.4rem 0.15rem;
   }
-  
+
   .history-table th {
     font-size: 0.85rem;
   }
-  
+
   .log-status {
     font-size: 0.8rem;
     padding: 0.25rem 0.5rem;
   }
-  
+
   .users-table {
     overflow-x: auto;
   }
-  
+
   .users-table table {
     min-width: 600px;
   }
-  
+
   .users-table td,
   .users-table th {
     font-size: 0.9rem;
     padding: 0.75rem 0.5rem;
   }
-  
+
   .users-table th {
     font-size: 0.95rem;
   }
-  
+
   /* Mobile inline editing styles */
   .inline-edit-form {
     padding: 0.75rem;
   }
-  
+
   .inline-edit-form .form-grid {
     grid-template-columns: 1fr;
     gap: 0.75rem;
   }
-  
+
   .inline-edit-header {
     flex-direction: column;
     gap: 0.5rem;
     align-items: flex-start;
   }
-  
+
   .inline-edit-form .form-actions {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .inline-edit-form .btn {
     width: 100%;
     justify-content: center;
   }
-  
+
   .user-action-buttons {
     flex-direction: column;
     gap: 0.25rem;
   }
-  
+
   .gates-checkbox-grid {
     grid-template-columns: 1fr;
   }
-  
+
   /* Modal responsive styles */
   .modal-overlay {
     padding: 1rem;
     align-items: flex-start;
     padding-top: 2rem;
   }
-  
+
   .modal-content {
     max-width: 95vw;
     max-height: 90vh;
     border-radius: 16px;
   }
-  
+
   .modal-header {
     padding: 1.5rem 2rem;
   }
-  
+
   .modal-header h2 {
     font-size: 1.5rem;
   }
-  
+
   .modal-body {
     padding: 1.5rem 2rem;
   }
-  
+
   .modal-footer {
     padding: 1rem 2rem;
     flex-direction: column;
   }
-  
+
   .modal-footer .btn {
     width: 100%;
   }
-  
+
   .caller-id-validation-modal {
     width: 95vw;
     max-width: 95vw;
   }
-  
+
   .validation-form,
   .validation-result {
     padding: 1.5rem;
   }
-  
+
   .validation-details {
     gap: 0.75rem;
   }
-  
+
   .validation-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .caller-item {
     flex-direction: column;
     gap: 1rem;
     text-align: center;
   }
-  
+
   .form-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
-  
+
   .form-actions {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .mobile-gate-detail {
     padding: 1.5rem;
     margin: 0 0.5rem 1rem 0.5rem;
   }
-  
+
   .mobile-gate-header h2 {
     font-size: 1.75rem;
   }
-  
+
   .mobile-admin-actions {
     flex-direction: column;
     gap: 0.75rem;
@@ -3342,23 +3408,23 @@ body::before {
     overflow-x: hidden;
     box-sizing: border-box;
   }
-  
+
   .history-header h2 {
     font-size: 1.25rem;
   }
-  
+
   .history-filters {
     padding: 0.75rem;
     max-width: 100%;
     box-sizing: border-box;
   }
-  
+
   .bulk-actions {
     padding: 0.75rem;
     max-width: 100%;
     box-sizing: border-box;
   }
-  
+
   .history-table-container {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -3366,65 +3432,65 @@ body::before {
     max-width: 100%;
     margin: 0;
   }
-  
+
   .history-table {
     margin: 0;
     overflow-x: auto;
     width: 100%;
     max-width: 100%;
   }
-  
+
   .history-table table {
     min-width: 600px;
     width: 100%;
   }
-  
+
   .history-table td,
   .history-table th {
     font-size: 0.75rem;
     padding: 0.35rem 0.1rem;
   }
-  
+
   .history-table th {
     font-size: 0.8rem;
   }
-  
+
   .no-history {
     padding: 1.5rem 1rem;
   }
-  
+
   .no-history-icon {
     font-size: 2.5rem;
   }
-  
+
   .no-history h3 {
     font-size: 1.3rem;
   }
-  
+
   .users-table td,
   .users-table th {
     font-size: 0.85rem;
     padding: 0.5rem 0.25rem;
   }
-  
+
   .users-table th {
     font-size: 0.9rem;
   }
-  
+
   .validation-form,
   .validation-result {
     padding: 1rem;
   }
-  
+
   .form-container {
     padding: 1rem;
   }
-  
+
   .mobile-gate-detail {
     padding: 1rem;
     margin: 0 0.25rem 1rem 0.25rem;
   }
-  
+
   .mobile-gate-header h2 {
     font-size: 1.5rem;
   }
@@ -3657,7 +3723,7 @@ body::before {
   }
 
   /* Keep the section title on its own row */
-  .settings-section > h3 {
+  .settings-section>h3 {
     flex: 1 1 100%;
     width: 100%;
   }
@@ -3752,6 +3818,7 @@ body::before {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;

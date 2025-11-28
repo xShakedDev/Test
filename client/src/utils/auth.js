@@ -7,10 +7,10 @@
  */
 export const isSessionExpired = (errorData) => {
   if (!errorData || !errorData.error) return false;
-  
+
   const errorMessage = errorData.error;
   return (
-    errorMessage.includes('סשן לא תקף') || 
+    errorMessage.includes('סשן לא תקף') ||
     errorMessage.includes('סשן פג תוקף') ||
     errorMessage.includes('טוקן לא תקף') ||
     errorMessage.includes('שגיאה באימות')
@@ -24,11 +24,12 @@ export const isSessionExpired = (errorData) => {
  */
 export const isTokenExpired = (errorData) => {
   if (!errorData || !errorData.error) return false;
-  
+
   const errorMessage = errorData.error;
   return (
     errorMessage.includes('שגיאה באימות') ||
-    errorMessage.includes('טוקן לא תקף')
+    errorMessage.includes('טוקן לא תקף') ||
+    errorMessage.includes('סשן פג תוקף')
   );
 };
 
@@ -52,12 +53,12 @@ export const refreshAccessToken = async () => {
     // Check localStorage first, then sessionStorage
     let refreshToken = localStorage.getItem('refreshToken');
     let storage = localStorage;
-    
+
     if (!refreshToken) {
       refreshToken = sessionStorage.getItem('refreshToken');
       storage = sessionStorage;
     }
-    
+
     if (!refreshToken) {
       return null;
     }
@@ -75,12 +76,12 @@ export const refreshAccessToken = async () => {
       // Update tokens in the same storage where refresh token was found
       storage.setItem('authToken', data.accessToken);
       storage.setItem('refreshToken', data.refreshToken);
-      
+
       // Notify App.js to update token state
       if (tokenUpdateCallback) {
         tokenUpdateCallback(data.accessToken);
       }
-      
+
       // Also dispatch custom event for same-tab updates
       window.dispatchEvent(new CustomEvent('customStorageChange', {
         detail: {
@@ -89,10 +90,10 @@ export const refreshAccessToken = async () => {
           oldValue: storage.getItem('authToken')
         }
       }));
-      
+
       return data;
     }
-    
+
     return null;
   } catch (error) {
     console.error('Failed to refresh token:', error);
@@ -126,7 +127,7 @@ export const authenticatedFetch = async (url, options = {}) => {
   if (!options.headers) {
     options.headers = {};
   }
-  
+
   if (!options.headers.Authorization) {
     // Check localStorage first, then sessionStorage
     let token = localStorage.getItem('authToken');
@@ -138,8 +139,13 @@ export const authenticatedFetch = async (url, options = {}) => {
     }
   }
 
+  // Add cache control headers to prevent browser caching
+  options.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+  options.headers['Pragma'] = 'no-cache';
+  options.headers['Expires'] = '0';
+
   let response = await fetch(url, options);
-  
+
   // If unauthorized, try to refresh token
   if (response.status === 401) {
     // Use a clone so we don't consume the body; callers may read it
@@ -149,11 +155,11 @@ export const authenticatedFetch = async (url, options = {}) => {
     } catch (e) {
       errorData = null;
     }
-    
+
     if (isTokenExpired(errorData)) {
       // Try to refresh the token
       const refreshResult = await refreshAccessToken();
-      
+
       if (refreshResult) {
         // Retry the original request with new token
         if (options.headers.Authorization) {
@@ -170,6 +176,6 @@ export const authenticatedFetch = async (url, options = {}) => {
       return response;
     }
   }
-  
+
   return response;
 };

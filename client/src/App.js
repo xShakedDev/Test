@@ -5,6 +5,7 @@ import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
+import GateStatistics from './components/GateStatistics';
 import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback } from './utils/auth';
 import './styles/design-system.css';
 import './App.css';
@@ -44,7 +45,7 @@ function App() {
     setTokenUpdateCallback((newToken) => {
       setToken(newToken);
     });
-    
+
     return () => {
       setTokenUpdateCallback(null);
     };
@@ -67,7 +68,7 @@ function App() {
 
     // Listen to both localStorage and sessionStorage changes
     window.addEventListener('storage', handleStorageChange);
-    
+
     // Also listen to custom storage events (for same-tab updates)
     const handleCustomStorageChange = (e) => {
       if (e.detail && e.detail.key === 'authToken') {
@@ -77,9 +78,9 @@ function App() {
         }
       }
     };
-    
+
     window.addEventListener('customStorageChange', handleCustomStorageChange);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('customStorageChange', handleCustomStorageChange);
@@ -91,7 +92,7 @@ function App() {
     if (window.showSystemNotification) {
       window.showSystemNotification('התנתקת בהצלחה מהמערכת', 'info');
     }
-    
+
     setUser(null);
     setToken(null);
     setCurrentView('gates');
@@ -128,13 +129,13 @@ function App() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        
+
         // Check if it's a session expiration error
         if (isSessionExpired(errorData)) {
           handleLogout();
           return;
         }
-        
+
         // For other errors, keep user logged in but log the issue
         console.warn('Token verification failed but keeping user logged in:', errorData);
       } else {
@@ -171,13 +172,13 @@ function App() {
     // Check localStorage first (remember me), then sessionStorage (session only)
     let savedToken = localStorage.getItem('authToken');
     let savedUser = localStorage.getItem('user');
-    
+
     // If not in localStorage, check sessionStorage
     if (!savedToken || !savedUser) {
       savedToken = sessionStorage.getItem('authToken');
       savedUser = sessionStorage.getItem('user');
     }
-    
+
     if (savedToken && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
@@ -190,28 +191,28 @@ function App() {
         handleLogout();
       }
     }
-    
+
     // Check maintenance status
     checkMaintenanceStatus();
-    
+
     setIsLoading(false);
   }, [verifyToken, handleLogout, checkMaintenanceStatus]);
 
   // Auto-refresh token every hour
   useEffect(() => {
     if (!token) return;
-    
+
     const refreshInterval = setInterval(async () => {
       try {
         // Check localStorage first, then sessionStorage
         let refreshToken = localStorage.getItem('refreshToken');
         let storage = localStorage;
-        
+
         if (!refreshToken) {
           refreshToken = sessionStorage.getItem('refreshToken');
           storage = sessionStorage;
         }
-        
+
         if (refreshToken) {
           const response = await authenticatedFetch('/api/auth/refresh', {
             method: 'POST',
@@ -220,7 +221,7 @@ function App() {
             },
             body: JSON.stringify({ refreshToken }),
           });
-          
+
           if (response.ok) {
             const data = await response.json();
             setToken(data.accessToken);
@@ -233,7 +234,7 @@ function App() {
         console.error('Auto-refresh failed:', error);
       }
     }, 60 * 60 * 1000); // Every hour
-    
+
     return () => clearInterval(refreshInterval);
   }, [token]);
 
@@ -253,16 +254,16 @@ function App() {
   // Check both state and storage to handle token refresh scenarios
   const hasTokenInState = !!(user && token);
   const hasTokenInStorage = !!(localStorage.getItem('authToken') || sessionStorage.getItem('authToken'));
-  
+
   if (!hasTokenInState && !hasTokenInStorage) {
     return <Login onLogin={handleLogin} isLoading={isLoading} />;
   }
-  
+
   // If token exists in storage but not in state, try to reload it
   if (!hasTokenInState && hasTokenInStorage) {
     const savedToken = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
-    
+
     if (savedToken && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
@@ -272,7 +273,7 @@ function App() {
         console.error('Error parsing saved user:', error);
       }
     }
-    
+
     // Show loading while syncing
     return (
       <div className="loading">
@@ -298,8 +299,8 @@ function App() {
           </div>
         </div>
       )}
-      
-      <Header 
+
+      <Header
         user={user}
         currentView={currentView}
         onViewChange={handleViewChange}
@@ -307,28 +308,30 @@ function App() {
       />
       <main>
         {currentView === 'gates' ? (
-          <GateDashboard 
+          <GateDashboard
             user={user}
             token={token}
           />
         ) : currentView === 'users' && user.role === 'admin' ? (
-          <UserManagement 
+          <UserManagement
             user={user}
             token={token}
           />
         ) : currentView === 'history' ? (
-          <GateHistory 
+          <GateHistory
             user={user}
             token={token}
           />
         ) : currentView === 'settings' && user.role === 'admin' ? (
-          <AdminSettings 
+          <AdminSettings
             user={user}
             token={token}
           />
+        ) : currentView === 'statistics' && user.role === 'admin' ? (
+          <GateStatistics />
         ) : (
           // Fallback to gates if invalid view
-          <GateDashboard 
+          <GateDashboard
             user={user}
             token={token}
           />

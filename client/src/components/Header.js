@@ -98,7 +98,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
       if (!clickedInsideMenu && !clickedToggle) {
         setIsMobileMenuOpen(false);
       }
-      
+
       touchStartY = null;
       isScrolling = false;
     };
@@ -118,10 +118,10 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
     document.addEventListener('touchstart', handlePointerDown, { passive: true });
     document.addEventListener('touchmove', handleTouchMove, { passive: true });
     document.addEventListener('touchend', handlePointerUp, { passive: true });
-    
+
     // For mouse devices: use mousedown
     document.addEventListener('mousedown', handleMouseDown);
-    
+
     return () => {
       document.removeEventListener('touchstart', handlePointerDown);
       document.removeEventListener('touchmove', handleTouchMove);
@@ -133,18 +133,18 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   // Handle header visibility on scroll
   useEffect(() => {
     let ticking = false;
-    
+
     const handleScroll = () => {
       // Don't hide header if mobile menu is open
       if (isMobileMenuOpen) {
         setIsHeaderVisible(true);
         return;
       }
-      
+
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY;
-          
+
           // Always show header at the top of the page
           if (currentScrollY < 10) {
             setIsHeaderVisible(true);
@@ -155,11 +155,11 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             // Scrolling down (with threshold to avoid flickering)
             setIsHeaderVisible(false);
           }
-          
+
           lastScrollY.current = currentScrollY;
           ticking = false;
         });
-        
+
         ticking = true;
       }
     };
@@ -171,7 +171,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
   const fetchTwilioBalance = async () => {
     setBalanceLoading(true);
     setBalanceError(null);
-    
+
     try {
       const token = localStorage.getItem('authToken');
       const response = await authenticatedFetch('/api/twilio/balance');
@@ -213,7 +213,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
           <div className="app-title">
             <img src={`${process.env.PUBLIC_URL || ''}/logo.png`} alt="Shaked Gates" className="header-logo-img" />
           </div>
-          
+
           {/* Desktop Navigation - Hidden on mobile */}
           {!isMobile && (
             <nav className="header-navigation desktop-navigation">
@@ -223,7 +223,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               >
                 שערים
               </button>
-              
+
               {user?.role === 'admin' && (
                 <button
                   onClick={() => onViewChange('users')}
@@ -241,12 +241,20 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               </button>
 
               {user?.role === 'admin' && (
-                <button
-                  onClick={() => onViewChange('settings')}
-                  className={`nav-button ${currentView === 'settings' ? 'nav-button-active' : ''}`}
-                >
-                  הגדרות מנהל
-                </button>
+                <>
+                  <button
+                    onClick={() => onViewChange('statistics')}
+                    className={`nav-button ${currentView === 'statistics' ? 'nav-button-active' : ''}`}
+                  >
+                    סטטיסטיקות
+                  </button>
+                  <button
+                    onClick={() => onViewChange('settings')}
+                    className={`nav-button ${currentView === 'settings' ? 'nav-button-active' : ''}`}
+                  >
+                    הגדרות מנהל
+                  </button>
+                </>
               )}
             </nav>
           )}
@@ -274,11 +282,11 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                   )}
                 </div>
                 {balanceError && (
-                  <button 
+                  <button
                     onClick={fetchTwilioBalance}
                     className="btn btn-secondary"
-                    style={{ 
-                      padding: '0.25rem 0.5rem', 
+                    style={{
+                      padding: '0.25rem 0.5rem',
                       fontSize: '0.7rem',
                       marginLeft: '0.5rem'
                     }}
@@ -344,28 +352,28 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
 
       {/* Mobile Navigation - Collapsible */}
       <div className="mobile-navigation">
-        <button 
+        <button
           className="mobile-menu-toggle"
           onClick={toggleMobileMenu}
           aria-label="Toggle mobile menu"
           ref={mobileMenuToggleRef}
         >
-          <svg 
+          <svg
             className={`hamburger-icon ${isMobileMenuOpen ? 'open' : ''}`}
-            fill="none" 
-            stroke="currentColor" 
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
               d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
             />
           </svg>
           <span>תפריט ניווט</span>
         </button>
-        
+
         <div
           className={`mobile-nav-content ${isMobileMenuOpen ? 'open' : ''}`}
           ref={mobileNavContentRef}
@@ -411,7 +419,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                     )}
                   </div>
                   {balanceError && (
-                    <button 
+                    <button
                       onClick={fetchTwilioBalance}
                       className="btn btn-secondary mobile-refresh-btn"
                       title="נסה שוב"
@@ -458,7 +466,7 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             >
               שערים
             </button>
-            
+
             {user?.role === 'admin' && (
               <button
                 onClick={() => handleMobileNavClick('users')}
@@ -476,12 +484,20 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             </button>
 
             {user?.role === 'admin' && (
-              <button
-                onClick={() => handleMobileNavClick('settings')}
-                className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
-              >
-                הגדרות מנהל
-              </button>
+              <>
+                <button
+                  onClick={() => handleMobileNavClick('statistics')}
+                  className={`mobile-nav-button ${currentView === 'statistics' ? 'mobile-nav-button-active' : ''}`}
+                >
+                  סטטיסטיקות
+                </button>
+                <button
+                  onClick={() => handleMobileNavClick('settings')}
+                  className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
+                >
+                  הגדרות מנהל
+                </button>
+              </>
             )}
           </div>
         </div>
