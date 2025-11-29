@@ -3881,3 +3881,15 @@ body::before {
     opacity: 1;
   }
 }
+
+@keyframes slideInUp {
+  from {
+    transform: translate(-50%, -40%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}

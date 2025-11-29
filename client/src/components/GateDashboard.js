@@ -438,6 +438,7 @@ const GateDashboard = ({ user, token }) => {
     }
   });
   const [autoOpenedGates, setAutoOpenedGates] = useState({}); // Track gates opened in current proximity session
+  const [autoOpenNotification, setAutoOpenNotification] = useState(null); // Notification state
 
   // Refs for scrolling to errors
   const errorRef = useRef(null);
@@ -820,6 +821,53 @@ const GateDashboard = ({ user, token }) => {
       setIsSubmitting(false);
     }
   };
+
+  // Handle Auto-Open Logic
+  useEffect(() => {
+    if (!userLocation || !gates.length) return;
+
+    gates.forEach(gate => {
+      if (gate.location && gate.location.latitude && gate.location.longitude) {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          gate.location.latitude,
+          gate.location.longitude
+        );
+
+        const gateId = gate._id || gate.id;
+        const isEnabled = autoOpenSettings[gateId];
+        const radius = gate.location.autoOpenRadius || 50;
+        const isNear = distance <= radius;
+        
+        // Check for auto-open
+        if (isEnabled && isNear) {
+          // Only open if not already opened in this session (and not in cooldown)
+          if (!autoOpenedGates[gateId] && !cooldowns[gateId]) {
+            console.log(`Auto-opening gate ${gate.name} (Distance: ${distance}m)`);
+            handleOpenGate(gate, gate.password || '');
+            
+            // Mark as opened
+            setAutoOpenedGates(prev => ({ ...prev, [gateId]: true }));
+            
+            // Show auto-open notification
+            setAutoOpenNotification({ gateName: gate.name });
+            setTimeout(() => setAutoOpenNotification(null), 5000);
+          }
+        } 
+        
+        // Reset auto-open state when user moves away
+        const resetDistance = Math.max(radius * 1.5, radius + 50); 
+        if (distance > resetDistance && autoOpenedGates[gateId]) {
+          setAutoOpenedGates(prev => {
+            const newState = { ...prev };
+            delete newState[gateId];
+            return newState;
+          });
+        }
+      }
+    });
+  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, cooldowns, handleOpenGate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -1635,6 +1683,35 @@ const GateDashboard = ({ user, token }) => {
           token={token}
           onClose={() => setShowCallerIdValidation(false)}
         />
+      )}
+
+      {/* Auto-Open Notification Toast */}
+      {autoOpenNotification && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: '#10b981',
+          color: 'white',
+          padding: '1.5rem 2rem',
+          borderRadius: '16px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          zIndex: 10001,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
+          fontSize: '1.1rem',
+          fontWeight: '600',
+          animation: 'slideInUp 0.3s ease-out',
+          maxWidth: '90%',
+          textAlign: 'center'
+        }}>
+          <svg style={{ width: '24px', height: '24px', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span>זוהתה קרבה לשער {autoOpenNotification.gateName} - פותח אוטומטית!</span>
+        </div>
       )}
     </div>
   );
