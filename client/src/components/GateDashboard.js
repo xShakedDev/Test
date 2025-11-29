@@ -45,7 +45,7 @@ function formatDistance(meters) {
 }
 
 // Sortable Gate Card Component
-const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation }) => {
+const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation, toggleAutoOpen, autoOpenSettings }) => {
   const {
     attributes,
     listeners,
@@ -60,6 +60,22 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // Format distance helper
+  const getDistanceText = () => {
+    if (!userLocation || !gate.location || !gate.location.latitude) return null;
+    
+    const distance = calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      gate.location.latitude,
+      gate.location.longitude
+    );
+    
+    return formatDistance(distance);
+  };
+  
+  const distanceText = getDistanceText();
 
   return (
     <div
@@ -95,9 +111,31 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
             </div>
           )}
 
-          {/* Row 2: Gate name */}
-          <div className="gate-name-mobile-row">
-            <h3>{gate.name}</h3>
+          {/* Row 2: Gate name + Distance */}
+          <div className="gate-name-with-icon" style={{ alignItems: 'flex-start' }}>
+            <svg className="gate-icon-mobile" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ marginTop: '4px', flexShrink: 0 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+            </svg>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+              <h3 style={{ margin: 0, lineHeight: '1.4' }}>{gate.name}</h3>
+              {distanceText && (
+                <span style={{ 
+                  fontSize: '0.75rem', 
+                  color: '#2563eb', 
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontWeight: '600'
+                }}>
+                  <svg style={{ width: '12px', height: '12px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {distanceText}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Row 3: Icon + Status + Arrow */}
@@ -376,7 +414,8 @@ const GateDashboard = ({ user, token }) => {
     phoneNumber: '',
     authorizedNumber: '',
     password: '',
-    location: null
+    location: null,
+    autoOpenRadius: 50 // Default 50 meters
   });
   const [verifiedCallers, setVerifiedCallers] = useState([]);
   const [cooldowns, setCooldowns] = useState({});
@@ -387,10 +426,31 @@ const GateDashboard = ({ user, token }) => {
   const [settings, setSettings] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // Add userLocation state
   const [locationError, setLocationError] = useState(null);
+  
+  // Auto-open settings and state
+  const [autoOpenSettings, setAutoOpenSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gateAutoOpenSettings');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error('Error loading auto-open settings:', e);
+      return {};
+    }
+  });
+  const [autoOpenedGates, setAutoOpenedGates] = useState({}); // Track gates opened in current proximity session
 
   // Refs for scrolling to errors
   const errorRef = useRef(null);
   const successRef = useRef(null);
+
+  const toggleAutoOpen = (gateId) => {
+    const newSettings = {
+      ...autoOpenSettings,
+      [gateId]: !autoOpenSettings[gateId]
+    };
+    setAutoOpenSettings(newSettings);
+    localStorage.setItem('gateAutoOpenSettings', JSON.stringify(newSettings));
+  };
 
   const requestLocation = useCallback((showError = false) => {
     if (!navigator.geolocation) {
@@ -1346,7 +1406,27 @@ const GateDashboard = ({ user, token }) => {
             <div className="mobile-gate-content">
               <div className="gate-info">
                 <p><strong>מספר טלפון:</strong> {selectedGate.phoneNumber}</p>
-                <p><strong>הגנה:</strong> {selectedGate.password ? 'מוגן' : 'לא מוגן'}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <p style={{ margin: 0 }}><strong>הגנה:</strong> {selectedGate.password ? 'מוגן' : 'לא מוגן'}</p>
+                  {userLocation && selectedGate.location && selectedGate.location.latitude && (
+                    <span style={{ 
+                      background: '#eff6ff', 
+                      color: '#1e40af', 
+                      border: '1px solid #dbeafe',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      fontWeight: '600'
+                    }}>
+                      {formatDistance(calculateDistance(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        selectedGate.location.latitude,
+                        selectedGate.location.longitude
+                      ))}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="gate-authorized">
@@ -1380,6 +1460,38 @@ const GateDashboard = ({ user, token }) => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span>אנא המתן {cooldowns[selectedGate.id]} שניות לפני פתיחת השער שוב!</span>
+                    </div>
+                  )}
+
+                  {/* Auto Open Toggle */}
+                  {selectedGate.location && selectedGate.location.latitude && (
+                    <div className="auto-open-toggle" style={{ marginBottom: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <svg style={{ width: '20px', height: '20px', color: '#2563eb' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span style={{ fontWeight: '600', color: '#1e40af' }}>פתיחה אוטומטית בהגעה</span>
+                      </div>
+                      <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '24px' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={!!autoOpenSettings[selectedGate.id]} 
+                          onChange={() => toggleAutoOpen(selectedGate.id)}
+                          style={{ opacity: 0, width: 0, height: 0 }}
+                        />
+                        <span className="slider round" style={{ 
+                          position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, 
+                          backgroundColor: !!autoOpenSettings[selectedGate.id] ? '#2563eb' : '#ccc', 
+                          transition: '.4s', borderRadius: '34px' 
+                        }}>
+                          <span style={{ 
+                            position: 'absolute', content: '""', height: '16px', width: '16px', 
+                            left: !!autoOpenSettings[selectedGate.id] ? '4px' : '30px', bottom: '4px', 
+                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%' 
+                          }}></span>
+                        </span>
+                      </label>
                     </div>
                   )}
 
@@ -1499,6 +1611,8 @@ const GateDashboard = ({ user, token }) => {
                   handleGateSelect={handleGateSelect}
                   isEditMode={isEditMode}
                   userLocation={userLocation}
+                  toggleAutoOpen={toggleAutoOpen}
+                  autoOpenSettings={autoOpenSettings}
                 />
               ))}
             </div>
