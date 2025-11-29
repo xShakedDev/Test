@@ -198,7 +198,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
           username: req.user.username,
           gateName: gate.name,
           success: false,
-          errorMessage: `דילאי פעיל - נסה שוב בעוד ${remainingTime} שניות`
+          errorMessage: `אנא המתן ${remainingTime} שניות לפני פתיחת השער שוב!`
         }).save();
       } catch (logError) {
         console.error('שגיאה ברישום היסטוריית כישלון:', logError);
@@ -206,7 +206,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 
       return res.status(429).json({
         error: 'דילאי פעיל',
-        message: `נסה שוב בעוד ${remainingTime} שניות`,
+        message: `אנא המתן ${remainingTime} שניות לפני פתיחת השער שוב!`,
         remainingTime
       });
     }
@@ -295,7 +295,41 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
   } catch (error) {
     console.error('שגיאה בפתיחת השער:', error);
 
-    // Log failed gate opening attempt
+    // Convert error to user-friendly Hebrew message
+    let userFriendlyError = 'שגיאה לא ידועה בפתיחת השער';
+    
+    if (error.message && error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+      userFriendlyError = 'Twilio לא מוגדר - בדוק את משתני הסביבה';
+    } else if (error.code === 'ENOTFOUND' || error.message?.includes('ENOTFOUND')) {
+      userFriendlyError = 'שגיאת רשת - לא ניתן להגיע ל-Twilio';
+    } else if (error.code === 'UNAUTHORIZED' || error.message?.includes('UNAUTHORIZED')) {
+      userFriendlyError = 'אימות Twilio נכשל - בדוק פרטי התחברות';
+    } else if (error.name === 'CastError' || error.message?.includes('CastError')) {
+      userFriendlyError = 'מזהה השער לא תקין';
+    } else if (error.message?.includes('Invalid phone number') || error.message?.includes('phone number')) {
+      userFriendlyError = 'מספר טלפון לא תקין';
+    } else if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+      userFriendlyError = 'פג זמן ההמתנה - שרת Twilio לא הגיב';
+    } else if (error.message?.includes('ECONNREFUSED')) {
+      userFriendlyError = 'חיבור נדחה - שרת Twilio לא זמין';
+    } else if (error.message?.includes('balance') || error.message?.includes('insufficient')) {
+      userFriendlyError = 'יתרת Twilio נמוכה - לא ניתן לבצע שיחה';
+    } else if (error.message) {
+      // Try to extract meaningful information from error message
+      const errorMsg = error.message.toLowerCase();
+      if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+        userFriendlyError = 'שגיאת רשת - לא ניתן להתחבר ל-Twilio';
+      } else if (errorMsg.includes('authentication') || errorMsg.includes('auth')) {
+        userFriendlyError = 'שגיאת אימות - פרטי Twilio שגויים';
+      } else if (errorMsg.includes('permission') || errorMsg.includes('forbidden')) {
+        userFriendlyError = 'אין הרשאה לבצע פעולה זו';
+      } else {
+        // Use original error message but add context
+        userFriendlyError = `שגיאה בפתיחת השער: ${error.message}`;
+      }
+    }
+
+    // Log failed gate opening attempt with user-friendly error message
     try {
       await new GateHistory({
         userId: req.user._id,
@@ -303,14 +337,14 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         username: req.user.username,
         gateName: gate?.name || 'Unknown',
         success: false,
-        errorMessage: error.message
+        errorMessage: userFriendlyError
       }).save();
     } catch (logError) {
       console.error('שגיאה ברישום היסטוריית כישלון:', logError);
     }
 
-    // Provide more specific error messages
-    if (error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
+    // Provide more specific error messages for API response
+    if (error.message && error.message.includes('פרטי התחברות ל-Twilio לא מוגדרים')) {
       res.status(500).json({ error: 'Twilio לא מוגדר - בדוק את משתני הסביבה' });
     } else if (error.code === 'ENOTFOUND') {
       res.status(500).json({ error: 'שגיאת רשת - לא ניתן להגיע ל-Twilio' });
@@ -319,7 +353,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     } else if (error.name === 'CastError') {
       res.status(400).json({ error: 'מזהה השער לא תקין' });
     } else {
-      res.status(500).json({ error: 'נכשל בפתיחת השער', details: error.message });
+      res.status(500).json({ error: userFriendlyError });
     }
   }
 });
@@ -348,8 +382,8 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   }
 });
 
-// Gate statistics endpoint (admin only)
-router.get('/gates/stats', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+// Gate statistics endpoint - admin sees all, regular users see only their own
+router.get('/gates/stats', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const matchStage = {};
@@ -371,7 +405,22 @@ router.get('/gates/stats', requireMongoDB, authenticateToken, requireAdmin, asyn
     // Add filter for active gates only
     matchStage.gateId = { $in: activeGateIds };
 
-    // Top Gates
+    // For regular users, only show their own statistics
+    let userGates = [];
+    if (req.user.role !== 'admin') {
+      matchStage.userId = req.user._id;
+      
+      // Get list of authorized gates for the user
+      const authorizedGateIds = req.user.authorizedGates || [];
+      if (authorizedGateIds.length > 0) {
+        userGates = await Gate.find({
+          id: { $in: authorizedGateIds },
+          isActive: true
+        }).select('id name').lean();
+      }
+    }
+
+    // Top Gates (for user: only gates they opened)
     const topGates = await GateHistory.aggregate([
       { $match: matchStage },
       { $group: { _id: "$gateName", count: { $sum: 1 } } },
@@ -379,13 +428,23 @@ router.get('/gates/stats', requireMongoDB, authenticateToken, requireAdmin, asyn
       { $limit: 10 }
     ]);
 
-    // Top Users
-    const topUsers = await GateHistory.aggregate([
-      { $match: matchStage },
-      { $group: { _id: "$username", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 }
-    ]);
+    // Top Users (only for admin, for regular users this will be empty or just them)
+    let topUsers = [];
+    if (req.user.role === 'admin') {
+      topUsers = await GateHistory.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$username", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]);
+    } else {
+      // For regular users, show their own stats
+      const userStats = await GateHistory.aggregate([
+        { $match: matchStage },
+        { $group: { _id: "$username", count: { $sum: 1 } } }
+      ]);
+      topUsers = userStats;
+    }
 
     // Hourly Activity
     const hourlyActivity = await GateHistory.aggregate([
@@ -405,10 +464,27 @@ router.get('/gates/stats', requireMongoDB, authenticateToken, requireAdmin, asyn
       return { hour: i, count: found ? found.count : 0 };
     });
 
+    // For regular users, fill in missing gates with 0 count
+    let completeTopGates = topGates;
+    if (req.user.role !== 'admin' && userGates.length > 0) {
+      const gatesMap = new Map(topGates.map(g => [g._id, g.count]));
+      completeTopGates = userGates.map(gate => ({
+        _id: gate.name,
+        count: gatesMap.get(gate.name) || 0
+      })).sort((a, b) => {
+        // Sort by count (descending), then by name
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return a._id.localeCompare(b._id);
+      });
+    }
+
     res.json({
-      topGates,
+      topGates: completeTopGates,
       topUsers,
-      hourlyActivity: fullHourlyActivity
+      hourlyActivity: fullHourlyActivity,
+      isPersonal: req.user.role !== 'admin' // Flag to indicate if these are personal stats
     });
   } catch (error) {
     console.error('שגיאה בטעינת סטטיסטיקות:', error);

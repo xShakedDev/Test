@@ -315,8 +315,8 @@ function App() {
             user={user}
             token={token}
           />
-        ) : currentView === 'statistics' && user.role === 'admin' ? (
-          <GateStatistics />
+        ) : currentView === 'statistics' ? (
+          <GateStatistics user={user} />
         ) : (
           // Fallback to gates if invalid view
           <GateDashboard

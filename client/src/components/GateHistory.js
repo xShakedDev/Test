@@ -528,30 +528,30 @@ const GateHistory = ({ user, token }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map(log => (
-                    <tr key={log.id} className="history-row">
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedLogs.includes(log.id)}
-                          onChange={() => handleSelectLog(log.id)}
-                        />
-                      </td>
-                      <td className="history-user">{log.userName || log.username || (log.userId && (log.userId.name || log.userId.username)) || 'לא ידוע'}</td>
-                      <td className="history-gate">{log.gateName || 'לא ידוע'}</td>
-                      <td className="history-status">
-                        {(() => {
-                          const isSuccess = (log.success === true) || (log.status === 'success');
-                          return (
-                            <span className={`status-badge status-${isSuccess ? 'success' : 'error'}`}>
-                              {isSuccess ? 'הצלחה' : 'שגיאה'}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td className="history-date">{formatDate(log.timestamp)}</td>
-                    </tr>
-                  ))}
+                  {history.map(log => {
+                    const isSuccess = (log.success === true) || (log.status === 'success');
+                    return (
+                      <tr key={log.id} className="history-row">
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedLogs.includes(log.id)}
+                            onChange={() => handleSelectLog(log.id)}
+                          />
+                        </td>
+                        <td className="history-user">{log.userName || log.username || (log.userId && (log.userId.name || log.userId.username)) || 'לא ידוע'}</td>
+                        <td className="history-gate">{log.gateName || 'לא ידוע'}</td>
+                        <td className="history-status">
+                          <span 
+                            className={`status-badge status-${isSuccess ? 'success' : 'error'}`}
+                          >
+                            {isSuccess ? 'פתיחה הצליחה' : (log.errorMessage || 'שגיאה')}
+                          </span>
+                        </td>
+                        <td className="history-date">{formatDate(log.timestamp)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

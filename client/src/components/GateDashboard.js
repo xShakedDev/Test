@@ -281,7 +281,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                       <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>השער נפתח לאחרונה - נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
+                      <span>אנא המתן {cooldowns[gate.id]} שניות לפני פתיחת השער שוב!</span>
                     </div>
                   )}
 
@@ -303,7 +303,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                         <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span>נסה שוב בעוד {cooldowns[gate.id]} שניות</span>
+                        <span>אנא המתן {cooldowns[gate.id]} שניות לפני פתיחת השער שוב!</span>
                       </>
                     ) : (
                       <>
@@ -611,7 +611,7 @@ const GateDashboard = ({ user, token }) => {
 
         } else if (response.status === 429) {
           if (data.error === 'דילאי פעיל') {
-            const msg = `דילאי פעיל: ${data.message}`;
+            const msg = data.message || `אנא המתן ${data.remainingTime} שניות לפני פתיחת השער שוב!`;
             setError(msg);
             // Update cooldown with remaining time
             if (data.remainingTime) {
@@ -1200,7 +1200,7 @@ const GateDashboard = ({ user, token }) => {
                       <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>השער נפתח לאחרונה - נסה שוב בעוד {cooldowns[selectedGate.id]} שניות</span>
+                      <span>אנא המתן {cooldowns[selectedGate.id]} שניות לפני פתיחת השער שוב!</span>
                     </div>
                   )}
 
@@ -1219,7 +1219,7 @@ const GateDashboard = ({ user, token }) => {
                         <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span>נסה שוב בעוד {cooldowns[selectedGate.id]} שניות</span>
+                        <span>אנא המתן {cooldowns[selectedGate.id]} שניות לפני פתיחת השער שוב!</span>
                       </>
                     ) : (
                       <>

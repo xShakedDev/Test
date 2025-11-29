@@ -240,14 +240,15 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                 היסטוריית שערים
               </button>
 
+              <button
+                onClick={() => onViewChange('statistics')}
+                className={`nav-button ${currentView === 'statistics' ? 'nav-button-active' : ''}`}
+              >
+                {user?.role === 'admin' ? 'סטטיסטיקות' : 'הסטטיסטיקות שלי'}
+              </button>
+
               {user?.role === 'admin' && (
                 <>
-                  <button
-                    onClick={() => onViewChange('statistics')}
-                    className={`nav-button ${currentView === 'statistics' ? 'nav-button-active' : ''}`}
-                  >
-                    סטטיסטיקות
-                  </button>
                   <button
                     onClick={() => onViewChange('settings')}
                     className={`nav-button ${currentView === 'settings' ? 'nav-button-active' : ''}`}
@@ -483,21 +484,20 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               היסטוריית שערים
             </button>
 
+            <button
+              onClick={() => handleMobileNavClick('statistics')}
+              className={`mobile-nav-button ${currentView === 'statistics' ? 'mobile-nav-button-active' : ''}`}
+            >
+              {user?.role === 'admin' ? 'סטטיסטיקות' : 'הסטטיסטיקות שלי'}
+            </button>
+
             {user?.role === 'admin' && (
-              <>
-                <button
-                  onClick={() => handleMobileNavClick('statistics')}
-                  className={`mobile-nav-button ${currentView === 'statistics' ? 'mobile-nav-button-active' : ''}`}
-                >
-                  סטטיסטיקות
-                </button>
-                <button
-                  onClick={() => handleMobileNavClick('settings')}
-                  className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
-                >
-                  הגדרות מנהל
-                </button>
-              </>
+              <button
+                onClick={() => handleMobileNavClick('settings')}
+                className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
+              >
+                הגדרות מנהל
+              </button>
             )}
           </div>
         </div>
