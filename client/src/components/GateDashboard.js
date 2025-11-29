@@ -426,6 +426,7 @@ const GateDashboard = ({ user, token }) => {
   const [settings, setSettings] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // Add userLocation state
   const [locationError, setLocationError] = useState(null);
+  const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
   
   // Auto-open settings and state
   const [autoOpenSettings, setAutoOpenSettings] = useState(() => {
@@ -459,6 +460,8 @@ const GateDashboard = ({ user, token }) => {
       return;
     }
 
+    setLocationPermissionRequested(true);
+    
     if (showError) {
       setLocationError(null);
     }
@@ -516,11 +519,57 @@ const GateDashboard = ({ user, token }) => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // Get user location on mount
+  // Get user location on mount - try automatically
   useEffect(() => {
-    // Try to get location automatically (without error popup)
-    requestLocation(false);
-  }, [requestLocation]);
+    if (navigator.geolocation && !locationPermissionRequested) {
+      setLocationPermissionRequested(true);
+      // Try to get location automatically (without error popup)
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        (error) => {
+          // Silent fail - don't show banner if permission was denied before
+          console.log('Auto location request failed:', error.message);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  }, [locationPermissionRequested]);
+
+  // Watch position for continuous updates once we have permission
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    let watchId = null;
+    
+    // Start watching if we have location or if permission was requested
+    if (userLocation || locationPermissionRequested) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        (error) => {
+          console.error('Error watching user location:', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [locationPermissionRequested]);
 
   // Drag and drop sensors - use TouchSensor for mobile, PointerSensor for desktop
   const sensors = useSensors(
@@ -1130,7 +1179,7 @@ const GateDashboard = ({ user, token }) => {
                 : 'לשינוי סדר השערים לחץ על כפתור "עריכה"'
             }
           </p>
-          {!userLocation && !locationError && (
+          {!userLocation && !locationPermissionRequested && (
             <div className="location-request-banner" style={{ 
               marginTop: '10px', 
               padding: '8px 12px', 
