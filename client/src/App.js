@@ -8,6 +8,7 @@ import AdminSettings from './components/AdminSettings';
 import GateStatistics from './components/GateStatistics';
 import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback, refreshAccessToken } from './utils/auth';
 import './styles/design-system.css';
+import './styles/LocationPicker.css'; // Import LocationPicker styles
 import './App.css';
 
 function App() {

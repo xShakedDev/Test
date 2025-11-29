@@ -57,6 +57,25 @@ const gateSchema = new mongoose.Schema({
   order: {
     type: Number,
     default: 0
+  },
+  location: {
+    latitude: {
+      type: Number,
+      default: null
+    },
+    longitude: {
+      type: Number,
+      default: null
+    },
+    autoOpenRadius: {
+      type: Number,
+      default: 50 // Default radius in meters
+    },
+    address: {
+      type: String,
+      default: null,
+      trim: true
+    }
   }
 }, {
   timestamps: true, // adds createdAt and updatedAt automatically

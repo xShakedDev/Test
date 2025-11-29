@@ -684,7 +684,7 @@ router.get('/gates/:id', requireMongoDB, authenticateToken, async (req, res) => 
 
 router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { name, phoneNumber, authorizedNumber, password } = req.body;
+    const { name, phoneNumber, authorizedNumber, password, location } = req.body;
 
     if (!name || !phoneNumber || !authorizedNumber) {
       return res.status(400).json({ error: 'חסרים שדות נדרשים: name, phoneNumber, authorizedNumber' });
@@ -709,7 +709,8 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
       phoneNumber,
       authorizedNumber,
       password: password || null,
-      order: nextOrder
+      order: nextOrder,
+      location: location || { latitude: null, longitude: null, autoOpenRadius: 50, address: null }
     });
 
     const savedGate = await newGate.save();
@@ -822,7 +823,7 @@ router.put('/gates/reorder', requireMongoDB, authenticateToken, async (req, res)
 router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, phoneNumber, authorizedNumber, password } = req.body;
+    const { name, phoneNumber, authorizedNumber, password, location } = req.body;
 
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
@@ -853,6 +854,7 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
     if (phoneNumber) gate.phoneNumber = phoneNumber;
     if (authorizedNumber) gate.authorizedNumber = authorizedNumber;
     if (password !== undefined) gate.password = password || null;
+    if (location !== undefined) gate.location = location;
 
     const updatedGate = await gate.save();
 

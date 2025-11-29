@@ -18,10 +18,34 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import GateHistory from './GateHistory';
 import CallerIdValidation from './CallerIdValidation';
+import LocationPicker from './LocationPicker'; // Import LocationPicker
 import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
+// Calculate distance between two points in meters (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+function formatDistance(meters) {
+  if (meters < 1000) {
+    return `${Math.round(meters)} מ'`;
+  }
+  return `${(meters / 1000).toFixed(1)} ק"מ`;
+}
+
 // Sortable Gate Card Component
-const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode }) => {
+const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation }) => {
   const {
     attributes,
     listeners,
@@ -174,6 +198,16 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                     />
                     <small>סיסמה להגנה על השער (ריק = ללא הגנה)</small>
                   </div>
+
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label>מיקום השער (אופציונלי)</label>
+                    <LocationPicker
+                      initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
+                      onLocationSelect={handleLocationSelect}
+                      userLocation={userLocation}
+                    />
+                    <small>לחץ על המפה או חפש כתובת לבחירת מיקום לפתיחה אוטומטית</small>
+                  </div>
                 </div>
 
                 <div className="form-actions">
@@ -249,6 +283,9 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
               <div className="gate-info">
                 <p><strong>מספר טלפון:</strong> {gate.phoneNumber}</p>
                 <p><strong>הגנה:</strong> {gate.password ? 'מוגן' : 'לא מוגן'}</p>
+                {userLocation && gate.location && gate.location.latitude && (
+                  <p><strong>מרחק:</strong> {formatDistance(calculateDistance(userLocation.latitude, userLocation.longitude, gate.location.latitude, gate.location.longitude))}</p>
+                )}
               </div>
 
               <div className="gate-authorized">
@@ -338,7 +375,8 @@ const GateDashboard = ({ user, token }) => {
     name: '',
     phoneNumber: '',
     authorizedNumber: '',
-    password: ''
+    password: '',
+    location: null
   });
   const [verifiedCallers, setVerifiedCallers] = useState([]);
   const [cooldowns, setCooldowns] = useState({});
@@ -347,10 +385,81 @@ const GateDashboard = ({ user, token }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [settings, setSettings] = useState(null);
+  const [userLocation, setUserLocation] = useState(null); // Add userLocation state
+  const [locationError, setLocationError] = useState(null);
 
   // Refs for scrolling to errors
   const errorRef = useRef(null);
   const successRef = useRef(null);
+
+  const requestLocation = useCallback((showError = false) => {
+    if (!navigator.geolocation) {
+      if (showError) alert('הדפדפן שלך לא תומך במיקום');
+      return;
+    }
+
+    if (showError) {
+      setLocationError(null);
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      (error) => {
+        console.error('Error getting user location:', error);
+        if (showError) {
+          let msg = 'שגיאה בקבלת מיקום:\n';
+          switch(error.code) {
+            case 1: // PERMISSION_DENIED
+              msg += 'הגישה למיקום נחסמה. אנא בדוק את הגדרות הדפדפן ואשר גישה למיקום עבור אתר זה.';
+              break;
+            case 2: // POSITION_UNAVAILABLE
+              msg += 'המיקום אינו זמין כרגע. וודא שה-GPS דלוק.';
+              break;
+            case 3: // TIMEOUT
+              msg += 'הבקשה לקבלת מיקום לקחה יותר מדי זמן.';
+              break;
+            default:
+              msg += error.message;
+          }
+          // Check for secure context issue (common on mobile)
+          if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+             msg += '\n\nשים לב: דפדפנים חוסמים גישה למיקום באתרים לא מאובטחים (HTTP). יש לגלוש דרך HTTPS או localhost.';
+          }
+          alert(msg);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // Also start watching
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      (error) => {
+        console.error('Error watching user location:', error);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Get user location on mount
+  useEffect(() => {
+    // Try to get location automatically (without error popup)
+    requestLocation(false);
+  }, [requestLocation]);
 
   // Drag and drop sensors - use TouchSensor for mobile, PointerSensor for desktop
   const sensors = useSensors(
@@ -660,6 +769,18 @@ const GateDashboard = ({ user, token }) => {
     }));
   };
 
+  const handleLocationSelect = (location) => {
+    setNewGateData(prev => ({
+      ...prev,
+      location: {
+        latitude: location.lat,
+        longitude: location.lng,
+        address: location.address,
+        autoOpenRadius: prev.location?.autoOpenRadius || 50
+      }
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -695,7 +816,8 @@ const GateDashboard = ({ user, token }) => {
           name: '',
           phoneNumber: '',
           authorizedNumber: '',
-          password: ''
+          password: '',
+          location: null
         });
         await fetchGates();
       } else {
@@ -724,7 +846,8 @@ const GateDashboard = ({ user, token }) => {
       name: gate.name,
       phoneNumber: gate.phoneNumber,
       authorizedNumber: gate.authorizedNumber,
-      password: gate.password || ''
+      password: gate.password || '',
+      location: gate.location || null
     });
   };
 
@@ -899,6 +1022,43 @@ const GateDashboard = ({ user, token }) => {
                 : 'לשינוי סדר השערים לחץ על כפתור "עריכה"'
             }
           </p>
+          {!userLocation && !locationError && (
+            <div className="location-request-banner" style={{ 
+              marginTop: '10px', 
+              padding: '8px 12px', 
+              backgroundColor: '#eff6ff', 
+              borderRadius: '6px', 
+              border: '1px solid #dbeafe',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.9rem',
+              color: '#1e40af'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>הפעל מיקום להצגת מרחקים ופתיחה אוטומטית</span>
+              </div>
+              <button 
+                onClick={() => requestLocation(true)}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+              >
+                הפעל
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1036,6 +1196,15 @@ const GateDashboard = ({ user, token }) => {
                 />
                 <small>סיסמה להגנה על השער (ריק = ללא הגנה)</small>
               </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label>מיקום השער (אופציונלי)</label>
+                <LocationPicker
+                  initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
+                  onLocationSelect={handleLocationSelect}
+                />
+                <small>לחץ על המפה או חפש כתובת לבחירת מיקום לפתיחה אוטומטית</small>
+              </div>
             </div>
 
             <div className="form-actions">
@@ -1141,6 +1310,16 @@ const GateDashboard = ({ user, token }) => {
                       disabled={isSubmitting}
                     />
                     <small>סיסמה להגנה על השער (ריק = ללא הגנה)</small>
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label>מיקום השער (אופציונלי)</label>
+                    <LocationPicker
+                      initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
+                      onLocationSelect={handleLocationSelect}
+                      userLocation={userLocation}
+                    />
+                    <small>לחץ על המפה או חפש כתובת לבחירת מיקום לפתיחה אוטומטית</small>
                   </div>
                 </div>
                 <div className="form-actions">
@@ -1308,6 +1487,7 @@ const GateDashboard = ({ user, token }) => {
                   editingGate={editingGate}
                   newGateData={newGateData}
                   handleInputChange={handleInputChange}
+                  handleLocationSelect={handleLocationSelect}
                   handleSubmit={handleSubmit}
                   handleCancel={handleCancel}
                   isSubmitting={isSubmitting}
@@ -1318,6 +1498,7 @@ const GateDashboard = ({ user, token }) => {
                   handleDelete={handleDelete}
                   handleGateSelect={handleGateSelect}
                   isEditMode={isEditMode}
+                  userLocation={userLocation}
                 />
               ))}
             </div>
