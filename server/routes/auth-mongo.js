@@ -261,8 +261,10 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     }
 
     const client = getTwilioClient();
+    // Build full URL for voice.xml file
+    const voiceXmlUrl = `${req.protocol}://${req.get('host')}/voice.xml`;
     const call = await client.calls.create({
-      url: 'http://demo.twilio.com/docs/voice.xml',
+      url: voiceXmlUrl,
       to: gate.phoneNumber,
       from: gate.authorizedNumber,
       statusCallback: `${req.protocol}://${req.get('host')}/api/gates/${id}/call-status`,
