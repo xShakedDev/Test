@@ -46,7 +46,8 @@ export const setTokenUpdateCallback = (callback) => {
 
 /**
  * Refresh the access token using the refresh token
- * @returns {Promise<Object>} - New tokens or null if refresh failed
+ * @returns {Promise<Object|null>} - New tokens or null if refresh failed
+ * @returns {Promise<{success: false, reason: string}>} - If refresh failed with reason
  */
 export const refreshAccessToken = async () => {
   try {
@@ -59,8 +60,9 @@ export const refreshAccessToken = async () => {
       storage = sessionStorage;
     }
 
+    // If no refresh token exists, return failure with reason
     if (!refreshToken) {
-      return null;
+      return { success: false, reason: 'no_refresh_token' };
     }
 
     const response = await fetch('/api/auth/refresh', {
@@ -73,6 +75,13 @@ export const refreshAccessToken = async () => {
 
     if (response.ok) {
       const data = await response.json();
+      
+      // Validate that we received both tokens
+      if (!data.accessToken || !data.refreshToken) {
+        console.error('Invalid refresh response: missing tokens');
+        return { success: false, reason: 'invalid_response' };
+      }
+      
       // Update tokens in the same storage where refresh token was found
       storage.setItem('authToken', data.accessToken);
       storage.setItem('refreshToken', data.refreshToken);
@@ -91,13 +100,32 @@ export const refreshAccessToken = async () => {
         }
       }));
 
-      return data;
+      return { success: true, accessToken: data.accessToken, refreshToken: data.refreshToken };
     }
 
-    return null;
+    // Check if refresh token is expired or invalid
+    let errorData = null;
+    try {
+      errorData = await response.json();
+    } catch (e) {
+      errorData = { error: 'שגיאה לא ידועה' };
+    }
+    
+    if (response.status === 401) {
+      // Check the specific error message to determine if token expired
+      const errorMessage = errorData?.error || '';
+      if (errorMessage.includes('סשן פג תוקף') || errorMessage.includes('טוקן לא תקף')) {
+        return { success: false, reason: 'refresh_token_expired' };
+      }
+      // Other 401 errors (like invalid user)
+      return { success: false, reason: 'refresh_token_invalid' };
+    }
+
+    // Other errors (400, 500, etc.)
+    return { success: false, reason: 'refresh_failed' };
   } catch (error) {
     console.error('Failed to refresh token:', error);
-    return null;
+    return { success: false, reason: 'network_error' };
   }
 };
 
@@ -156,22 +184,35 @@ export const authenticatedFetch = async (url, options = {}) => {
       errorData = null;
     }
 
-    if (isTokenExpired(errorData)) {
-      // Try to refresh the token
+    // Check if error indicates token expiration (not session expiration)
+    // If it's 'סשן פג תוקף', it could be just the access token expired, try to refresh
+    if (errorData && errorData.error && errorData.error.includes('סשן פג תוקף')) {
+      // Try to refresh the token - this could be just access token expiration
       const refreshResult = await refreshAccessToken();
 
-      if (refreshResult) {
+      if (refreshResult && refreshResult.success) {
         // Retry the original request with new token
         if (options.headers.Authorization) {
           options.headers.Authorization = `Bearer ${refreshResult.accessToken}`;
         }
         response = await fetch(url, options);
+      } else if (refreshResult) {
+        // Refresh failed - check the reason
+        // Only disconnect if refresh token is expired or doesn't exist
+        if (refreshResult.reason === 'refresh_token_expired' || refreshResult.reason === 'no_refresh_token') {
+          // Refresh token expired or doesn't exist - session is truly expired
+          handleSessionExpiration();
+          return response;
+        }
+        // For network errors or other failures, don't disconnect - just return the original 401
+        // The user might be offline temporarily or there's a temporary server issue
+        return response;
       } else {
-        // Refresh failed, session expired
-        handleSessionExpiration();
+        // refreshResult is null/undefined - shouldn't happen, but handle gracefully
         return response;
       }
     } else if (isSessionExpired(errorData)) {
+      // For other session errors (not 'סשן פג תוקף'), disconnect immediately
       handleSessionExpiration();
       return response;
     }

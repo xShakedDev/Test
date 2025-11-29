@@ -6,7 +6,7 @@ import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
 import GateStatistics from './components/GateStatistics';
-import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback } from './utils/auth';
+import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback, refreshAccessToken } from './utils/auth';
 import './styles/design-system.css';
 import './App.css';
 
@@ -198,40 +198,28 @@ function App() {
     setIsLoading(false);
   }, [verifyToken, handleLogout, checkMaintenanceStatus]);
 
-  // Auto-refresh token every hour
+  // Auto-refresh token every hour (proactive refresh before expiration)
   useEffect(() => {
     if (!token) return;
 
     const refreshInterval = setInterval(async () => {
       try {
-        // Check localStorage first, then sessionStorage
-        let refreshToken = localStorage.getItem('refreshToken');
-        let storage = localStorage;
-
-        if (!refreshToken) {
-          refreshToken = sessionStorage.getItem('refreshToken');
-          storage = sessionStorage;
-        }
-
-        if (refreshToken) {
-          const response = await authenticatedFetch('/api/auth/refresh', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ refreshToken }),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            setToken(data.accessToken);
-            // Save to the same storage where refresh token was found
-            storage.setItem('authToken', data.accessToken);
-            storage.setItem('refreshToken', data.refreshToken);
-          }
+        // Use the refreshAccessToken utility function for consistency
+        const refreshResult = await refreshAccessToken();
+        
+        if (refreshResult && refreshResult.success) {
+          // Token was refreshed successfully, update state
+          setToken(refreshResult.accessToken);
+          console.log('Token refreshed proactively');
+        } else {
+          // Refresh failed - this is OK, the token might still be valid
+          // The authenticatedFetch will handle refresh when needed
+          console.log('Proactive refresh skipped or failed');
         }
       } catch (error) {
         console.error('Auto-refresh failed:', error);
+        // Don't disconnect on proactive refresh failure
+        // The token might still be valid
       }
     }, 60 * 60 * 1000); // Every hour
 
