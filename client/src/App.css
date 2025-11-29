@@ -3169,44 +3169,38 @@ body::before {
   margin-bottom: var(--space-8);
 }
 
-.form-grid {
+.form-container .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
 
-.form-group {
+.form-container .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.form-group label {
+.form-container .form-group label {
   font-weight: var(--font-weight-semibold);
   color: var(--color-gray-900);
 }
 
 /* Removed duplicate form input styles - using existing .form-input styles */
 
-.form-group small {
+.form-container .form-group small {
   color: var(--color-gray-700);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
 }
 
-.form-actions {
+.form-container .form-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
   align-items: center;
 }
-
-/* ========================================
-   BUTTON STYLES
-   ======================================== */
-
-/* Removed duplicate .btn definitions - using the ones defined earlier in the file */
 
 /* ========================================
    MOBILE GATE DETAIL STYLES
