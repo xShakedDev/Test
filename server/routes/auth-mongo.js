@@ -94,7 +94,7 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
 router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { password } = req.body;
+    const { password, autoOpened } = req.body;
 
     // Get current admin settings
     const adminSettings = await AdminSettings.getCurrentSettings();
@@ -275,7 +275,8 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       gateId: gate.id,
       username: req.user.username,
       success: true,
-      callSid: call.sid
+      callSid: call.sid,
+      autoOpened: autoOpened === true
     }).save();
 
     res.json({

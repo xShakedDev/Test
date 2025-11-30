@@ -1247,10 +1247,12 @@ body::before {
   color: var(--color-gray-900);
   flex: 1;
   min-width: 0;
-  /* Allow text to shrink */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Allow text to wrap to multiple lines */
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .gate-icon-mobile {

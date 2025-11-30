@@ -34,6 +34,10 @@ const gateHistorySchema = new mongoose.Schema({
   errorMessage: {
     type: String,
     default: null
+  },
+  autoOpened: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true,

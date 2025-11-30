@@ -552,7 +552,7 @@ const GateHistory = ({ user, token }) => {
                           <span 
                             className={`status-badge status-${isSuccess ? 'success' : 'error'}`}
                           >
-                            {isSuccess ? 'פתיחה הצליחה' : (log.errorMessage || 'שגיאה')}
+                            {isSuccess ? (log.autoOpened ? 'נפתח אוטומטית' : 'פתיחה הצליחה') : (log.errorMessage || 'שגיאה')}
                           </span>
                         </td>
                         <td className="history-date">{formatDate(log.timestamp)}</td>
