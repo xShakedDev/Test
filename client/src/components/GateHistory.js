@@ -28,9 +28,8 @@ const GateHistory = ({ user, token }) => {
 
   useEffect(() => {
     fetchHistory();
-    if (filter === 'gate') {
-      fetchGates();
-    } else if (filter === 'user') {
+    fetchGates(); // Always fetch gates to get current names
+    if (filter === 'user') {
       fetchUsers();
     }
   }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit]);
@@ -80,6 +79,7 @@ const GateHistory = ({ user, token }) => {
       
       let url = `/api/gates/history?limit=${pagination.limit}&page=${pagination.page}`;
       if (filter === 'gate' && filterValue) {
+        // Send gateName to server, which will look up the gate and filter by gateId
         url += `&gateName=${encodeURIComponent(filterValue)}`;
       } else if (filter === 'user' && filterValue) {
         url += `&username=${encodeURIComponent(filterValue)}`;
@@ -540,7 +540,14 @@ const GateHistory = ({ user, token }) => {
                           />
                         </td>
                         <td className="history-user">{log.userName || log.username || (log.userId && (log.userId.name || log.userId.username)) || 'לא ידוע'}</td>
-                        <td className="history-gate">{log.gateName || 'לא ידוע'}</td>
+                        <td className="history-gate">
+                          {(() => {
+                            // Try to find current gate name by gateId
+                            const currentGate = gates.find(g => g.id === log.gateId);
+                            // Use current name if found, otherwise fallback to saved name
+                            return currentGate ? currentGate.name : (log.gateName || 'לא ידוע');
+                          })()}
+                        </td>
                         <td className="history-status">
                           <span 
                             className={`status-badge status-${isSuccess ? 'success' : 'error'}`}

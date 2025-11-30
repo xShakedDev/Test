@@ -16,7 +16,8 @@ const gateHistorySchema = new mongoose.Schema({
   },
   gateName: {
     type: String,
-    required: true
+    required: false,
+    default: null
   },
   timestamp: {
     type: Date,
@@ -49,7 +50,6 @@ const gateHistorySchema = new mongoose.Schema({
 // Indexes for better query performance
 gateHistorySchema.index({ userId: 1, timestamp: -1 });
 gateHistorySchema.index({ gateId: 1, timestamp: -1 });
-gateHistorySchema.index({ gateName: 1, timestamp: -1 });
 gateHistorySchema.index({ username: 1, timestamp: -1 });
 gateHistorySchema.index({ timestamp: -1 });
 gateHistorySchema.index({ success: 1 });

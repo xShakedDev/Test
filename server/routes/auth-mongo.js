@@ -114,7 +114,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
               userId: req.user._id,
               gateId: gateForLog?.id || (isNaN(gateIdForLog) ? -1 : gateIdForLog),
               username: req.user.username,
-              gateName: gateForLog?.name || 'Unknown',
               success: false,
               errorMessage: 'חסימת פתיחת שערים - יתרת Twilio נמוכה'
             }).save();
@@ -153,7 +152,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
           userId: req.user._id,
           gateId: isNaN(parseInt(id, 10)) ? -1 : parseInt(id, 10),
           username: req.user.username,
-          gateName: 'Unknown',
           success: false,
           errorMessage: 'השער לא נמצא או לא פעיל'
         }).save();
@@ -172,7 +170,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
           userId: req.user._id,
           gateId: gate.id,
           username: req.user.username,
-          gateName: gate.name,
           success: false,
           errorMessage: 'אין הרשאה לפתוח שער זה'
         }).save();
@@ -196,7 +193,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
           userId: req.user._id,
           gateId: gate.id,
           username: req.user.username,
-          gateName: gate.name,
           success: false,
           errorMessage: `אנא המתן ${remainingTime} שניות לפני פתיחת השער שוב!`
         }).save();
@@ -227,7 +223,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
           userId: req.user._id,
           gateId: gate.id,
           username: req.user.username,
-          gateName: gate.name,
           success: false,
           errorMessage: `חריגה ממספר הניסיונות המותר (${adminSettings.maxRetries})`
         }).save();
@@ -249,7 +244,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
           userId: req.user._id,
           gateId: gate.id,
           username: req.user.username,
-          gateName: gate.name,
           success: false,
           errorMessage: 'סיסמה שגויה'
         }).save();
@@ -280,7 +274,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
       userId: req.user._id,
       gateId: gate.id,
       username: req.user.username,
-      gateName: gate.name,
       success: true,
       callSid: call.sid
     }).save();
@@ -335,7 +328,6 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         userId: req.user._id,
         gateId: isNaN(parseInt(req.params.id, 10)) ? -1 : parseInt(req.params.id, 10),
         username: req.user.username,
-        gateName: gate?.name || 'Unknown',
         success: false,
         errorMessage: userFriendlyError
       }).save();
@@ -421,12 +413,24 @@ router.get('/gates/stats', requireMongoDB, authenticateToken, async (req, res) =
     }
 
     // Top Gates (for user: only gates they opened)
-    const topGates = await GateHistory.aggregate([
+    // Group by gateId instead of gateName
+    const topGatesByGateId = await GateHistory.aggregate([
       { $match: matchStage },
-      { $group: { _id: "$gateName", count: { $sum: 1 } } },
+      { $group: { _id: "$gateId", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
     ]);
+    
+    // Get gate names for the top gates
+    const topGates = await Promise.all(
+      topGatesByGateId.map(async ({ _id: gateId, count }) => {
+        const gate = await Gate.findOne({ id: gateId });
+        return {
+          _id: gate ? gate.name : `שער ${gateId}`,
+          count
+        };
+      })
+    );
 
     // Top Users (only for admin, for regular users this will be empty or just them)
     let topUsers = [];
@@ -523,14 +527,18 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
 
     // Build query based on filters
     if (gateName) {
-      query.gateName = gateName;
+      // If gateName is provided, find the gate by name first, then filter by gateId
+      const gate = await Gate.findOne({ name: gateName });
+      if (gate) {
+        query.gateId = gate.id;
+      } else {
+        // If gate not found, return empty result
+        query.gateId = -1; // Non-existent gate ID
+      }
     } else if (gateId) {
       const numericGateId = parseInt(gateId, 10);
       if (!isNaN(numericGateId)) {
         query.gateId = numericGateId;
-      } else {
-        // Backward compatibility: treat non-numeric gateId as gateName
-        query.gateName = gateId;
       }
     } else if (username) {
       // Filter by username

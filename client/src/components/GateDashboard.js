@@ -21,7 +21,7 @@ import CallerIdValidation from './CallerIdValidation';
 import LocationPicker from './LocationPicker'; // Import LocationPicker
 import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
-// Calculate distance between two points in meters (Haversine formula)
+// Calculate distance between two points in meters (Haversine formula) - for quick checks
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; // Earth radius in meters
   const φ1 = lat1 * Math.PI / 180;
@@ -37,6 +37,25 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// Calculate route distance using OSRM API (driving distance)
+async function calculateRouteDistance(lat1, lon1, lat2, lon2) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false&alternatives=false`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+      return data.routes[0].distance; // Distance in meters
+    }
+    // Fallback to Haversine if OSRM fails
+    return calculateDistance(lat1, lon1, lat2, lon2);
+  } catch (error) {
+    console.error('Error calculating route distance:', error);
+    // Fallback to Haversine if OSRM fails
+    return calculateDistance(lat1, lon1, lat2, lon2);
+  }
+}
+
 function formatDistance(meters) {
   if (meters < 1000) {
     return `${Math.round(meters)} מ'`;
@@ -45,7 +64,7 @@ function formatDistance(meters) {
 }
 
 // Sortable Gate Card Component
-const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation, toggleAutoOpen, autoOpenSettings }) => {
+const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation, toggleAutoOpen, autoOpenSettings, routeDistance }) => {
   const {
     attributes,
     listeners,
@@ -61,11 +80,13 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
     opacity: isDragging ? 0.5 : 1,
   };
 
-  // Format distance helper
+  // Format distance helper - use route distance if available, otherwise fallback to straight line
   const getDistanceText = () => {
     if (!userLocation || !gate.location || !gate.location.latitude) return null;
     
-    const distance = calculateDistance(
+    const gateId = gate._id || gate.id;
+    // Use route distance if available, otherwise calculate straight line distance
+    const distance = routeDistance !== undefined ? routeDistance : calculateDistance(
       userLocation.latitude,
       userLocation.longitude,
       gate.location.latitude,
@@ -440,6 +461,10 @@ const GateDashboard = ({ user, token }) => {
   });
   const [autoOpenedGates, setAutoOpenedGates] = useState({}); // Track gates opened in current proximity session
   const [autoOpenNotification, setAutoOpenNotification] = useState(null); // Notification state
+  const [routeDistances, setRouteDistances] = useState({}); // Cache for route distances (gateId -> distance in meters)
+  const [showGateSelectionModal, setShowGateSelectionModal] = useState(false); // Modal for selecting gate when multiple are nearby
+  const [nearbyGates, setNearbyGates] = useState([]); // Gates within range that need user selection
+  const [pendingGateSelection, setPendingGateSelection] = useState(false); // Flag to prevent modal from showing repeatedly
 
   // Refs for scrolling to errors
   const errorRef = useRef(null);
@@ -871,52 +896,115 @@ const GateDashboard = ({ user, token }) => {
     }
   };
 
-  // Handle Auto-Open Logic
+  // Calculate route distances for all gates with locations
   useEffect(() => {
     if (!userLocation || !gates.length) return;
 
-    gates.forEach(gate => {
-      if (gate.location && gate.location.latitude && gate.location.longitude) {
-        const distance = calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          gate.location.latitude,
-          gate.location.longitude
-        );
+    const calculateDistances = async () => {
+      const newDistances = {};
+      const promises = [];
 
-        const gateId = gate._id || gate.id;
-        const isEnabled = autoOpenSettings[gateId];
-        const radius = gate.location.autoOpenRadius || 50;
-        const isNear = distance <= radius;
-        
-        // Check for auto-open
-        if (isEnabled && isNear) {
-          // Only open if not already opened in this session (and not in cooldown)
-          if (!autoOpenedGates[gateId] && !cooldowns[gateId]) {
-            console.log(`Auto-opening gate ${gate.name} (Distance: ${distance}m)`);
-            handleOpenGate(gate, gate.password || '');
-            
-            // Mark as opened
-            setAutoOpenedGates(prev => ({ ...prev, [gateId]: true }));
-            
-            // Show auto-open notification
-            setAutoOpenNotification({ gateName: gate.name });
-            setTimeout(() => setAutoOpenNotification(null), 5000);
+      gates.forEach(gate => {
+        if (gate.location && gate.location.latitude && gate.location.longitude) {
+          const gateId = gate._id || gate.id;
+          // Calculate route distance for all gates (will be cached and reused)
+          promises.push(
+            calculateRouteDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              gate.location.latitude,
+              gate.location.longitude
+            ).then(distance => {
+              newDistances[gateId] = distance;
+            })
+          );
+        }
+      });
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        setRouteDistances(prev => ({ ...prev, ...newDistances }));
+      }
+    };
+
+    // Debounce distance calculations to avoid too many API calls
+    const timeoutId = setTimeout(calculateDistances, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [userLocation?.latitude, userLocation?.longitude, gates]);
+
+  // Handle Auto-Open Logic with route distance
+  useEffect(() => {
+    if (!userLocation || !gates.length) return;
+
+    const checkAutoOpen = async () => {
+      const gatesInRange = [];
+
+      for (const gate of gates) {
+        if (gate.location && gate.location.latitude && gate.location.longitude) {
+          const gateId = gate._id || gate.id;
+          const isEnabled = autoOpenSettings[gateId];
+          
+          if (!isEnabled) continue; // Skip if auto-open is not enabled for this gate
+
+          // Use route distance if available, otherwise use straight line distance
+          let distance = routeDistances[gateId];
+          if (distance === undefined) {
+            distance = calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              gate.location.latitude,
+              gate.location.longitude
+            );
           }
-        } 
-        
-        // Reset auto-open state when user moves away
-        const resetDistance = Math.max(radius * 1.5, radius + 50); 
-        if (distance > resetDistance && autoOpenedGates[gateId]) {
-          setAutoOpenedGates(prev => {
-            const newState = { ...prev };
-            delete newState[gateId];
-            return newState;
-          });
+
+          const radius = gate.location.autoOpenRadius || 50;
+          const isNear = distance <= radius;
+          
+          // Check for auto-open
+          if (isNear && !autoOpenedGates[gateId] && !cooldowns[gateId]) {
+            gatesInRange.push({ gate, distance, gateId });
+          }
+          
+          // Reset auto-open state when user moves away
+          const resetDistance = Math.max(radius * 1.5, radius + 50);
+          if (distance > resetDistance && autoOpenedGates[gateId]) {
+            setAutoOpenedGates(prev => {
+              const newState = { ...prev };
+              delete newState[gateId];
+              return newState;
+            });
+          }
         }
       }
-    });
-  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, cooldowns, handleOpenGate]);
+
+      // If multiple gates in range, show selection modal (only if not already showing)
+      if (gatesInRange.length > 1 && !showGateSelectionModal && !pendingGateSelection) {
+        setNearbyGates(gatesInRange);
+        setShowGateSelectionModal(true);
+        setPendingGateSelection(true);
+      } 
+      // If only one gate in range, open it automatically
+      else if (gatesInRange.length === 1) {
+        const { gate, distance, gateId } = gatesInRange[0];
+        console.log(`Auto-opening gate ${gate.name} (Distance: ${distance}m)`);
+        handleOpenGate(gate, gate.password || '');
+        
+        // Mark as opened
+        setAutoOpenedGates(prev => ({ ...prev, [gateId]: true }));
+        
+        // Show auto-open notification
+        setAutoOpenNotification({ gateName: gate.name });
+        setTimeout(() => setAutoOpenNotification(null), 5000);
+      }
+      
+      // Reset pending flag if no gates in range
+      if (gatesInRange.length === 0) {
+        setPendingGateSelection(false);
+      }
+    };
+
+    checkAutoOpen();
+  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, cooldowns, handleOpenGate, routeDistances]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -1687,31 +1775,35 @@ const GateDashboard = ({ user, token }) => {
             strategy={rectSortingStrategy}
           >
             <div className={`gates-grid ${isMobile ? 'gates-grid-mobile' : ''}`}>
-              {gates.map(gate => (
-                <SortableGateCard
-                  key={gate.id}
-                  gate={gate}
-                  user={user}
-                  isMobile={isMobile}
-                  editingGate={editingGate}
-                  newGateData={newGateData}
-                  handleInputChange={handleInputChange}
-                  handleLocationSelect={handleLocationSelect}
-                  handleSubmit={handleSubmit}
-                  handleCancel={handleCancel}
-                  isSubmitting={isSubmitting}
-                  verifiedCallers={verifiedCallers}
-                  cooldowns={cooldowns}
-                  handleOpenGateClick={handleOpenGateClick}
-                  handleEdit={handleEdit}
-                  handleDelete={handleDelete}
-                  handleGateSelect={handleGateSelect}
-                  isEditMode={isEditMode}
-                  userLocation={userLocation}
-                  toggleAutoOpen={toggleAutoOpen}
-                  autoOpenSettings={autoOpenSettings}
-                />
-              ))}
+              {gates.map(gate => {
+                const gateId = gate._id || gate.id;
+                return (
+                  <SortableGateCard
+                    key={gate.id}
+                    gate={gate}
+                    user={user}
+                    isMobile={isMobile}
+                    editingGate={editingGate}
+                    newGateData={newGateData}
+                    handleInputChange={handleInputChange}
+                    handleLocationSelect={handleLocationSelect}
+                    handleSubmit={handleSubmit}
+                    handleCancel={handleCancel}
+                    isSubmitting={isSubmitting}
+                    verifiedCallers={verifiedCallers}
+                    cooldowns={cooldowns}
+                    handleOpenGateClick={handleOpenGateClick}
+                    handleEdit={handleEdit}
+                    handleDelete={handleDelete}
+                    handleGateSelect={handleGateSelect}
+                    isEditMode={isEditMode}
+                    userLocation={userLocation}
+                    toggleAutoOpen={toggleAutoOpen}
+                    autoOpenSettings={autoOpenSettings}
+                    routeDistance={routeDistances[gateId]}
+                  />
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
@@ -1732,6 +1824,133 @@ const GateDashboard = ({ user, token }) => {
           token={token}
           onClose={() => setShowCallerIdValidation(false)}
         />
+      )}
+
+      {/* Gate Selection Modal - when multiple gates are in range */}
+      {showGateSelectionModal && nearbyGates.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }} onClick={() => {
+          setShowGateSelectionModal(false);
+          setPendingGateSelection(false);
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '600' }}>
+              זוהו מספר שערים בקרבת מקום
+            </h2>
+            <p style={{ marginBottom: '1.5rem', color: '#666' }}>
+              בחר איזה שער תרצה לפתוח:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {nearbyGates
+                .sort((a, b) => a.distance - b.distance)
+                .map(({ gate, distance, gateId }) => (
+                  <button
+                    key={gateId}
+                    onClick={() => {
+                      console.log(`Opening gate ${gate.name} (Distance: ${distance}m)`);
+                      handleOpenGate(gate, gate.password || '');
+                      
+                      // Mark as opened
+                      setAutoOpenedGates(prev => ({ ...prev, [gateId]: true }));
+                      
+                      // Show auto-open notification
+                      setAutoOpenNotification({ gateName: gate.name });
+                      setTimeout(() => setAutoOpenNotification(null), 5000);
+                      
+                      // Close modal
+                      setShowGateSelectionModal(false);
+                      setNearbyGates([]);
+                      setPendingGateSelection(false);
+                    }}
+                    disabled={cooldowns[gateId]}
+                    style={{
+                      padding: '1rem',
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '12px',
+                      backgroundColor: cooldowns[gateId] ? '#f3f4f6' : 'white',
+                      cursor: cooldowns[gateId] ? 'not-allowed' : 'pointer',
+                      textAlign: 'right',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '1rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!cooldowns[gateId]) {
+                        e.currentTarget.style.borderColor = '#2563eb';
+                        e.currentTarget.style.backgroundColor = '#eff6ff';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!cooldowns[gateId]) {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.25rem' }}>
+                        {gate.name}
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                        מרחק: {formatDistance(distance)}
+                      </div>
+                      {cooldowns[gateId] && (
+                        <div style={{ fontSize: '0.85rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                          אנא המתן {cooldowns[gateId]} שניות
+                        </div>
+                      )}
+                    </div>
+                    <svg style={{ width: '24px', height: '24px', flexShrink: 0, color: '#2563eb' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+            </div>
+            <button
+              onClick={() => {
+                setShowGateSelectionModal(false);
+                setNearbyGates([]);
+                setPendingGateSelection(false);
+              }}
+              style={{
+                marginTop: '1.5rem',
+                padding: '0.75rem 1.5rem',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: '#e5e7eb',
+                color: '#374151',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: '500',
+                width: '100%'
+              }}
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Auto-Open Notification Toast */}
