@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#001A4D" />
+    <title>אין חיבור לאינטרנט - אפליקציית בקרת שערים</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        direction: rtl;
+        text-align: right;
+      }
+
+      body {
+        background: linear-gradient(135deg, #001A4D 0%, #003366 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        min-height: 100vh;
+        position: relative;
+        overflow: hidden;
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background:
+          radial-gradient(circle at 20% 80%, rgba(10, 92, 255, 0.08) 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(0, 212, 170, 0.06) 0%, transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(10, 92, 255, 0.05) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .offline-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 40px 30px;
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        position: relative;
+        z-index: 1;
+        animation: fadeIn 0.5s ease-in;
+      }
+
+      .offline-logo-wrapper {
+        width: 140px;
+        height: 140px;
+        margin: 0 auto 30px;
+        border-radius: 50%;
+        border: 4px solid #001A4D;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        box-shadow: 0 4px 15px rgba(0, 26, 77, 0.2);
+      }
+
+      .offline-logo {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 50%;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+
+      h1 {
+        color: #001A4D;
+        font-size: 28px;
+        margin-bottom: 15px;
+        font-weight: 600;
+      }
+
+      p {
+        color: #666;
+        font-size: 16px;
+        line-height: 1.6;
+        margin-bottom: 30px;
+      }
+
+      .retry-button {
+        background: linear-gradient(135deg, #001A4D 0%, #003366 100%);
+        color: white;
+        border: none;
+        padding: 15px 40px;
+        font-size: 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        box-shadow: 0 4px 15px rgba(0, 26, 77, 0.3);
+      }
+
+      .retry-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 26, 77, 0.4);
+      }
+
+      .retry-button:active {
+        transform: translateY(0);
+      }
+
+      .retry-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .status-indicator {
+        margin-top: 20px;
+        font-size: 14px;
+        color: #999;
+      }
+
+      .status-indicator.online {
+        color: #00d4aa;
+      }
+
+      @media (max-width: 480px) {
+        .offline-container {
+          padding: 30px 20px;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+
+        p {
+          font-size: 14px;
+        }
+
+        .offline-logo-wrapper {
+          width: 120px;
+          height: 120px;
+          border-width: 3px;
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="offline-container">
+      <div class="offline-logo-wrapper">
+        <img src="/logo.png" alt="Shaked Gates" class="offline-logo" />
+      </div>
+      <h1>אין חיבור לאינטרנט</h1>
+      <p>
+        נראה שאין לך חיבור לאינטרנט כרגע.<br>
+        אנא בדוק את החיבור שלך ונסה שוב.
+      </p>
+    </div>
+  </body>
+</html>
+
