@@ -827,6 +827,7 @@ const GateDashboard = ({ user, token }) => {
     }
   });
   const [autoOpenedGates, setAutoOpenedGates] = useState({}); // Track gates opened in current proximity session
+  const [gatesInRangeState, setGatesInRangeState] = useState({}); // Track which gates user is currently in range of
   const [autoOpenNotification, setAutoOpenNotification] = useState(null); // Notification state
   const [showGateSelectionModal, setShowGateSelectionModal] = useState(false); // Modal for selecting gate when multiple are nearby
   const [nearbyGates, setNearbyGates] = useState([]); // Gates within range that need user selection
@@ -1271,6 +1272,7 @@ const GateDashboard = ({ user, token }) => {
 
     const checkAutoOpen = () => {
       const gatesInRange = [];
+      const newGatesInRangeState = {};
 
       for (const gate of gates) {
         if (gate.location && gate.location.latitude && gate.location.longitude) {
@@ -1290,22 +1292,39 @@ const GateDashboard = ({ user, token }) => {
           const radius = gate.location.autoOpenRadius || 50;
           const isNear = distance <= radius;
           
-          // Check for auto-open
-          if (isNear && !autoOpenedGates[gateId] && !cooldowns[gateId]) {
+          // Track current range state
+          if (isNear) {
+            newGatesInRangeState[gateId] = true;
+          }
+          
+          // Check if user just entered range (was not in range before, but is now)
+          const wasInRange = gatesInRangeState[gateId];
+          const justEnteredRange = isNear && !wasInRange;
+          
+          // Check for auto-open - only if user just entered range and gate hasn't been opened in this session
+          if (justEnteredRange && !autoOpenedGates[gateId] && !cooldowns[gateId]) {
             gatesInRange.push({ gate, distance, gateId });
           }
           
-          // Reset auto-open state when user moves away
-          const resetDistance = Math.max(radius * 1.5, radius + 50);
-          if (distance > resetDistance && autoOpenedGates[gateId]) {
-            setAutoOpenedGates(prev => {
-              const newState = { ...prev };
-              delete newState[gateId];
-              return newState;
-            });
+          // Reset auto-open state when user moves away from range
+          const resetDistance = 150; // Fixed 150 meters
+          if (distance > resetDistance) {
+            // User moved away - reset state for this gate
+            if (autoOpenedGates[gateId]) {
+              setAutoOpenedGates(prev => {
+                const newState = { ...prev };
+                delete newState[gateId];
+                return newState;
+              });
+            }
+            // Remove from in-range state
+            delete newGatesInRangeState[gateId];
           }
         }
       }
+
+      // Update gates in range state
+      setGatesInRangeState(newGatesInRangeState);
 
       // If multiple gates in range, show selection modal (only if not already showing)
       if (gatesInRange.length > 1 && !showGateSelectionModal && !pendingGateSelection) {
@@ -1334,7 +1353,7 @@ const GateDashboard = ({ user, token }) => {
     };
 
     checkAutoOpen();
-  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, cooldowns, handleOpenGate]);
+  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, gatesInRangeState, cooldowns, handleOpenGate, showGateSelectionModal, pendingGateSelection]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
