@@ -766,14 +766,26 @@ body::before {
   background-size: 1.25rem;
   padding-left: 2.5rem;
   padding-right: 1rem;
+  cursor: pointer;
+}
+
+.form-select:hover {
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%230a5cff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+}
+
+.form-select:focus {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%230a5cff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
 }
 
 .form-select option {
-  background: #fff;
-  color: #2d3748;
+  background: white;
+  color: var(--color-gray-900);
   direction: rtl;
-  padding: 0.5rem;
+  padding: var(--space-3) var(--space-4);
   text-align: right;
+  font-size: var(--font-size-base);
+  font-family: var(--font-family);
 }
 
 .form-select option:hover {
@@ -1046,6 +1058,18 @@ body::before {
   font-weight: var(--font-weight-bold);
   color: var(--color-gray-900);
   margin: 0;
+}
+
+.gate-edit-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.gate-edit-header h3 {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-gray-900);
 }
 
 .gate-actions-header {
@@ -2670,6 +2694,70 @@ body::before {
   margin-bottom: 0;
 }
 
+.inline-edit-form .form-group label {
+  display: block;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-900);
+  margin-bottom: var(--space-3);
+  line-height: var(--line-height-relaxed);
+}
+
+.inline-edit-form .form-group small {
+  display: block;
+  color: var(--color-gray-700);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-2);
+  line-height: var(--line-height-normal);
+}
+
+.inline-edit-form .form-group input,
+.inline-edit-form .form-group select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: white;
+  border: 2px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  color: var(--color-gray-900);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  padding: var(--space-3) var(--space-4);
+  transition: all var(--transition-normal);
+  direction: rtl;
+  text-align: right;
+  padding-right: 2.5rem;
+}
+
+.inline-edit-form .form-group input:focus,
+.inline-edit-form .form-group select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(10, 92, 255, 0.1);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.inline-edit-form .form-group input:disabled,
+.inline-edit-form .form-group select:disabled {
+  background-color: #f7fafc;
+  border-color: #e2e8f0;
+  color: #a0aec0;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.inline-edit-form .form-group select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  background-position: left 1rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25rem;
+  padding-left: 2.5rem;
+  padding-right: 1rem;
+  cursor: pointer;
+}
+
 .inline-edit-form .form-actions {
   display: flex;
   gap: 0.5rem;
@@ -2811,6 +2899,220 @@ body::before {
   font-size: 0.875rem;
   color: var(--color-gray-800);
   cursor: pointer;
+}
+
+/* ========================================
+   GATE TRANSFER TABLE STYLES
+   ======================================== */
+
+.gate-search-wrapper {
+  margin-bottom: 1rem;
+}
+
+.gate-search-input {
+  width: 100%;
+}
+
+.gates-transfer-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+  min-height: 400px;
+}
+
+.gates-column {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--color-gray-300);
+  border-radius: var(--radius-md);
+  background: white;
+  overflow: hidden;
+}
+
+.gates-available {
+  border-color: var(--color-gray-300);
+}
+
+.gates-selected {
+  border-color: rgba(10, 92, 255, 0.3);
+  background: rgba(10, 92, 255, 0.02);
+}
+
+.gates-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  background: rgba(249, 250, 251, 0.8);
+  border-bottom: 2px solid var(--color-gray-200);
+  direction: rtl;
+}
+
+.gates-available .gates-column-header {
+  background: rgba(249, 250, 251, 0.8);
+  border-bottom-color: var(--color-gray-200);
+}
+
+.gates-selected .gates-column-header {
+  background: rgba(10, 92, 255, 0.05);
+  border-bottom-color: rgba(10, 92, 255, 0.2);
+}
+
+.gates-column-header h4 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-900);
+}
+
+.gates-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+  background: rgba(10, 92, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.gates-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2);
+  min-height: 300px;
+  max-height: 400px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(10, 92, 255, 0.3) transparent;
+}
+
+.gates-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gates-list::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.gates-list::-webkit-scrollbar-thumb {
+  background: rgba(10, 92, 255, 0.3);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.gates-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(10, 92, 255, 0.5);
+}
+
+.gate-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+  background: white;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-normal);
+  direction: rtl;
+  position: relative;
+}
+
+.gate-item:hover {
+  background: rgba(249, 250, 251, 0.8);
+  border-color: var(--color-gray-300);
+  transform: translateX(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.gates-selected .gate-item {
+  background: rgba(10, 92, 255, 0.03);
+  border-color: rgba(10, 92, 255, 0.2);
+}
+
+.gates-selected .gate-item:hover {
+  background: rgba(10, 92, 255, 0.06);
+  border-color: rgba(10, 92, 255, 0.3);
+}
+
+.gate-item-name {
+  flex: 1;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-900);
+  font-size: var(--font-size-base);
+  text-align: right;
+}
+
+.gate-item-id {
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-600);
+  background: rgba(10, 92, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.gate-transfer-btn {
+  background: none;
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  font-size: 1.25rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  line-height: 1;
+}
+
+.gate-transfer-btn:hover {
+  background: var(--color-primary);
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(10, 92, 255, 0.3);
+}
+
+.gate-transfer-btn:active {
+  transform: scale(0.95);
+}
+
+.gate-add-btn {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #16a34a;
+}
+
+.gate-add-btn:hover {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: white;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.gate-remove-btn {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #dc2626;
+}
+
+.gate-remove-btn:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.gates-empty {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--color-gray-500);
+  font-style: italic;
+  font-size: var(--font-size-sm);
 }
 
 /* ========================================
@@ -3143,20 +3445,49 @@ body::before {
   max-width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.location-picker-wrapper {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.location-picker-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.location-picker-container .map-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .form-container .form-actions .btn-secondary {
-  background: var(--color-primary);
-  color: white;
-  border: 1px solid var(--color-primary);
-  box-shadow: var(--shadow-sm);
+  background-color: var(--color-gray-200) !important;
+  color: var(--color-gray-900) !important;
+  border: 2px solid var(--color-gray-300) !important;
+  backdrop-filter: none !important;
 }
 
 .form-container .form-actions .btn-secondary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background-color: var(--color-gray-300) !important;
+  border-color: var(--color-gray-400) !important;
+  color: var(--color-gray-900) !important;
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.form-container .form-actions .btn-secondary:disabled {
+  background-color: var(--color-gray-100) !important;
+  color: var(--color-gray-500) !important;
+  border-color: var(--color-gray-200) !important;
+  opacity: 0.6;
 }
 
 .form-container h3 {
@@ -3173,28 +3504,56 @@ body::before {
 
 .form-container .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: 1fr;
   gap: 1.5rem;
   margin-bottom: 2rem;
+  row-gap: 1.5rem;
 }
 
 .form-container .form-group {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-container .form-group label {
   font-weight: var(--font-weight-semibold);
   color: var(--color-gray-900);
+  min-width: 150px;
+  flex-shrink: 0;
+  margin-bottom: 0;
 }
 
-/* Removed duplicate form input styles - using existing .form-input styles */
+/* Center the gates authorized label */
+.form-container .form-group.gates-form-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.form-container .form-group.gates-form-group label {
+  text-align: center;
+  min-width: auto;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* Ensure form inputs and selects use the styled classes */
+.form-container .form-group .form-input,
+.form-container .form-group .form-select {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
 
 .form-container .form-group small {
   color: var(--color-gray-700);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
 }
 
 .form-container .form-actions {
@@ -3339,6 +3698,7 @@ body::before {
     font-size: 0.95rem;
   }
 
+
   /* Mobile inline editing styles */
   .inline-edit-form {
     padding: 0.75rem;
@@ -3373,6 +3733,233 @@ body::before {
   .gates-checkbox-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Form container responsive */
+  .form-container {
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+    overflow-x: hidden;
+  }
+
+  .location-picker-wrapper {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    margin-left: calc(-1 * var(--space-4));
+    margin-right: calc(-1 * var(--space-4));
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .form-container .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Form group - label and input in same row on mobile */
+  .form-container .form-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Exception: gates authorized field stays vertical */
+  .form-container .form-group.gates-form-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .form-container .form-group label {
+    min-width: 90px;
+    flex-shrink: 0;
+    margin-bottom: 0;
+    font-size: var(--font-size-sm);
+  }
+
+  /* Gates field label stays full width and centered */
+  .form-container .form-group.gates-form-group label {
+    min-width: auto;
+    width: 100%;
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+
+  .form-container .form-group input,
+  .form-container .form-group select {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .form-container .form-group small {
+    display: none; /* Hide small text on mobile to save space */
+  }
+
+  /* Show small text for gates field */
+  .form-container .form-group.gates-form-group small {
+    display: block;
+    font-size: var(--font-size-xs);
+    margin-top: 0.25rem;
+  }
+
+  /* Gate transfer table responsive - keep side by side on mobile */
+  .gates-transfer-table {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    min-height: 300px;
+  }
+
+  .gates-column-header {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .gates-column-header h4 {
+    font-size: var(--font-size-sm);
+  }
+
+  .gates-count {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.375rem;
+  }
+
+  .gates-list {
+    min-height: 200px;
+    max-height: 250px;
+    padding: var(--space-1);
+  }
+
+  .gate-item {
+    padding: var(--space-2);
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    cursor: pointer;
+  }
+
+  .gate-item:active {
+    background: rgba(10, 92, 255, 0.1) !important;
+    transform: scale(0.98);
+  }
+
+  .gate-item-name {
+    font-size: var(--font-size-sm);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gate-item-id {
+    font-size: 0.7rem;
+    padding: 0.125rem 0.25rem;
+    flex-shrink: 0;
+  }
+
+  .gate-transfer-btn {
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+  }
+
+  .gates-empty {
+    padding: var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+
+  /* Gate edit header - center on mobile */
+  .gate-edit-header {
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+
+  .gate-edit-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-gray-900);
+  }
+
+  /* Fix cancel button visibility in gate edit form */
+  .gate-card .form-container .form-actions .btn-secondary,
+  .gate-card-mobile .form-container .form-actions .btn-secondary,
+  .form-container .form-actions .btn-secondary {
+    background-color: #e5e7eb !important;
+    background: #e5e7eb !important;
+    color: #111827 !important;
+    border: 2px solid #d1d5db !important;
+    backdrop-filter: none !important;
+  }
+
+  .gate-card .form-container .form-actions .btn-secondary:hover:not(:disabled),
+  .gate-card-mobile .form-container .form-actions .btn-secondary:hover:not(:disabled),
+  .form-container .form-actions .btn-secondary:hover:not(:disabled) {
+    background-color: #d1d5db !important;
+    background: #d1d5db !important;
+    border-color: #9ca3af !important;
+    color: #111827 !important;
+  }
+
+  .gate-card .form-container .form-actions .btn-secondary:disabled,
+  .gate-card-mobile .form-container .form-actions .btn-secondary:disabled,
+  .form-container .form-actions .btn-secondary:disabled {
+    background-color: #f3f4f6 !important;
+    background: #f3f4f6 !important;
+    color: #6b7280 !important;
+    border-color: #e5e7eb !important;
+    opacity: 0.6;
+  }
+
+  /* Gate Hint Tooltip */
+  .gate-hint-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    z-index: 10000;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: tooltipFadeIn 0.2s ease-out;
+    max-width: 200px;
+    word-wrap: break-word;
+    white-space: normal;
+    text-align: center;
+    direction: rtl;
+  }
+
+  .gate-hint-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(0, 0, 0, 0.85);
+  }
+
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
 
   /* Modal responsive styles */
   .modal-overlay {

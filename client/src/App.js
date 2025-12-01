@@ -33,7 +33,7 @@ function App() {
           document.body.appendChild(notification);
           setTimeout(() => {
             if (notification.parentElement) notification.remove();
-          }, 5000);
+          }, 2500);
         } catch (_e) {
           // no-op fallback
         }

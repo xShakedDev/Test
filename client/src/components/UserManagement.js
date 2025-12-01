@@ -18,10 +18,30 @@ const UserManagement = ({ user, token }) => {
     role: 'user',
     authorizedGates: []
   });
+
+  // Search state for gates
+  const [gateSearchInput, setGateSearchInput] = useState('');
+  const gateInputRefCreate = useRef(null);
+  const gateInputRefEdit = useRef(null);
+  
+  // Mobile gate item hint
+  const [gateHint, setGateHint] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Refs for scrolling to messages
   const errorRef = useRef(null);
   const successRef = useRef(null);
+
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -118,6 +138,17 @@ const UserManagement = ({ user, token }) => {
     }
   };
 
+  // Handle cell click on mobile - show gate information tooltip
+  const handleCellClick = (content, element) => {
+    if (isMobile) {
+      setGateHint({ content, element });
+      // Auto-hide after 3 seconds
+      setTimeout(() => {
+        setGateHint(null);
+      }, 3000);
+    }
+  };
+
 
 
   const handleInputChange = (e) => {
@@ -139,6 +170,71 @@ const UserManagement = ({ user, token }) => {
     }
   };
 
+  // Handle gate search input change
+  const handleGateSearchChange = (e) => {
+    const value = e.target.value;
+    setGateSearchInput(value);
+  };
+
+  // Handle gate removal
+  const handleGateRemove = (gateIdToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      authorizedGates: prev.authorizedGates.filter(id => {
+        const idStr = typeof id === 'object' && id.id ? id.id.toString() : id.toString();
+        return idStr !== gateIdToRemove.toString();
+      })
+    }));
+  };
+
+  // Handle moving gate from available to selected
+  const handleGateAdd = (gateId) => {
+    const idStr = gateId.toString();
+    const isAlreadySelected = formData.authorizedGates.some(id => {
+      const idStr2 = typeof id === 'object' && id.id ? id.id.toString() : id.toString();
+      return idStr2 === idStr;
+    });
+
+    if (!isAlreadySelected) {
+      setFormData(prev => ({
+        ...prev,
+        authorizedGates: [...prev.authorizedGates, idStr]
+      }));
+    }
+  };
+
+  // Get filtered gates based on search
+  const getFilteredGates = () => {
+    const selectedGateIds = formData.authorizedGates.map(id => 
+      typeof id === 'object' && id.id ? id.id.toString() : id.toString()
+    );
+
+    let filtered = gates;
+
+    // Filter by search input if exists
+    if (gateSearchInput.trim() !== '') {
+      filtered = gates.filter(gate => {
+        const gateId = (gate.id || gate._id).toString();
+        return gate.name.toLowerCase().includes(gateSearchInput.toLowerCase()) ||
+               gateId.includes(gateSearchInput);
+      });
+    }
+
+    // Split into available and selected
+    const available = filtered.filter(gate => {
+      const gateId = (gate.id || gate._id).toString();
+      return !selectedGateIds.includes(gateId);
+    });
+
+    const selected = filtered.filter(gate => {
+      const gateId = (gate.id || gate._id).toString();
+      return selectedGateIds.includes(gateId);
+    });
+
+    return { available, selected };
+  };
+
+
   const resetForm = () => {
     setFormData({
       username: '',
@@ -151,6 +247,7 @@ const UserManagement = ({ user, token }) => {
     setShowCreateForm(false);
     setError('');
     setSuccessMessage('');
+    setGateSearchInput('');
   };
 
   const handleSubmit = async (e) => {
@@ -237,6 +334,7 @@ const UserManagement = ({ user, token }) => {
         typeof gate === 'object' && gate.id ? gate.id.toString() : gate.toString()
       ) : []
     });
+    setGateSearchInput('');
   };
 
   const handleDelete = async (userId, username) => {
@@ -337,11 +435,12 @@ const UserManagement = ({ user, token }) => {
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label htmlFor="username">שם משתמש *</label>
+                <label htmlFor="username">שם משתמש:</label>
                 <input
                   type="text"
                   id="username"
                   name="username"
+                  className="form-input"
                   value={formData.username}
                   onChange={handleInputChange}
                   required
@@ -350,11 +449,12 @@ const UserManagement = ({ user, token }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="password">סיסמה *</label>
+                <label htmlFor="password">סיסמה:</label>
                 <input
                   type="password"
                   id="password"
                   name="password"
+                  className="form-input"
                   value={formData.password}
                   onChange={handleInputChange}
                   required
@@ -365,11 +465,12 @@ const UserManagement = ({ user, token }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="name">שם מלא *</label>
+                <label htmlFor="name">שם מלא:</label>
                 <input
                   type="text"
                   id="name"
                   name="name"
+                  className="form-input"
                   value={formData.name}
                   onChange={handleInputChange}
                   required
@@ -378,10 +479,11 @@ const UserManagement = ({ user, token }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="role">תפקיד *</label>
+                <label htmlFor="role">תפקיד:</label>
                 <select
                   id="role"
                   name="role"
+                  className="form-select"
                   value={formData.role}
                   onChange={handleInputChange}
                   required
@@ -393,28 +495,114 @@ const UserManagement = ({ user, token }) => {
               </div>
             </div>
 
-            <div className="form-group">
+            <div className="form-group gates-form-group">
               <label>שערים מורשים</label>
-              <div className="gates-checkbox-grid">
-                {gates.map(gate => {
-                  const gateId = gate.id || gate._id;
-                  return (
-                    <label key={gateId} className="gate-checkbox-item">
-                      <input
-                        type="checkbox"
-                        name="authorizedGates"
-                        value={gateId}
-                        checked={formData.authorizedGates.some(id => 
-                          (typeof id === 'object' && id.id ? id.id.toString() : id.toString()) === gateId.toString()
-                        )}
-                        onChange={handleInputChange}
-                      />
-                      <span className="gate-checkbox-label">{gate.name}</span>
-                    </label>
-                  );
-                })}
+              
+              {/* Search input */}
+              <div className="gate-search-wrapper">
+                <input
+                  type="text"
+                  className="form-input gate-search-input"
+                  placeholder="חפש שער לפי שם או מספר..."
+                  value={gateSearchInput}
+                  onChange={handleGateSearchChange}
+                  ref={gateInputRefCreate}
+                />
               </div>
-              <small>בחר איזה שערים המשתמש יכול לפתוח</small>
+
+              {/* Two-column gates table */}
+              {(() => {
+                const { available, selected } = getFilteredGates();
+                return (
+                  <div className="gates-transfer-table">
+                    <div className="gates-column gates-available">
+                      <div className="gates-column-header">
+                        <h4>שערים זמינים</h4>
+                        <span className="gates-count">({available.length})</span>
+                      </div>
+                      <div className="gates-list">
+                        {available.length > 0 ? (
+                          available.map(gate => {
+                            const gateId = (gate.id || gate._id).toString();
+                            return (
+                              <div 
+                                key={gateId} 
+                                className="gate-item"
+                                onClick={(e) => {
+                                  if (isMobile && e.target.tagName !== 'BUTTON') {
+                                    handleCellClick(`${gate.name} (#${gateId})`, e.currentTarget);
+                                  }
+                                }}
+                              >
+                                <span className="gate-item-name">{gate.name}</span>
+                                <span className="gate-item-id">#{gateId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGateAdd(gateId);
+                                  }}
+                                  className="gate-transfer-btn gate-add-btn"
+                                  aria-label="הוסף שער"
+                                  title="הוסף שער"
+                                >
+                                  ←
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="gates-empty">אין שערים זמינים</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="gates-column gates-selected">
+                      <div className="gates-column-header">
+                        <h4>שערים מורשים</h4>
+                        <span className="gates-count">({selected.length})</span>
+                      </div>
+                      <div className="gates-list">
+                        {selected.length > 0 ? (
+                          selected.map(gate => {
+                            const gateId = (gate.id || gate._id).toString();
+                            return (
+                              <div 
+                                key={gateId} 
+                                className="gate-item"
+                                onClick={(e) => {
+                                  if (isMobile && e.target.tagName !== 'BUTTON') {
+                                    handleCellClick(`${gate.name} (#${gateId})`, e.currentTarget);
+                                  }
+                                }}
+                              >
+                                <span className="gate-item-name">{gate.name}</span>
+                                <span className="gate-item-id">#{gateId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGateRemove(gateId);
+                                  }}
+                                  className="gate-transfer-btn gate-remove-btn"
+                                  aria-label="הסר שער"
+                                  title="הסר שער"
+                                >
+                                  →
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="gates-empty">אין שערים מורשים</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              <small>השתמש בשדה החיפוש כדי לסנן שערים, והעבר שערים בין הטורים</small>
             </div>
 
             <div className="form-actions">
@@ -436,10 +624,212 @@ const UserManagement = ({ user, token }) => {
         </div>
       )}
 
+      {/* Edit User Form */}
+      {editingUser && (
+        <div className="form-container">
+          <h3>ערוך משתמש</h3>
+          <p>ערוך פרטי משתמש במערכת</p>
+          
+          <form onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <div className="form-group">
+                <label htmlFor={`username-edit-${editingUser.id}`}>שם משתמש:</label>
+                <input
+                  type="text"
+                  id={`username-edit-${editingUser.id}`}
+                  name="username"
+                  className="form-input"
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  required
+                  disabled={true}
+                />
+                <small>שם משתמש ייחודי להתחברות</small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor={`password-edit-${editingUser.id}`}>סיסמה:</label>
+                <input
+                  type="password"
+                  id={`password-edit-${editingUser.id}`}
+                  name="password"
+                  className="form-input"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="השאר ריק אם אינך רוצה לשנות"
+                  autoComplete="new-password"
+                />
+                <small>השאר ריק אם אינך רוצה לשנות</small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor={`name-edit-${editingUser.id}`}>שם מלא:</label>
+                <input
+                  type="text"
+                  id={`name-edit-${editingUser.id}`}
+                  name="name"
+                  className="form-input"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
+                />
+                <small>שם מלא של המשתמש</small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor={`role-edit-${editingUser.id}`}>תפקיד:</label>
+                <select
+                  id={`role-edit-${editingUser.id}`}
+                  name="role"
+                  className="form-select"
+                  value={formData.role}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="user">משתמש</option>
+                  <option value="admin">מנהל</option>
+                </select>
+                <small>תפקיד המשתמש במערכת</small>
+              </div>
+            </div>
+
+            <div className="form-group gates-form-group">
+              <label>שערים מורשים</label>
+              
+              {/* Search input */}
+              <div className="gate-search-wrapper">
+                <input
+                  type="text"
+                  className="form-input gate-search-input"
+                  placeholder="חפש שער לפי שם או מספר..."
+                  value={gateSearchInput}
+                  onChange={handleGateSearchChange}
+                  ref={gateInputRefEdit}
+                />
+              </div>
+
+              {/* Two-column gates table */}
+              {(() => {
+                const { available, selected } = getFilteredGates();
+                return (
+                  <div className="gates-transfer-table">
+                    <div className="gates-column gates-available">
+                      <div className="gates-column-header">
+                        <h4>שערים זמינים</h4>
+                        <span className="gates-count">({available.length})</span>
+                      </div>
+                      <div className="gates-list">
+                        {available.length > 0 ? (
+                          available.map(gate => {
+                            const gateId = (gate.id || gate._id).toString();
+                            return (
+                              <div 
+                                key={gateId} 
+                                className="gate-item"
+                                onClick={(e) => {
+                                  if (isMobile && e.target.tagName !== 'BUTTON') {
+                                    handleCellClick(`${gate.name} (#${gateId})`, e.currentTarget);
+                                  }
+                                }}
+                              >
+                                <span className="gate-item-name">{gate.name}</span>
+                                <span className="gate-item-id">#{gateId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGateAdd(gateId);
+                                  }}
+                                  className="gate-transfer-btn gate-add-btn"
+                                  aria-label="הוסף שער"
+                                  title="הוסף שער"
+                                >
+                                  ←
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="gates-empty">אין שערים זמינים</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="gates-column gates-selected">
+                      <div className="gates-column-header">
+                        <h4>שערים מורשים</h4>
+                        <span className="gates-count">({selected.length})</span>
+                      </div>
+                      <div className="gates-list">
+                        {selected.length > 0 ? (
+                          selected.map(gate => {
+                            const gateId = (gate.id || gate._id).toString();
+                            return (
+                              <div 
+                                key={gateId} 
+                                className="gate-item"
+                                onClick={(e) => {
+                                  if (isMobile && e.target.tagName !== 'BUTTON') {
+                                    handleCellClick(`${gate.name} (#${gateId})`, e.currentTarget);
+                                  }
+                                }}
+                              >
+                                <span className="gate-item-name">{gate.name}</span>
+                                <span className="gate-item-id">#{gateId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGateRemove(gateId);
+                                  }}
+                                  className="gate-transfer-btn gate-remove-btn"
+                                  aria-label="הסר שער"
+                                  title="הסר שער"
+                                >
+                                  →
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="gates-empty">אין שערים מורשים</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              <small>השתמש בשדה החיפוש כדי לסנן שערים, והעבר שערים בין הטורים</small>
+            </div>
+
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingUser(null);
+                  resetForm();
+                }}
+                className="btn btn-secondary"
+              >
+                ביטול
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+              >
+                עדכן
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Users Table */}
-      <div className="users-table-container">
-        <div className="users-table">
-          <table>
+      {!showCreateForm && !editingUser && (
+        <div className="users-table-container">
+          <div className="users-table">
+            <table>
             <thead>
               <tr>
                 <th>שם משתמש</th>
@@ -453,196 +843,84 @@ const UserManagement = ({ user, token }) => {
             <tbody>
               {users.map(userItem => (
                 <tr key={userItem.id} className="user-row">
-                  {editingUser && editingUser.id === userItem.id ? (
-                    // Inline editing form
-                    <>
-                      <td colSpan="6">
-                        <div className="form-container inline-edit-form">
-                          <div className="inline-edit-header">
-                            <h4>ערוך משתמש</h4>
-                            <button
-                              onClick={() => {
-                                setEditingUser(null);
-                                resetForm();
-                              }}
-                              className="btn btn-secondary btn-small"
-                            >
-                              חזרה
-                            </button>
-                          </div>
-                          
-                          <form onSubmit={handleSubmit}>
-                            <div className="form-grid">
-                              <div className="form-group">
-                                <label htmlFor={`username-${userItem.id}`}>שם משתמש *</label>
-                                <input
-                                  type="text"
-                                  id={`username-${userItem.id}`}
-                                  name="username"
-                                  value={formData.username}
-                                  onChange={handleInputChange}
-                                  required
-                                  disabled={true}
-                                />
-                                <small>שם משתמש ייחודי להתחברות</small>
-                              </div>
-
-                              <div className="form-group">
-                                <label htmlFor={`password-${userItem.id}`}>סיסמה</label>
-                                <input
-                                  type="password"
-                                  id={`password-${userItem.id}`}
-                                  name="password"
-                                  value={formData.password}
-                                  onChange={handleInputChange}
-                                  placeholder="השאר ריק אם אינך רוצה לשנות"
-                                  autoComplete="new-password"
-                                />
-                                <small>השאר ריק אם אינך רוצה לשנות</small>
-                              </div>
-
-                              <div className="form-group">
-                                <label htmlFor={`name-${userItem.id}`}>שם מלא *</label>
-                                <input
-                                  type="text"
-                                  id={`name-${userItem.id}`}
-                                  name="name"
-                                  value={formData.name}
-                                  onChange={handleInputChange}
-                                  required
-                                />
-                                <small>שם מלא של המשתמש</small>
-                              </div>
-
-                              <div className="form-group">
-                                <label htmlFor={`role-${userItem.id}`}>תפקיד *</label>
-                                <select
-                                  id={`role-${userItem.id}`}
-                                  name="role"
-                                  value={formData.role}
-                                  onChange={handleInputChange}
-                                  required
-                                >
-                                  <option value="user">משתמש</option>
-                                  <option value="admin">מנהל</option>
-                                </select>
-                                <small>תפקיד המשתמש במערכת</small>
-                              </div>
-                            </div>
-
-                            <div className="form-group">
-                              <label>שערים מורשים</label>
-                              <div className="gates-checkbox-grid">
-                                {gates.map(gate => {
-                                  const gateId = gate.id || gate._id;
-                                  return (
-                                    <label key={gateId} className="gate-checkbox-item">
-                                      <input
-                                        type="checkbox"
-                                        name="authorizedGates"
-                                        value={gateId}
-                                        checked={formData.authorizedGates.some(id => 
-                                          (typeof id === 'object' && id.id ? id.id.toString() : id.toString()) === gateId.toString()
-                                        )}
-                                        onChange={handleInputChange}
-                                      />
-                                      <span className="gate-checkbox-label">{gate.name}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                              <small>בחר איזה שערים המשתמש יכול לפתוח</small>
-                            </div>
-
-                            <div className="form-actions">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingUser(null);
-                                  resetForm();
-                                }}
-                                className="btn btn-secondary"
-                              >
-                                ביטול
-                              </button>
-                              <button
-                                type="submit"
-                                className="btn btn-primary"
-                              >
-                                עדכן
-                              </button>
-                            </div>
-                          </form>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    // Normal user row display
-                    <>
-                      <td className="user-username">
-                        {userItem.username}
-                        {userItem.id === user.id && (
-                          <span className="current-user-badge">(אתה)</span>
-                        )}
-                      </td>
-                      <td className="user-name">{userItem.name}</td>
-                      <td className="user-role">
-                        <span className={`role-badge role-${userItem.role}`}>
-                          {userItem.role === 'admin' ? 'מנהל' : 'משתמש'}
-                        </span>
-                      </td>
-                      <td className="user-gates">
-                        {userItem.role === 'admin' ? (
-                          <span className="all-gates-badge">כל השערים</span>
-                        ) : userItem.authorizedGates && userItem.authorizedGates.length > 0 ? (
-                          <div className="user-gates-list">
-                            {userItem.authorizedGates.map(gateEntry => {
-                              const gateKey = (typeof gateEntry === 'object' && gateEntry.id != null) ? gateEntry.id : gateEntry;
-                              const gateFromList = gates.find(g => String(g.id) === String(gateKey) || String(g._id) === String(gateKey));
-                              const displayName = (typeof gateEntry === 'object' && gateEntry.name) 
-                                ? gateEntry.name 
-                                : (gateFromList ? gateFromList.name : `שער ${gateKey}`);
-                              const key = String(gateKey);
-                              return (
-                                <span key={key} className="gate-badge">
-                                  {displayName}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span className="no-gates-badge">אין הרשאות</span>
-                        )}
-                      </td>
-                      <td className="user-created">
-                        {new Date(userItem.createdAt).toLocaleDateString('he-IL')}
-                      </td>
-                      <td className="user-actions">
-                        {userItem.id !== user.id && (
-                          <div className="user-action-buttons">
-                            <button
-                              onClick={() => handleEdit(userItem)}
-                              className="btn btn-primary btn-small"
-                            >
-                              ערוך
-                            </button>
-                            <button
-                              onClick={() => handleDelete(userItem.id, userItem.username)}
-                              className="btn btn-danger btn-small"
-                            >
-                              מחק
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </>
-                  )}
+                  <td className="user-username">
+                    {userItem.username}
+                    {userItem.id === user.id && (
+                      <span className="current-user-badge">(אתה)</span>
+                    )}
+                  </td>
+                  <td className="user-name">{userItem.name}</td>
+                  <td className="user-role">
+                    <span className={`role-badge role-${userItem.role}`}>
+                      {userItem.role === 'admin' ? 'מנהל' : 'משתמש'}
+                    </span>
+                  </td>
+                  <td className="user-gates">
+                    {userItem.role === 'admin' ? (
+                      <span className="all-gates-badge">כל השערים</span>
+                    ) : userItem.authorizedGates && userItem.authorizedGates.length > 0 ? (
+                      <div className="user-gates-list">
+                        {userItem.authorizedGates.map(gateEntry => {
+                          const gateKey = (typeof gateEntry === 'object' && gateEntry.id != null) ? gateEntry.id : gateEntry;
+                          const gateFromList = gates.find(g => String(g.id) === String(gateKey) || String(g._id) === String(gateKey));
+                          const displayName = (typeof gateEntry === 'object' && gateEntry.name) 
+                            ? gateEntry.name 
+                            : (gateFromList ? gateFromList.name : `שער ${gateKey}`);
+                          const key = String(gateKey);
+                          return (
+                            <span key={key} className="gate-badge">
+                              {displayName}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <span className="no-gates-badge">אין הרשאות</span>
+                    )}
+                  </td>
+                  <td className="user-created">
+                    {new Date(userItem.createdAt).toLocaleDateString('he-IL')}
+                  </td>
+                  <td className="user-actions">
+                    {userItem.id !== user.id && (
+                      <div className="user-action-buttons">
+                        <button
+                          onClick={() => handleEdit(userItem)}
+                          className="btn btn-primary btn-small"
+                        >
+                          ערוך
+                        </button>
+                        <button
+                          onClick={() => handleDelete(userItem.id, userItem.username)}
+                          className="btn btn-danger btn-small"
+                        >
+                          מחק
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+      )}
+
+      {/* Mobile Gate Hint Tooltip */}
+      {gateHint && gateHint.element && (
+        <div 
+          className="gate-hint-tooltip"
+          style={{
+            position: 'fixed',
+            top: `${gateHint.element.getBoundingClientRect().top - 45}px`,
+            left: `${gateHint.element.getBoundingClientRect().left + gateHint.element.offsetWidth / 2}px`,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          {gateHint.content}
+        </div>
+      )}
     </div>
   );
 };

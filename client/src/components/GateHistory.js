@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { isSessionExpired, handleSessionExpiration, authenticatedFetch } from '../utils/auth';
 
 const GateHistory = ({ user, token }) => {
@@ -25,14 +25,6 @@ const GateHistory = ({ user, token }) => {
   // Refs for scrolling to messages
   const errorRef = useRef(null);
   const successRef = useRef(null);
-
-  useEffect(() => {
-    fetchHistory();
-    fetchGates(); // Always fetch gates to get current names
-    if (filter === 'user') {
-      fetchUsers();
-    }
-  }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit]);
 
   // Function to scroll to messages
   const scrollToMessage = (type) => {
@@ -72,7 +64,7 @@ const GateHistory = ({ user, token }) => {
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
@@ -126,7 +118,15 @@ const GateHistory = ({ user, token }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filter, filterValue, dateFilter, pagination.limit, pagination.page, scrollToMessage]);
+
+  useEffect(() => {
+    fetchHistory();
+    fetchGates(); // Always fetch gates to get current names
+    if (filter === 'user') {
+      fetchUsers();
+    }
+  }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit, fetchHistory]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'לא ידוע';
@@ -244,23 +244,10 @@ const GateHistory = ({ user, token }) => {
 
   const handleGateSearch = (searchTerm) => {
     setFilterValue(searchTerm);
-    if (searchTerm.length >= 2) {
-      const filteredGates = gates.filter(gate => 
-        gate.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      // Could add autocomplete dropdown here
-    }
   };
 
   const handleUserSearch = (searchTerm) => {
     setFilterValue(searchTerm);
-    if (searchTerm.length >= 2) {
-      const filteredUsers = users.filter(user => 
-        user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      // Could add autocomplete dropdown here
-    }
   };
 
   const handlePageChange = (newPage) => {

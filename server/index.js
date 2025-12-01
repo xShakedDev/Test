@@ -114,6 +114,16 @@ const initializeServer = async () => {
 
     // Check if build files exist
     if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
+      // Set no-cache headers for service worker and manifest to force updates
+      app.use((req, res, next) => {
+        if (req.path === '/service-worker.js' || req.path === '/manifest.json') {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+        next();
+      });
+
       app.use(express.static(buildPath));
 
       // Serve React app for any non-API routes

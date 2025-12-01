@@ -85,7 +85,7 @@ const GatesMapController = ({ gates, userLocation, initialFitDone, setInitialFit
         }
       }, 100);
     }
-  }, []); // Empty dependency array - only run once on mount
+  }, [gates, userLocation, initialFitDone, map, setInitialFitDone]); // Dependencies included, but hasFittedRef ensures it only runs once
   
   return null;
 };
@@ -520,27 +520,22 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
           )}
         </div>
       ) : (
-        // Desktop: Full card or inline edit when editing this gate
+        // Desktop: Full card (edit form is shown outside the grid, only on mobile it's inline)
         <>
-          {editingGate && editingGate.id === gate.id ? (
+          {editingGate && editingGate.id === gate.id && isMobile ? (
             <div className="form-container" onClick={(e) => e.stopPropagation()}>
-              <div className="gate-header" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="gate-edit-header">
                 <h3>ערוך שער</h3>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCancel(); }}
-                  className="btn btn-secondary btn-small"
-                >
-                  חזרה
-                </button>
               </div>
               <form onSubmit={handleSubmit}>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="name">שם השער *</label>
+                    <label htmlFor="name">שם השער:</label>
                     <input
                       type="text"
                       id="name"
                       name="name"
+                      className="form-input"
                       value={newGateData.name}
                       onChange={handleInputChange}
                       required
@@ -550,11 +545,12 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="phoneNumber">מספר טלפון *</label>
+                    <label htmlFor="phoneNumber">מספר טלפון:</label>
                     <input
                       type="tel"
                       id="phoneNumber"
                       name="phoneNumber"
+                      className="form-input"
                       value={newGateData.phoneNumber}
                       onChange={handleInputChange}
                       required
@@ -564,10 +560,11 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="authorizedNumber">מספר מורשה *</label>
+                    <label htmlFor="authorizedNumber">מספר מורשה:</label>
                     <select
                       id="authorizedNumber"
                       name="authorizedNumber"
+                      className="form-select"
                       value={newGateData.authorizedNumber}
                       onChange={handleInputChange}
                       required
@@ -589,6 +586,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                       type="password"
                       id="password"
                       name="password"
+                      className="form-input"
                       value={newGateData.password}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
@@ -598,13 +596,15 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
 
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label>מיקום השער (אופציונלי)</label>
-                    <LocationPicker
-                      initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
-                      onLocationSelect={handleLocationSelect}
-                      userLocation={userLocation}
-                    />
                     <small>לחץ על המפה או חפש כתובת לבחירת מיקום לפתיחה אוטומטית</small>
                   </div>
+                </div>
+                <div className="location-picker-wrapper" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+                  <LocationPicker
+                    initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
+                    onLocationSelect={handleLocationSelect}
+                    userLocation={userLocation}
+                  />
                 </div>
 
                 <div className="form-actions">
@@ -614,7 +614,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                     className="btn btn-secondary"
                     disabled={isSubmitting}
                   >
-                    חזרה
+                    ביטול
                   </button>
                   <button
                     type="submit"
@@ -813,7 +813,6 @@ const GateDashboard = ({ user, token }) => {
   const [activeTab, setActiveTab] = useState('gates'); // 'gates' or 'map'
   const [settings, setSettings] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // Add userLocation state
-  const [locationError, setLocationError] = useState(null);
   const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
   
   // Auto-open settings and state
@@ -853,10 +852,6 @@ const GateDashboard = ({ user, token }) => {
     }
 
     setLocationPermissionRequested(true);
-    
-    if (showError) {
-      setLocationError(null);
-    }
     
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -961,7 +956,7 @@ const GateDashboard = ({ user, token }) => {
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [locationPermissionRequested]);
+  }, [userLocation, locationPermissionRequested]);
 
   // Drag and drop sensors - use TouchSensor for mobile, PointerSensor for desktop
   const sensors = useSensors(
@@ -1091,7 +1086,7 @@ const GateDashboard = ({ user, token }) => {
   }, [successMessage, error]);
 
   // Function to scroll to error or success message
-  const scrollToMessage = (type) => {
+  const scrollToMessage = useCallback((type) => {
     const ref = type === 'error' ? errorRef : successRef;
     if (ref.current) {
       ref.current.scrollIntoView({
@@ -1100,7 +1095,7 @@ const GateDashboard = ({ user, token }) => {
         inline: 'nearest'
       });
     }
-  };
+  }, []);
 
   // Fetch settings once on mount
   useEffect(() => {
@@ -1183,7 +1178,7 @@ const GateDashboard = ({ user, token }) => {
     setSelectedGate(null);
   };
 
-  const handleOpenGate = async (gate, password = '', autoOpened = false) => {
+  const handleOpenGate = useCallback(async (gate, password = '', autoOpened = false) => {
     try {
       setIsSubmitting(true);
       const response = await authenticatedFetch(`/api/gates/${gate.id}/open`, {
@@ -1264,7 +1259,7 @@ const GateDashboard = ({ user, token }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [fetchGates, scrollToMessage]);
 
   // Handle Auto-Open Logic
   useEffect(() => {
@@ -1772,19 +1767,22 @@ const GateDashboard = ({ user, token }) => {
       )}
 
       {/* Add/Edit Gate Form */}
-      {showAddGate && (
+      {(showAddGate || (editingGate && !isMobile)) && (
         <div className="form-container">
-          <h3>{editingGate ? 'ערוך שער' : 'הוסף שער חדש'}</h3>
-          <p>{editingGate ? 'עדכן את פרטי השער' : 'מלא את הפרטים להוספת שער חדש למערכת'}</p>
+          <div className="gate-edit-header">
+            <h3>{editingGate ? 'ערוך שער' : 'הוסף שער חדש'}</h3>
+          </div>
+          {!editingGate && <p>מלא את הפרטים להוספת שער חדש למערכת</p>}
 
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
               <div className="form-group">
-                <label htmlFor="name">שם השער *</label>
+                <label htmlFor="name">שם השער:</label>
                 <input
                   type="text"
                   id="name"
                   name="name"
+                  className="form-input"
                   value={newGateData.name}
                   onChange={handleInputChange}
                   required
@@ -1794,11 +1792,12 @@ const GateDashboard = ({ user, token }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="phoneNumber">מספר טלפון *</label>
+                <label htmlFor="phoneNumber">מספר טלפון:</label>
                 <input
                   type="tel"
                   id="phoneNumber"
                   name="phoneNumber"
+                  className="form-input"
                   value={newGateData.phoneNumber}
                   onChange={handleInputChange}
                   required
@@ -1808,10 +1807,11 @@ const GateDashboard = ({ user, token }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="authorizedNumber">מספר מורשה *</label>
+                <label htmlFor="authorizedNumber">מספר מורשה:</label>
                 <select
                   id="authorizedNumber"
                   name="authorizedNumber"
+                  className="form-select"
                   value={newGateData.authorizedNumber}
                   onChange={handleInputChange}
                   required
@@ -1833,6 +1833,7 @@ const GateDashboard = ({ user, token }) => {
                   type="password"
                   id="password"
                   name="password"
+                  className="form-input"
                   value={newGateData.password}
                   onChange={handleInputChange}
                   disabled={isSubmitting}
@@ -1843,12 +1844,14 @@ const GateDashboard = ({ user, token }) => {
 
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label>מיקום השער (אופציונלי)</label>
-                <LocationPicker
-                  initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
-                  onLocationSelect={handleLocationSelect}
-                />
                 <small>לחץ על המפה או חפש כתובת לבחירת מיקום לפתיחה אוטומטית</small>
               </div>
+            </div>
+            <div className="location-picker-wrapper" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+              <LocationPicker
+                initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
+                onLocationSelect={handleLocationSelect}
+              />
             </div>
 
             <div className="form-actions">
@@ -1899,11 +1902,12 @@ const GateDashboard = ({ user, token }) => {
               <form onSubmit={handleSubmit}>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="name">שם השער *</label>
+                    <label htmlFor="name">שם השער:</label>
                     <input
                       type="text"
                       id="name"
                       name="name"
+                      className="form-input"
                       value={newGateData.name}
                       onChange={handleInputChange}
                       required
@@ -1912,11 +1916,12 @@ const GateDashboard = ({ user, token }) => {
                     <small>שם ייחודי לזיהוי השער במערכת</small>
                   </div>
                   <div className="form-group">
-                    <label htmlFor="phoneNumber">מספר טלפון *</label>
+                    <label htmlFor="phoneNumber">מספר טלפון:</label>
                     <input
                       type="tel"
                       id="phoneNumber"
                       name="phoneNumber"
+                      className="form-input"
                       value={newGateData.phoneNumber}
                       onChange={handleInputChange}
                       required
@@ -1925,10 +1930,11 @@ const GateDashboard = ({ user, token }) => {
                     <small>מספר הטלפון של השער (למשל: 03-1234567)</small>
                   </div>
                   <div className="form-group">
-                    <label htmlFor="authorizedNumber">מספר מורשה *</label>
+                    <label htmlFor="authorizedNumber">מספר מורשה:</label>
                     <select
                       id="authorizedNumber"
                       name="authorizedNumber"
+                      className="form-select"
                       value={newGateData.authorizedNumber}
                       onChange={handleInputChange}
                       required
@@ -1949,6 +1955,7 @@ const GateDashboard = ({ user, token }) => {
                       type="password"
                       id="password"
                       name="password"
+                      className="form-input"
                       value={newGateData.password}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
@@ -1958,13 +1965,15 @@ const GateDashboard = ({ user, token }) => {
 
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label>מיקום השער (אופציונלי)</label>
-                    <LocationPicker
-                      initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
-                      onLocationSelect={handleLocationSelect}
-                      userLocation={userLocation}
-                    />
                     <small>לחץ על המפה או חפש כתובת לבחירת מיקום לפתיחה אוטומטית</small>
                   </div>
+                </div>
+                <div className="location-picker-wrapper" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+                  <LocationPicker
+                    initialLocation={newGateData.location ? { lat: newGateData.location.latitude, lng: newGateData.location.longitude, address: newGateData.location.address } : null}
+                    onLocationSelect={handleLocationSelect}
+                    userLocation={userLocation}
+                  />
                 </div>
                 <div className="form-actions">
                   <button
@@ -2192,7 +2201,7 @@ const GateDashboard = ({ user, token }) => {
       )}
 
       {/* Gates Grid - Show compact cards on mobile, full cards on desktop */}
-      {activeTab === 'gates' && !showAddGate && !selectedGate && !showCallerIdValidation && gates.length > 0 && (
+      {activeTab === 'gates' && !showAddGate && !selectedGate && !showCallerIdValidation && (!editingGate || isMobile) && gates.length > 0 && (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

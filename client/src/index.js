@@ -12,15 +12,23 @@ root.render(
 // Register service worker for PWA and handle updates automatically
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    // Register service worker - browser will check for updates automatically
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {
         console.log('SW registered: ', registration);
 
-        // Check for updates immediately and then every hour
+        // Check for updates immediately and then every 5 minutes (instead of hourly)
         registration.update();
         setInterval(() => {
           registration.update();
-        }, 60 * 60 * 1000);
+        }, 5 * 60 * 1000); // 5 minutes
+
+        // Also check when page becomes visible (user returns to app)
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            registration.update();
+          }
+        });
 
         // Listen for service worker updates
         registration.addEventListener('updatefound', () => {

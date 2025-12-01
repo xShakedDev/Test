@@ -353,7 +353,7 @@ const CallerIdValidation = ({ token, onClose }) => {
                   }} 
                   className="btn btn-secondary"
                 >
-                  סגור
+                  חזור
                 </button>
                 {validationResult && validationResult.phoneNumber && (
                   <button 
@@ -400,11 +400,12 @@ const CallerIdValidation = ({ token, onClose }) => {
               <h3>בקשת אימות מספר טלפון</h3>
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label htmlFor="phoneNumber">מספר טלפון *</label>
+                  <label htmlFor="phoneNumber">מספר טלפון:</label>
                   <input
                     type="tel"
                     id="phoneNumber"
                     name="phoneNumber"
+                    className="form-input"
                     value={validationData.phoneNumber}
                     onChange={handleInputChange}
                     placeholder="+972501234567"
@@ -420,6 +421,7 @@ const CallerIdValidation = ({ token, onClose }) => {
                     type="text"
                     id="friendlyName"
                     name="friendlyName"
+                    className="form-input"
                     value={validationData.friendlyName}
                     onChange={handleInputChange}
                     placeholder="שם או תיאור"
