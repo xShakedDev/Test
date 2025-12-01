@@ -2,7 +2,7 @@
 // This ensures all data is always fresh and up-to-date
 // Exception: offline.html is cached to show when there's no internet
 
-const SW_VERSION = 'v1.0.2'; // Update this when you deploy changes
+const SW_VERSION = 'v1.0.3'; // Update this when you deploy changes
 const OFFLINE_CACHE = 'offline-page-v1';
 const OFFLINE_URL = '/offline.html';
 
@@ -25,6 +25,12 @@ self.addEventListener('fetch', (event) => {
   // Skip API requests - let them go directly to network without service worker intervention
   if (url.pathname.startsWith('/api/')) {
     return; // Don't intercept API calls
+  }
+  
+  // Skip external requests (different origin) - let them go directly to network
+  // This prevents service worker from intercepting third-party APIs like OSRM routing
+  if (url.origin !== self.location.origin) {
+    return; // Don't intercept external requests
   }
   
   // Handle navigation requests (page loads) - show offline page if network fails
