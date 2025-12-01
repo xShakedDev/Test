@@ -21,7 +21,25 @@ const GateStatistics = ({ user }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [dateRange, setDateRange] = useState('week'); // 'day', 'week', 'month', 'all'
+    const [exchangeRate, setExchangeRate] = useState(3.7); // Default rate
     const isPersonal = stats?.isPersonal || false;
+
+    // Fetch exchange rate
+    useEffect(() => {
+        const fetchExchangeRate = async () => {
+            try {
+                const response = await authenticatedFetch('/api/exchange-rate');
+                if (response.ok) {
+                    const data = await response.json();
+                    setExchangeRate(data.rate || 3.7);
+                }
+            } catch (err) {
+                console.error('Error fetching exchange rate:', err);
+                // Keep default rate
+            }
+        };
+        fetchExchangeRate();
+    }, []);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -101,6 +119,30 @@ const GateStatistics = ({ user }) => {
                     </select>
                 </div>
             </div>
+
+            {/* Total Cost - Only for admin */}
+            {user?.role === 'admin' && stats.totalCost !== null && (
+                <div className="stats-summary-card">
+                    <h3>סיכום עלויות</h3>
+                    <div className="cost-summary">
+                        <div className="cost-item">
+                            <span className="cost-label">סה"כ עלויות:</span>
+                            <span className="cost-value">
+                                ₪{(stats.totalCost * exchangeRate).toFixed(2)} 
+                                <span style={{ fontSize: '0.85rem', opacity: 0.8, marginRight: '0.5rem' }}>
+                                    (${stats.totalCost.toFixed(4)})
+                                </span>
+                            </span>
+                        </div>
+                        {stats.costCount !== undefined && (
+                            <div className="cost-item" style={{ marginTop: '0.5rem', fontSize: '0.9rem', opacity: 0.9 }}>
+                                <span className="cost-label">מספר שיחות עם עלות:</span>
+                                <span className="cost-value">{stats.costCount}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="stats-grid">
                 {/* Top Gates Chart */}
@@ -309,6 +351,39 @@ const GateStatistics = ({ user }) => {
             </div>
 
             <style jsx>{`
+        .stats-summary-card {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 1.5rem;
+          border-radius: 12px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          margin-bottom: 2rem;
+        }
+        .stats-summary-card h3 {
+          margin: 0 0 1rem 0;
+          color: white;
+        }
+        .cost-summary {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .cost-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 8px;
+        }
+        .cost-label {
+          font-size: 1rem;
+          font-weight: 500;
+        }
+        .cost-value {
+          font-size: 1.5rem;
+          font-weight: 700;
+        }
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));

@@ -60,6 +60,12 @@ const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     
+    // Check if MongoDB is connected
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ error: 'מסד הנתונים לא זמין. אנא נסה שוב מאוחר יותר.' });
+    }
+    
     // Get user from database to ensure they still exist and are active
     const user = await User.findById(decoded.userId);
     if (!user || !user.isActive) {
@@ -70,9 +76,14 @@ const authenticateToken = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Authentication error:', error);
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'סשן פג תוקף' });
     }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'טוקן לא תקף' });
+    }
+    // Ensure we always return valid JSON
     return res.status(401).json({ error: 'שגיאה באימות' });
   }
 };
@@ -117,6 +128,24 @@ router.post('/init-admin', async (req, res) => {
     });
 
     await adminUser.save();
+
+    // Enable auto-open for all gates with location by default
+    const allGates = await Gate.find({ 
+      'location.latitude': { $exists: true, $ne: null },
+      'location.longitude': { $exists: true, $ne: null }
+    });
+    
+    if (allGates.length > 0) {
+      allGates.forEach(gate => {
+        const gateId = String(gate._id || gate.id);
+        adminUser.autoOpenSettings.set(gateId, true);
+        // Set default radius to 50 meters if not set
+        if (!adminUser.autoOpenRadius.has(gateId)) {
+          adminUser.autoOpenRadius.set(gateId, gate.location?.autoOpenRadius || 50);
+        }
+      });
+      await adminUser.save();
+    }
 
     console.log(`Initial admin user created: ${adminUser.username}`);
 
@@ -368,6 +397,24 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
 
     await newUser.save();
 
+    // Enable auto-open for all gates with location by default
+    const allGates = await Gate.find({ 
+      'location.latitude': { $exists: true, $ne: null },
+      'location.longitude': { $exists: true, $ne: null }
+    });
+    
+    if (allGates.length > 0) {
+      allGates.forEach(gate => {
+        const gateId = String(gate._id || gate.id);
+        newUser.autoOpenSettings.set(gateId, true);
+        // Set default radius to 50 meters if not set
+        if (!newUser.autoOpenRadius.has(gateId)) {
+          newUser.autoOpenRadius.set(gateId, gate.location?.autoOpenRadius || 50);
+        }
+      });
+      await newUser.save();
+    }
+
     // Convert to plain object and ensure consistent ID handling
     const userObj = newUser.toJSON();
     if (userObj.authorizedGates && userObj.authorizedGates.length > 0) {
@@ -533,6 +580,105 @@ router.put('/change-password', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'שגיאה בשינוי סיסמה' });
+  }
+});
+
+// Get user auto-open settings
+router.get('/user/auto-open-settings', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'משתמש לא נמצא' });
+    }
+
+    // Convert Maps to plain objects for JSON response
+    const autoOpenSettings = {};
+    if (user.autoOpenSettings instanceof Map) {
+      user.autoOpenSettings.forEach((value, key) => {
+        autoOpenSettings[key] = value;
+      });
+    } else if (user.autoOpenSettings) {
+      Object.assign(autoOpenSettings, user.autoOpenSettings);
+    }
+
+    const autoOpenRadius = {};
+    if (user.autoOpenRadius instanceof Map) {
+      user.autoOpenRadius.forEach((value, key) => {
+        autoOpenRadius[key] = value;
+      });
+    } else if (user.autoOpenRadius) {
+      Object.assign(autoOpenRadius, user.autoOpenRadius);
+    }
+
+    res.json({
+      autoOpenSettings,
+      autoOpenRadius
+    });
+  } catch (error) {
+    console.error('Get auto-open settings error:', error);
+    res.status(500).json({ error: 'שגיאה בקבלת הגדרות פתיחה אוטומטית' });
+  }
+});
+
+// Update user auto-open settings
+router.put('/user/auto-open-settings', authenticateToken, async (req, res) => {
+  try {
+    const { autoOpenSettings, autoOpenRadius } = req.body;
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'משתמש לא נמצא' });
+    }
+
+    // Update autoOpenSettings
+    if (autoOpenSettings !== undefined) {
+      if (!user.autoOpenSettings) {
+        user.autoOpenSettings = new Map();
+      }
+      Object.keys(autoOpenSettings).forEach(gateId => {
+        user.autoOpenSettings.set(String(gateId), !!autoOpenSettings[gateId]);
+      });
+    }
+
+    // Update autoOpenRadius
+    if (autoOpenRadius !== undefined) {
+      if (!user.autoOpenRadius) {
+        user.autoOpenRadius = new Map();
+      }
+      Object.keys(autoOpenRadius).forEach(gateId => {
+        const radius = parseInt(autoOpenRadius[gateId]);
+        if (!isNaN(radius) && radius >= 0 && radius <= 1000) {
+          user.autoOpenRadius.set(String(gateId), radius);
+        }
+      });
+    }
+
+    await user.save();
+
+    // Convert Maps to plain objects for response
+    const responseAutoOpenSettings = {};
+    if (user.autoOpenSettings instanceof Map) {
+      user.autoOpenSettings.forEach((value, key) => {
+        responseAutoOpenSettings[key] = value;
+      });
+    }
+
+    const responseAutoOpenRadius = {};
+    if (user.autoOpenRadius instanceof Map) {
+      user.autoOpenRadius.forEach((value, key) => {
+        responseAutoOpenRadius[key] = value;
+      });
+    }
+
+    res.json({
+      success: true,
+      autoOpenSettings: responseAutoOpenSettings,
+      autoOpenRadius: responseAutoOpenRadius,
+      message: 'הגדרות פתיחה אוטומטית עודכנו בהצלחה'
+    });
+  } catch (error) {
+    console.error('Update auto-open settings error:', error);
+    res.status(500).json({ error: 'שגיאה בעדכון הגדרות פתיחה אוטומטית' });
   }
 });
 

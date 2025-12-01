@@ -38,6 +38,10 @@ const gateHistorySchema = new mongoose.Schema({
   autoOpened: {
     type: Boolean,
     default: false
+  },
+  cost: {
+    type: Number,
+    default: null
   }
 }, {
   timestamps: true,

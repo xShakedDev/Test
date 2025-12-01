@@ -13,6 +13,7 @@ const GateHistory = ({ user, token }) => {
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [selectedLogs, setSelectedLogs] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(3.7); // Default rate
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -151,6 +152,25 @@ const GateHistory = ({ user, token }) => {
       setIsLoading(false);
     }
   }, [filter, filterValue, dateFilter, scrollToMessage]);
+
+  // Fetch exchange rate
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await authenticatedFetch('/api/exchange-rate');
+        if (response.ok) {
+          const data = await response.json();
+          setExchangeRate(data.rate || 3.7);
+        }
+      } catch (err) {
+        console.error('Error fetching exchange rate:', err);
+        // Keep default rate
+      }
+    };
+    if (user?.role === 'admin') {
+      fetchExchangeRate();
+    }
+  }, [user?.role]);
 
   useEffect(() => {
     fetchHistory();
@@ -545,6 +565,7 @@ const GateHistory = ({ user, token }) => {
                     <th>שער</th>
                     <th>סטטוס</th>
                     <th>תאריך</th>
+                    {user?.role === 'admin' && <th>עלות</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -576,6 +597,24 @@ const GateHistory = ({ user, token }) => {
                           </span>
                         </td>
                         <td className="history-date">{formatDate(log.timestamp)}</td>
+                        {user?.role === 'admin' && (
+                          <td className="history-cost" style={{ 
+                            textAlign: 'center',
+                            fontWeight: '600',
+                            color: log.cost !== null && log.cost !== undefined ? '#10b981' : '#9ca3af'
+                          }}>
+                            {log.cost !== null && log.cost !== undefined 
+                              ? (
+                                <span>
+                                  ₪{(parseFloat(log.cost) * exchangeRate).toFixed(2)}
+                                  <span style={{ fontSize: '0.75rem', opacity: 0.7, marginRight: '0.25rem', display: 'block', marginTop: '0.1rem' }}>
+                                    (${parseFloat(log.cost).toFixed(4)})
+                                  </span>
+                                </span>
+                              )
+                              : '-'}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

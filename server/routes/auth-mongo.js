@@ -86,7 +86,12 @@ router.get('/gates', requireMongoDB, authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('שגיאה בטעינת שערים:', error);
-    res.status(500).json({ error: 'נכשל בטעינת השערים' });
+    console.error('Error stack:', error.stack);
+    // Ensure we always return valid JSON
+    res.status(500).json({ 
+      error: 'נכשל בטעינת השערים',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -354,7 +359,8 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
     const { id } = req.params;
-    const { CallStatus, CallDuration } = req.body;
+    // Twilio sends Price (not CallPrice) in status callback
+    const { CallStatus, CallDuration, CallSid, Price, CallPrice } = req.body;
 
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
@@ -366,6 +372,52 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
 
     if (gate) {
       await gate.updateCallStatus(CallStatus, CallDuration);
+    }
+
+    // Update call cost in history if CallSid is provided
+    // Twilio sends Price (or sometimes CallPrice) in the callback, but sometimes it's missing
+    // If price is not in callback, fetch it from Twilio API
+    if (CallSid) {
+      try {
+        let cost = null;
+        const priceValue = Price || CallPrice;
+        
+        // First try to get price from callback
+        if (priceValue !== undefined && priceValue !== null && priceValue !== '') {
+          cost = Math.abs(parseFloat(priceValue)) || null;
+        }
+        
+        // If no price in callback and call is completed, fetch from Twilio API
+        if ((cost === null || isNaN(cost)) && CallStatus === 'completed') {
+          try {
+            const client = getTwilioClient();
+            const call = await client.calls(CallSid).fetch();
+            if (call.price) {
+              cost = Math.abs(parseFloat(call.price)) || null;
+            }
+          } catch (apiError) {
+            console.error(`Error fetching call price from Twilio API for ${CallSid}:`, apiError.message);
+          }
+        }
+        
+        // Update history if we have a cost
+        if (cost !== null && !isNaN(cost) && cost > 0) {
+          const updateResult = await GateHistory.updateOne(
+            { callSid: CallSid },
+            { cost: cost }
+          );
+          if (updateResult.matchedCount === 0) {
+            console.warn(`No history record found for callSid: ${CallSid}`);
+          } else {
+            console.log(`Updated cost for callSid ${CallSid}: $${cost}`);
+          }
+        } else if (CallStatus === 'completed') {
+          // Log if call completed but no cost found
+          console.warn(`Call ${CallSid} completed but no cost available. Price from callback: ${priceValue}`);
+        }
+      } catch (updateError) {
+        console.error('שגיאה בעדכון עלות שיחה:', updateError);
+      }
     }
 
     res.sendStatus(200);
@@ -485,11 +537,51 @@ router.get('/gates/stats', requireMongoDB, authenticateToken, async (req, res) =
       });
     }
 
+    // Calculate total cost (only for admin)
+    // Only sum costs that are not null - don't count null as 0
+    let totalCost = null;
+    let costCount = 0;
+    if (req.user.role === 'admin') {
+      const costStats = await GateHistory.aggregate([
+        { $match: matchStage },
+        {
+          $group: {
+            _id: null,
+            totalCost: { 
+              $sum: { 
+                $cond: [
+                  { $and: [{ $ne: ['$cost', null] }, { $gt: ['$cost', 0] }] },
+                  '$cost',
+                  0
+                ]
+              } 
+            },
+            callCount: { $sum: 1 },
+            costCount: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $ne: ['$cost', null] }, { $gt: ['$cost', 0] }] },
+                  1,
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ]);
+      if (costStats.length > 0) {
+        totalCost = costStats[0].totalCost;
+        costCount = costStats[0].costCount || 0;
+      }
+    }
+
     res.json({
       topGates: completeTopGates,
       topUsers,
       hourlyActivity: fullHourlyActivity,
-      isPersonal: req.user.role !== 'admin' // Flag to indicate if these are personal stats
+      isPersonal: req.user.role !== 'admin', // Flag to indicate if these are personal stats
+      totalCost: totalCost, // Total cost in USD (only for admin, only for calls with cost data)
+      costCount: costCount // Number of calls with cost data (only for admin)
     });
   } catch (error) {
     console.error('שגיאה בטעינת סטטיסטיקות:', error);
@@ -562,13 +654,38 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limitNum)
-      .populate('userId', 'username name');
+      .populate('userId', 'username name')
+      .lean(); // Use lean() for better performance and to avoid Mongoose document issues
 
     const totalPages = Math.ceil(totalCount / limitNum);
 
+    // Transform history records to ensure proper JSON format
+    const transformedHistory = history.map(record => {
+      const transformed = {
+        id: record._id ? record._id.toString() : record.id,
+        userId: record.userId ? (typeof record.userId === 'object' ? record.userId._id?.toString() : record.userId.toString()) : null,
+        gateId: record.gateId,
+        username: record.username,
+        gateName: record.gateName,
+        timestamp: record.timestamp,
+        success: record.success,
+        cost: record.cost !== undefined ? record.cost : null, // Include cost field
+        callSid: record.callSid,
+        errorMessage: record.errorMessage,
+        autoOpened: record.autoOpened || false
+      };
+      
+      // Add user info if populated
+      if (record.userId && typeof record.userId === 'object') {
+        transformed.userName = record.userId.name || record.userId.username || record.username;
+      }
+      
+      return transformed;
+    });
+
     res.json({
-      history: history.map(record => record.toJSON()),
-      count: history.length,
+      history: transformedHistory,
+      count: transformedHistory.length,
       totalCount: totalCount,
       page: pageNum,
       limit: limitNum,
@@ -579,7 +696,12 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
     });
   } catch (error) {
     console.error('שגיאה בטעינת היסטוריית שערים:', error);
-    res.status(500).json({ error: 'נכשל בטעינת היסטוריית השערים' });
+    console.error('Error stack:', error.stack);
+    // Ensure we always return valid JSON
+    res.status(500).json({ 
+      error: 'נכשל בטעינת היסטוריית השערים',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -1170,6 +1292,73 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
     } else {
       res.status(500).json({ error: 'נכשל בשמירת הגדרות' });
     }
+  }
+});
+
+// Get USD to ILS exchange rate
+router.get('/exchange-rate', async (req, res) => {
+  try {
+    // Try to get exchange rate from a free API
+    // Using exchangerate-api.com (free tier allows 1500 requests/month)
+    const https = require('https');
+    
+    const fetchExchangeRate = () => {
+      return new Promise((resolve, reject) => {
+        https.get('https://api.exchangerate-api.com/v4/latest/USD', (response) => {
+          let data = '';
+          
+          response.on('data', (chunk) => {
+            data += chunk;
+          });
+          
+          response.on('end', () => {
+            try {
+              if (response.statusCode === 200) {
+                const jsonData = JSON.parse(data);
+                resolve({
+                  ok: true,
+                  data: jsonData
+                });
+              } else {
+                resolve({
+                  ok: false,
+                  data: null
+                });
+              }
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }).on('error', (error) => {
+          reject(error);
+        });
+      });
+    };
+    
+    const result = await fetchExchangeRate();
+    
+    if (result.ok && result.data) {
+      const ilsRate = result.data.rates?.ILS || 3.7; // Fallback to 3.7 if API fails
+      res.json({ 
+        rate: ilsRate,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      // Fallback to default rate if API fails
+      res.json({ 
+        rate: 3.7,
+        timestamp: new Date().toISOString(),
+        note: 'Using default rate - API unavailable'
+      });
+    }
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    // Fallback to default rate
+    res.json({ 
+      rate: 3.7,
+      timestamp: new Date().toISOString(),
+      note: 'Using default rate - API error'
+    });
   }
 });
 

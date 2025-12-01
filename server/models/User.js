@@ -41,6 +41,18 @@ const userSchema = new mongoose.Schema({
     type: Map,
     of: Number,
     default: {}
+  },
+  // Auto-open settings per user
+  autoOpenSettings: {
+    type: Map,
+    of: Boolean,
+    default: {}
+  },
+  // Auto-open radius per gate per user (in meters)
+  autoOpenRadius: {
+    type: Map,
+    of: Number,
+    default: {}
   }
 }, {
   timestamps: true,

@@ -48,9 +48,11 @@ function formatDistance(meters) {
 
 // Gate Icon for Map - using site logo
 const createGateIcon = () => {
+  // Use absolute URL to ensure logo loads correctly on all platforms
+  const logoUrl = `${window.location.origin}/logo.png`;
   return L.divIcon({
     className: 'gate-map-icon',
-    html: '<div style="background-color: white; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><img src="/logo.png" alt="Gate" style="width: 28px; height: 28px; object-fit: contain;" /></div>',
+    html: `<div style="background-color: white; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; overflow: hidden; cursor: pointer; pointer-events: auto;"><img src="${logoUrl}" alt="Gate" style="width: 28px; height: 28px; object-fit: contain; display: block; pointer-events: none;" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#2563eb';" /></div>`,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
   });
@@ -197,16 +199,48 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
               icon={createGateIcon()}
               eventHandlers={{
                 click: (e) => {
+                  // Prevent event bubbling and default behavior using Leaflet's method
+                  L.DomEvent.stop(e.originalEvent || e);
+                  
                   // Set selected gate for route display
                   setSelectedGateForRoute(gate);
+                  
                   // Open popup without panning the map
                   const marker = e.target;
-                  marker.openPopup();
+                  if (marker) {
+                    // Close any other open popups first
+                    const map = marker._map;
+                    if (map) {
+                      map.closePopup();
+                    }
+                    
+                    // Use setTimeout to ensure marker is ready and map is updated
+                    setTimeout(() => {
+                      if (marker && typeof marker.openPopup === 'function') {
+                        try {
+                          marker.openPopup();
+                        } catch (err) {
+                          console.error('Error opening popup:', err);
+                          // Fallback: try opening popup directly
+                          if (marker._popup) {
+                            marker._popup.openOn(marker._map);
+                          }
+                        }
+                      }
+                    }, 50);
+                  }
+                  // Note: onGateClick is only called from the "View Details" button in the popup, not here
+                },
+                mousedown: (e) => {
+                  // Prevent map drag when clicking marker
+                  if (e.originalEvent) {
+                    e.originalEvent.stopPropagation();
+                  }
                 }
               }}
             >
               <Popup autoPan={false} closeOnClick={false}>
-                <div style={{ textAlign: 'right', direction: 'rtl', minWidth: '150px' }}>
+                <div style={{ textAlign: 'right', direction: 'rtl', minWidth: '150px' }} className="leaflet-popup-content-wrapper-fixed">
                   <strong style={{ fontSize: '1.1rem', marginBottom: '0.5rem', display: 'block' }}>
                     {gate.name}
                   </strong>
@@ -224,28 +258,37 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
                     {/* Open Gate Button */}
                     <button
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation(); // Prevent popup from closing
                         if (handleOpenGateClick) {
                           handleOpenGateClick(gate);
                         }
                       }}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (handleOpenGateClick) {
+                          handleOpenGateClick(gate);
+                        }
+                      }}
                       disabled={(() => {
-                        const gateId = gate._id || gate.id;
-                        return isSubmitting || cooldowns[gate.id] || autoOpenedGates?.[gateId];
+                        return isSubmitting || cooldowns[gate.id];
                       })()}
                       style={{
                         width: '100%',
                         padding: '0.75rem 1rem',
                         backgroundColor: (() => {
-                          const gateId = gate._id || gate.id;
-                          return cooldowns[gate.id] || autoOpenedGates?.[gateId] ? '#9ca3af' : '#2563eb';
+                          return cooldowns[gate.id] ? '#9ca3af' : '#2563eb';
                         })(),
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
                         cursor: (() => {
-                          const gateId = gate._id || gate.id;
-                          return isSubmitting || cooldowns[gate.id] || autoOpenedGates?.[gateId] ? 'not-allowed' : 'pointer';
+                          return isSubmitting || cooldowns[gate.id] ? 'not-allowed' : 'pointer';
                         })(),
                         fontSize: '0.9rem',
                         fontWeight: '500',
@@ -255,19 +298,20 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
                         justifyContent: 'center',
                         gap: '0.5rem',
                         opacity: (() => {
-                          const gateId = gate._id || gate.id;
-                          return isSubmitting || cooldowns[gate.id] || autoOpenedGates?.[gateId] ? 0.6 : 1;
-                        })()
+                          return isSubmitting || cooldowns[gate.id] ? 0.6 : 1;
+                        })(),
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                        zIndex: 1000,
+                        position: 'relative'
                       }}
                       onMouseEnter={(e) => {
-                        const gateId = gate._id || gate.id;
-                        if (!isSubmitting && !cooldowns[gate.id] && !autoOpenedGates?.[gateId]) {
+                        if (!isSubmitting && !cooldowns[gate.id]) {
                           e.currentTarget.style.backgroundColor = '#1d4ed8';
                         }
                       }}
                       onMouseLeave={(e) => {
-                        const gateId = gate._id || gate.id;
-                        if (!isSubmitting && !cooldowns[gate.id] && !autoOpenedGates?.[gateId]) {
+                        if (!isSubmitting && !cooldowns[gate.id]) {
                           e.currentTarget.style.backgroundColor = '#2563eb';
                         }
                       }}
@@ -294,7 +338,7 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
                               <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                               </svg>
-                              <span>נפתח אוטומטית</span>
+                              <span>פתח ידנית (נפתח אוטומטית)</span>
                             </>
                           );
                         } else {
@@ -310,12 +354,25 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
                       })()}
                     </button>
                     
-                    {/* View Details Button */}
-                    <button
-                      onClick={() => {
-                        setSelectedGateForRoute(gate);
-                        if (onGateClick) onGateClick(gate);
-                      }}
+                    {/* View Details Button - Only show on mobile */}
+                    {onGateClick && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedGateForRoute(gate);
+                          if (onGateClick) onGateClick(gate);
+                        }}
+                        onTouchStart={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSelectedGateForRoute(gate);
+                          if (onGateClick) onGateClick(gate);
+                        }}
                       style={{
                         width: '100%',
                         padding: '0.5rem 1rem',
@@ -326,7 +383,11 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
                         cursor: 'pointer',
                         fontSize: '0.85rem',
                         fontWeight: '500',
-                        transition: 'background-color 0.2s'
+                        transition: 'background-color 0.2s',
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                        zIndex: 1000,
+                        position: 'relative'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#eff6ff';
@@ -337,6 +398,7 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
                     >
                       פתח פרטים
                     </button>
+                    )}
                   </div>
                 </div>
               </Popup>
@@ -369,7 +431,7 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
 };
 
 // Sortable Gate Card Component
-const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation, toggleAutoOpen, autoOpenSettings, autoOpenedGates }) => {
+const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, handleInputChange, handleLocationSelect, handleSubmit, handleCancel, isSubmitting, verifiedCallers, cooldowns, handleOpenGateClick, handleEdit, handleDelete, handleGateSelect, isEditMode, userLocation, toggleAutoOpen, autoOpenSettings, autoOpenedGates, handleUpdateAutoOpenRadius, autoOpenRadius }) => {
   const {
     attributes,
     listeners,
@@ -379,10 +441,22 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
     isDragging,
   } = useSortable({ id: String(gate.id), disabled: !!editingGate || !isEditMode });
 
+  // Local state for radius slider to prevent lag
+  const gateId = gate._id || gate.id;
+  const userRadius = autoOpenRadius?.[gateId] || gate.location?.autoOpenRadius || 50;
+  const [localRadius, setLocalRadius] = useState(userRadius);
+  
+  // Update local radius when user settings or gate prop changes
+  useEffect(() => {
+    const newRadius = autoOpenRadius?.[gateId] || gate.location?.autoOpenRadius || 50;
+    setLocalRadius(newRadius);
+  }, [autoOpenRadius, gateId, gate.location?.autoOpenRadius]);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    cursor: isMobile ? 'pointer' : 'default',
   };
 
   // Format distance helper
@@ -406,7 +480,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
       ref={setNodeRef}
       style={style}
       className={`gate-card ${isMobile ? 'gate-card-mobile' : ''} ${isDragging ? 'gate-card-dragging' : ''}`}
-      onClick={() => handleGateSelect(gate)}
+      onClick={isMobile ? () => handleGateSelect(gate) : undefined}
     >
       {isMobile ? (
         // Mobile: Compact card with just gate name
@@ -474,28 +548,24 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                     handleOpenGateClick(gate);
                   }}
                   disabled={(() => {
-                    const gateId = gate._id || gate.id;
-                    return isSubmitting || cooldowns[gate.id] || autoOpenedGates?.[gateId];
+                    return isSubmitting || cooldowns[gate.id];
                   })()}
                   style={{
                     width: '100%',
                     padding: '0.5rem 1rem',
                     fontSize: '0.85rem',
                     backgroundColor: (() => {
-                      const gateId = gate._id || gate.id;
-                      return cooldowns[gate.id] || autoOpenedGates?.[gateId] ? '#9ca3af' : '#2563eb';
+                      return cooldowns[gate.id] ? '#9ca3af' : '#2563eb';
                     })(),
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
                     cursor: (() => {
-                      const gateId = gate._id || gate.id;
-                      return isSubmitting || cooldowns[gate.id] || autoOpenedGates?.[gateId] ? 'not-allowed' : 'pointer';
+                      return isSubmitting || cooldowns[gate.id] ? 'not-allowed' : 'pointer';
                     })(),
                     fontWeight: '600',
                     opacity: (() => {
-                      const gateId = gate._id || gate.id;
-                      return isSubmitting || cooldowns[gate.id] || autoOpenedGates?.[gateId] ? 0.6 : 1;
+                      return isSubmitting || cooldowns[gate.id] ? 0.6 : 1;
                     })()
                   }}
                 >
@@ -720,10 +790,97 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                         <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <span>השער נפתח אוטומטית - לא ניתן לפתוח שוב כרגע</span>
+                        <span>השער נפתח אוטומטית - ניתן לפתוח ידנית</span>
                       </div>
                     ) : null;
                   })()}
+
+                  {/* Auto Open Toggle - Desktop */}
+                  {gate.location && gate.location.latitude && (
+                    <>
+                      <div className="auto-open-toggle" style={{ marginBottom: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <svg style={{ width: '20px', height: '20px', color: '#2563eb' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span style={{ fontWeight: '600', color: '#1e40af' }}>פתיחה אוטומטית בהגעה</span>
+                        </div>
+                        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '24px' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={!!autoOpenSettings[gate.id]} 
+                            onChange={() => toggleAutoOpen(gate.id)}
+                            style={{ opacity: 0, width: 0, height: 0 }}
+                          />
+                          <span className="slider round" style={{ 
+                            position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, 
+                            backgroundColor: !!autoOpenSettings[gate.id] ? '#2563eb' : '#ccc', 
+                            transition: '.4s', borderRadius: '34px' 
+                          }}>
+                            <span style={{ 
+                              position: 'absolute', content: '""', height: '16px', width: '16px', 
+                              left: !!autoOpenSettings[gate.id] ? '4px' : '30px', bottom: '4px', 
+                              backgroundColor: 'white', transition: '.4s', borderRadius: '50%' 
+                            }}></span>
+                          </span>
+                        </label>
+                      </div>
+                      
+                      {/* Auto Open Radius Range Slider - Desktop */}
+                      {!!autoOpenSettings[gate.id] && (
+                        <div className="auto-open-radius-setting" style={{ marginBottom: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <svg style={{ width: '18px', height: '18px', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                              </svg>
+                              טווח פתיחה אוטומטית
+                            </label>
+                            <span style={{ fontWeight: '600', color: '#2563eb', fontSize: '1rem' }}>
+                              {localRadius} מ'
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1000"
+                            step="10"
+                            value={localRadius}
+                            onChange={(e) => {
+                              const newRadius = parseInt(e.target.value);
+                              // Update local state immediately for responsive UI
+                              setLocalRadius(newRadius);
+                              // The handleUpdateAutoOpenRadius will update the server with debounce
+                              handleUpdateAutoOpenRadius({
+                                ...gate,
+                                location: {
+                                  ...gate.location,
+                                  autoOpenRadius: newRadius
+                                }
+                              }, newRadius);
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '8px',
+                              borderRadius: '4px',
+                              background: '#e5e7eb',
+                              outline: 'none',
+                              WebkitAppearance: 'none',
+                              appearance: 'none'
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                            <span>0 מ'</span>
+                            <span>1000 מ'</span>
+                          </div>
+                          <small style={{ display: 'block', marginTop: '0.5rem', color: '#6b7280', fontSize: '0.8rem' }}>
+                            השער יפתח אוטומטית כשתגיע למרחק של עד {localRadius} מטר מהשער
+                          </small>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   <button
                     onClick={(e) => {
@@ -731,12 +888,10 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                       handleOpenGateClick(gate);
                     }}
                     disabled={(() => {
-                      const gateId = gate._id || gate.id;
-                      return isSubmitting || cooldowns[gate.id] || autoOpenedGates[gateId];
+                      return isSubmitting || cooldowns[gate.id];
                     })()}
                     className={`btn ${(() => {
-                      const gateId = gate._id || gate.id;
-                      return cooldowns[gate.id] || autoOpenedGates[gateId] ? 'btn-secondary cooldown' : 'btn-primary';
+                      return cooldowns[gate.id] ? 'btn-secondary cooldown' : 'btn-primary';
                     })()} gate-open-btn`}
                   >
                     {isSubmitting ? (
@@ -761,7 +916,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                             <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            <span>השער נפתח אוטומטית - לא ניתן לפתוח שוב כרגע</span>
+                            <span>פתח ידנית (נפתח אוטומטית)</span>
                           </>
                         );
                       } else {
@@ -816,15 +971,8 @@ const GateDashboard = ({ user, token }) => {
   const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
   
   // Auto-open settings and state
-  const [autoOpenSettings, setAutoOpenSettings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('gateAutoOpenSettings');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      console.error('Error loading auto-open settings:', e);
-      return {};
-    }
-  });
+  const [autoOpenSettings, setAutoOpenSettings] = useState({});
+  const [autoOpenRadius, setAutoOpenRadius] = useState({}); // Per-user radius settings
   const [autoOpenedGates, setAutoOpenedGates] = useState({}); // Track gates opened in current proximity session
   const [gatesInRangeState, setGatesInRangeState] = useState({}); // Track which gates user is currently in range of
   const [autoOpenNotification, setAutoOpenNotification] = useState(null); // Notification state
@@ -841,13 +989,41 @@ const GateDashboard = ({ user, token }) => {
   const showGateSelectionModalRef = useRef(false);
   const pendingGateSelectionRef = useRef(false);
 
-  const toggleAutoOpen = (gateId) => {
+  const toggleAutoOpen = async (gateId) => {
     const newSettings = {
       ...autoOpenSettings,
       [gateId]: !autoOpenSettings[gateId]
     };
     setAutoOpenSettings(newSettings);
-    localStorage.setItem('gateAutoOpenSettings', JSON.stringify(newSettings));
+    
+    // Save to server
+    try {
+      const response = await authenticatedFetch('/api/auth/user/auto-open-settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          autoOpenSettings: newSettings
+        })
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        setAutoOpenSettings(autoOpenSettings);
+        const data = await response.json();
+        if (window.showSystemNotification) {
+          window.showSystemNotification(`שגיאה בעדכון הגדרות: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+        }
+      }
+    } catch (error) {
+      console.error('Error updating auto-open settings:', error);
+      // Revert on error
+      setAutoOpenSettings(autoOpenSettings);
+      if (window.showSystemNotification) {
+        window.showSystemNotification('שגיאת רשת בעדכון הגדרות', 'error');
+      }
+    }
   };
 
   const requestLocation = useCallback((showError = false) => {
@@ -1120,6 +1296,100 @@ const GateDashboard = ({ user, token }) => {
     fetchSettings();
   }, []);
 
+  // Fetch user auto-open settings from server
+  useEffect(() => {
+    const fetchAutoOpenSettings = async () => {
+      try {
+        const response = await authenticatedFetch('/api/auth/user/auto-open-settings');
+        if (response.ok) {
+          const data = await response.json();
+          let settings = data.autoOpenSettings || {};
+          let radius = data.autoOpenRadius || {};
+          
+          // Ensure all gates with location are enabled by default
+          // This will be updated after gates are loaded
+          setAutoOpenSettings(settings);
+          setAutoOpenRadius(radius);
+        } else {
+          // If error, try to load from localStorage as fallback (for migration)
+          try {
+            const saved = localStorage.getItem('gateAutoOpenSettings');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              setAutoOpenSettings(parsed);
+              // Migrate to server
+              await authenticatedFetch('/api/auth/user/auto-open-settings', {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  autoOpenSettings: parsed
+                })
+              });
+              // Clear localStorage after migration
+              localStorage.removeItem('gateAutoOpenSettings');
+            }
+          } catch (e) {
+            console.error('Error loading from localStorage:', e);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching auto-open settings:', error);
+        // Fallback to localStorage if server fails
+        try {
+          const saved = localStorage.getItem('gateAutoOpenSettings');
+          if (saved) {
+            setAutoOpenSettings(JSON.parse(saved));
+          }
+        } catch (e) {
+          console.error('Error loading from localStorage:', e);
+        }
+      }
+    };
+
+    if (token) {
+      fetchAutoOpenSettings();
+    }
+  }, [token]);
+
+  // Ensure all gates are enabled by default after gates are loaded
+  useEffect(() => {
+    if (gates.length > 0 && token) {
+      const gatesWithLocation = gates.filter(g => g.location && g.location.latitude && g.location.longitude);
+      let updatedSettings = { ...autoOpenSettings };
+      let hasChanges = false;
+      
+      // Enable all gates with location by default if not already set
+      gatesWithLocation.forEach(gate => {
+        const gateId = gate._id || gate.id;
+        if (updatedSettings[gateId] === undefined) {
+          updatedSettings[gateId] = true; // Default to enabled
+          hasChanges = true;
+        }
+      });
+      
+      // Save to server if there are changes
+      if (hasChanges) {
+        setAutoOpenSettings(updatedSettings);
+        // Save to server in background
+        authenticatedFetch('/api/auth/user/auto-open-settings', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            autoOpenSettings: updatedSettings
+          })
+        }).catch(error => {
+          console.error('Error saving default auto-open settings:', error);
+        });
+      }
+    }
+    // Only run when gates change, not when autoOpenSettings changes (to avoid infinite loop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gates, token]);
+
   // Calculate cooldowns and update timer every second
   useEffect(() => {
     let cooldownInterval;
@@ -1289,7 +1559,9 @@ const GateDashboard = ({ user, token }) => {
             gate.location.longitude
           );
 
-          const radius = gate.location.autoOpenRadius || 50;
+          // Use user's custom radius if set, otherwise use gate default (50m)
+          const userRadius = autoOpenRadius[gateId] || gate.location?.autoOpenRadius || 50;
+          const radius = userRadius;
           const isNear = distance <= radius;
           
           // Track current range state
@@ -1506,6 +1778,76 @@ const GateDashboard = ({ user, token }) => {
       password: ''
     });
   };
+
+  // Debounce timer ref for radius updates
+  const radiusUpdateTimerRef = useRef({});
+
+  const handleUpdateAutoOpenRadius = useCallback(async (gate, newRadius) => {
+    try {
+      // Ensure radius is within valid range (0-1000)
+      const radius = Math.max(0, Math.min(1000, parseInt(newRadius) || 50));
+      
+      // Clear any pending update for this gate
+      if (radiusUpdateTimerRef.current[gate.id]) {
+        clearTimeout(radiusUpdateTimerRef.current[gate.id]);
+      }
+      
+      // Update local state immediately using functional update
+      setAutoOpenRadius(prev => {
+        const newRadiusSettings = {
+          ...prev,
+          [gate.id]: radius
+        };
+
+        // Debounce the server update to avoid too many requests
+        radiusUpdateTimerRef.current[gate.id] = setTimeout(async () => {
+          try {
+            const response = await authenticatedFetch('/api/auth/user/auto-open-settings', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                autoOpenRadius: newRadiusSettings
+              })
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              // Update with server response
+              setAutoOpenRadius(data.autoOpenRadius || newRadiusSettings);
+            } else {
+              const data = await response.json();
+              // Revert the local state change on error using functional update
+              setAutoOpenRadius(prevState => {
+                const reverted = { ...prevState };
+                delete reverted[gate.id];
+                return reverted;
+              });
+              if (window.showSystemNotification) {
+                window.showSystemNotification(`שגיאה בעדכון טווח פתיחה: ${data.error || 'שגיאה לא ידועה'}`, 'error');
+              }
+            }
+          } catch (error) {
+            console.error('Error updating auto-open radius:', error);
+            // Revert the local state change on error using functional update
+            setAutoOpenRadius(prevState => {
+              const reverted = { ...prevState };
+              delete reverted[gate.id];
+              return reverted;
+            });
+            if (window.showSystemNotification) {
+              window.showSystemNotification('שגיאת רשת בעדכון טווח פתיחה', 'error');
+            }
+          }
+        }, 300); // 300ms debounce
+
+        return newRadiusSettings;
+      });
+    } catch (error) {
+      console.error('Error in handleUpdateAutoOpenRadius:', error);
+    }
+  }, [authenticatedFetch]);
 
   const handleDragEnd = async (event) => {
     const { active, over } = event;
@@ -2071,52 +2413,103 @@ const GateDashboard = ({ user, token }) => {
                         <svg className="cooldown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <span>השער נפתח אוטומטית - לא ניתן לפתוח שוב כרגע</span>
+                        <span>השער נפתח אוטומטית - ניתן לפתוח ידנית</span>
                       </div>
                     ) : null;
                   })()}
 
                   {/* Auto Open Toggle */}
                   {selectedGate.location && selectedGate.location.latitude && (
-                    <div className="auto-open-toggle" style={{ marginBottom: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <svg style={{ width: '20px', height: '20px', color: '#2563eb' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span style={{ fontWeight: '600', color: '#1e40af' }}>פתיחה אוטומטית בהגעה</span>
+                    <>
+                      <div className="auto-open-toggle" style={{ marginBottom: '1rem', padding: '1rem', background: '#f0f9ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <svg style={{ width: '20px', height: '20px', color: '#2563eb' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span style={{ fontWeight: '600', color: '#1e40af' }}>פתיחה אוטומטית בהגעה</span>
+                        </div>
+                        <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '24px' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={!!autoOpenSettings[selectedGate.id]} 
+                            onChange={() => toggleAutoOpen(selectedGate.id)}
+                            style={{ opacity: 0, width: 0, height: 0 }}
+                          />
+                          <span className="slider round" style={{ 
+                            position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, 
+                            backgroundColor: !!autoOpenSettings[selectedGate.id] ? '#2563eb' : '#ccc', 
+                            transition: '.4s', borderRadius: '34px' 
+                          }}>
+                            <span style={{ 
+                              position: 'absolute', content: '""', height: '16px', width: '16px', 
+                              left: !!autoOpenSettings[selectedGate.id] ? '4px' : '30px', bottom: '4px', 
+                              backgroundColor: 'white', transition: '.4s', borderRadius: '50%' 
+                            }}></span>
+                          </span>
+                        </label>
                       </div>
-                      <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '50px', height: '24px' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={!!autoOpenSettings[selectedGate.id]} 
-                          onChange={() => toggleAutoOpen(selectedGate.id)}
-                          style={{ opacity: 0, width: 0, height: 0 }}
-                        />
-                        <span className="slider round" style={{ 
-                          position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, 
-                          backgroundColor: !!autoOpenSettings[selectedGate.id] ? '#2563eb' : '#ccc', 
-                          transition: '.4s', borderRadius: '34px' 
-                        }}>
-                          <span style={{ 
-                            position: 'absolute', content: '""', height: '16px', width: '16px', 
-                            left: !!autoOpenSettings[selectedGate.id] ? '4px' : '30px', bottom: '4px', 
-                            backgroundColor: 'white', transition: '.4s', borderRadius: '50%' 
-                          }}></span>
-                        </span>
-                      </label>
-                    </div>
+                      
+                      {/* Auto Open Radius Range Slider */}
+                      {!!autoOpenSettings[selectedGate.id] && (
+                        <div className="auto-open-radius-setting" style={{ marginBottom: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                            <label style={{ fontWeight: '600', color: '#374151', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <svg style={{ width: '18px', height: '18px', color: '#6b7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                              </svg>
+                              טווח פתיחה אוטומטית
+                            </label>
+                            <span style={{ fontWeight: '600', color: '#2563eb', fontSize: '1rem' }}>
+                              {autoOpenRadius[selectedGate.id] || selectedGate.location?.autoOpenRadius || 50} מ'
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1000"
+                            step="10"
+                            value={autoOpenRadius[selectedGate.id] || selectedGate.location?.autoOpenRadius || 50}
+                            onChange={(e) => {
+                              // Update display value immediately for responsive UI
+                              const newRadius = parseInt(e.target.value);
+                              // Update local state immediately
+                              setAutoOpenRadius(prev => ({
+                                ...prev,
+                                [selectedGate.id]: newRadius
+                              }));
+                              // Save to server with debounce
+                              handleUpdateAutoOpenRadius(selectedGate, newRadius);
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '8px',
+                              borderRadius: '4px',
+                              background: '#e5e7eb',
+                              outline: 'none',
+                              WebkitAppearance: 'none',
+                              appearance: 'none'
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem', fontSize: '0.75rem', color: '#6b7280' }}>
+                            <span>0 מ'</span>
+                            <span>1000 מ'</span>
+                          </div>
+                          <small style={{ display: 'block', marginTop: '0.5rem', color: '#6b7280', fontSize: '0.8rem' }}>
+                            השער יפתח אוטומטית כשתגיע למרחק של עד {autoOpenRadius[selectedGate.id] || selectedGate.location?.autoOpenRadius || 50} מטר מהשער
+                          </small>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <button
                     onClick={() => handleOpenGateClick(selectedGate)}
                     disabled={(() => {
-                      const gateId = selectedGate._id || selectedGate.id;
-                      return isSubmitting || cooldowns[selectedGate.id] || autoOpenedGates[gateId];
+                      return isSubmitting || cooldowns[selectedGate.id];
                     })()}
                     className={`btn ${(() => {
-                      const gateId = selectedGate._id || selectedGate.id;
-                      return cooldowns[selectedGate.id] || autoOpenedGates[gateId] ? 'btn-secondary cooldown' : 'btn-primary';
+                      return cooldowns[selectedGate.id] ? 'btn-secondary cooldown' : 'btn-primary';
                     })()} gate-open-btn`}
                   >
                     {isSubmitting ? (
@@ -2141,7 +2534,7 @@ const GateDashboard = ({ user, token }) => {
                             <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            <span>השער נפתח אוטומטית - לא ניתן לפתוח שוב כרגע</span>
+                            <span>פתח ידנית (נפתח אוטומטית)</span>
                           </>
                         );
                       } else {
@@ -2206,7 +2599,7 @@ const GateDashboard = ({ user, token }) => {
       )}
 
       {/* Map View */}
-      {activeTab === 'map' && !showAddGate && !selectedGate && !showCallerIdValidation && (
+      {activeTab === 'map' && !showAddGate && !showCallerIdValidation && (
         <div style={{ width: '100%', height: 'calc(100vh - 300px)', minHeight: '500px', marginTop: '1rem' }}>
           <GatesMapView 
             gates={gates.filter(gate => {
@@ -2215,7 +2608,13 @@ const GateDashboard = ({ user, token }) => {
               return user?.canAccessGate?.(gate.id) ?? true;
             })}
             userLocation={userLocation}
-            onGateClick={(gate) => handleGateSelect(gate)}
+            onGateClick={(gate) => {
+              // On mobile, select gate to show details
+              // On desktop, just open popup (don't hide map)
+              if (isMobile) {
+                handleGateSelect(gate);
+              }
+            }}
             handleOpenGateClick={handleOpenGateClick}
             cooldowns={cooldowns}
             isSubmitting={isSubmitting}
@@ -2268,6 +2667,8 @@ const GateDashboard = ({ user, token }) => {
                   toggleAutoOpen={toggleAutoOpen}
                   autoOpenSettings={autoOpenSettings}
                   autoOpenedGates={autoOpenedGates}
+                  handleUpdateAutoOpenRadius={handleUpdateAutoOpenRadius}
+                  autoOpenRadius={autoOpenRadius}
                 />
               ))}
             </div>

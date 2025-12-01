@@ -131,28 +131,40 @@ const initializeServer = async () => {
       });
     }
 
-    // Error handling middleware
+    // Error handling middleware - must be last
     app.use((err, req, res, next) => {
       console.error('מטפל שגיאות גלובלי:', {
         error: err.message,
         stack: err.stack,
         url: req.url,
         method: req.method,
-        body: req.body,
-        headers: req.headers,
         timestamp: new Date().toISOString()
       });
       
-      // Don't expose internal error details in production
-      if (process.env.NODE_ENV === 'production') {
-        res.status(500).json({ error: 'שגיאה בפעולה' });
-      } else {
-        res.status(500).json({ 
-          error: 'שגיאה בפעולה',
-          message: err.message,
-          stack: err.stack
-        });
+      // Ensure response hasn't been sent already
+      if (res.headersSent) {
+        return next(err);
       }
+      
+      // Always return valid JSON
+      const statusCode = err.statusCode || err.status || 500;
+      const errorResponse = {
+        error: 'שגיאה בפעולה',
+        timestamp: new Date().toISOString()
+      };
+      
+      // Don't expose internal error details in production
+      if (process.env.NODE_ENV !== 'production') {
+        errorResponse.message = err.message;
+        errorResponse.stack = err.stack;
+      }
+      
+      res.status(statusCode).json(errorResponse);
+    });
+    
+    // Handle 404 for API routes
+    app.use('/api/*', (req, res) => {
+      res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
     });
 
     // Start the server
