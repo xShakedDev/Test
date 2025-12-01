@@ -22,6 +22,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
+  // Skip API requests - let them go directly to network without service worker intervention
+  if (url.pathname.startsWith('/api/')) {
+    return; // Don't intercept API calls
+  }
+  
   // Handle navigation requests (page loads) - show offline page if network fails
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -48,7 +53,7 @@ self.addEventListener('fetch', (event) => {
         })
     );
   } 
-  // For all other requests (API calls, other assets, etc.), always go to network - no caching
+  // For all other requests (other assets, etc.), always go to network - no caching
   else {
     event.respondWith(fetch(request));
   }

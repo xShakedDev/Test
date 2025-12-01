@@ -25,9 +25,12 @@ const GateHistory = ({ user, token }) => {
   // Refs for scrolling to messages
   const errorRef = useRef(null);
   const successRef = useRef(null);
+  
+  // Ref to track pagination without causing re-renders
+  const paginationRef = useRef(pagination);
 
-  // Function to scroll to messages
-  const scrollToMessage = (type) => {
+  // Function to scroll to messages - use useCallback to prevent recreation
+  const scrollToMessage = useCallback((type) => {
     const ref = type === 'error' ? errorRef : successRef;
     if (ref.current) {
       ref.current.scrollIntoView({ 
@@ -36,7 +39,12 @@ const GateHistory = ({ user, token }) => {
         inline: 'nearest'
       });
     }
-  };
+  }, []);
+  
+  // Sync ref with state
+  useEffect(() => {
+    paginationRef.current = pagination;
+  }, [pagination]);
 
   const fetchGates = async () => {
     try {
@@ -45,6 +53,15 @@ const GateHistory = ({ user, token }) => {
       if (response.ok) {
         const data = await response.json();
         setGates(data.gates || []);
+      } else {
+        // Try to parse error response as JSON, but handle non-JSON responses
+        try {
+          const text = await response.text();
+          const errorData = text ? JSON.parse(text) : { error: 'שגיאה לא ידועה' };
+          console.error('Error fetching gates:', errorData);
+        } catch (parseError) {
+          console.error('Error fetching gates - non-JSON response:', response.status, response.statusText);
+        }
       }
     } catch (error) {
       console.error('Error fetching gates:', error);
@@ -69,7 +86,11 @@ const GateHistory = ({ user, token }) => {
       setIsLoading(true);
       setError('');
       
-      let url = `/api/gates/history?limit=${pagination.limit}&page=${pagination.page}`;
+      // Use ref to get current pagination values without causing re-render
+      const currentLimit = paginationRef.current.limit;
+      const currentPage = paginationRef.current.page;
+      
+      let url = `/api/gates/history?limit=${currentLimit}&page=${currentPage}`;
       if (filter === 'gate' && filterValue) {
         // Send gateName to server, which will look up the gate and filter by gateId
         url += `&gateName=${encodeURIComponent(filterValue)}`;
@@ -100,7 +121,16 @@ const GateHistory = ({ user, token }) => {
         setSelectedLogs([]);
         setSelectAll(false);
       } else {
-        const errorData = await response.json();
+        // Try to parse error response as JSON, but handle non-JSON responses
+        let errorData;
+        try {
+          const text = await response.text();
+          errorData = text ? JSON.parse(text) : { error: 'שגיאה לא ידועה' };
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorData = { error: `שגיאת שרת (${response.status}): ${response.statusText}` };
+        }
+        
         if (isSessionExpired(errorData)) {
           handleSessionExpiration();
           return;
@@ -112,13 +142,15 @@ const GateHistory = ({ user, token }) => {
       }
     } catch (error) {
       console.error('Error fetching history:', error);
-      const msg = 'שגיאת רשת';
+      const msg = error.message?.includes('JSON') 
+        ? 'שגיאה בשרת - תגובה לא תקינה'
+        : 'שגיאת רשת';
       setError(msg);
       if (window.showSystemNotification) window.showSystemNotification(msg, 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [filter, filterValue, dateFilter, pagination.limit, pagination.page, scrollToMessage]);
+  }, [filter, filterValue, dateFilter, scrollToMessage]);
 
   useEffect(() => {
     fetchHistory();
@@ -126,7 +158,8 @@ const GateHistory = ({ user, token }) => {
     if (filter === 'user') {
       fetchUsers();
     }
-  }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit, fetchHistory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'לא ידוע';

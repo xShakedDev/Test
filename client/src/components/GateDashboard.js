@@ -835,6 +835,11 @@ const GateDashboard = ({ user, token }) => {
   // Refs for scrolling to errors
   const errorRef = useRef(null);
   const successRef = useRef(null);
+  
+  // Refs to track state without causing re-renders (to prevent infinite loops)
+  const gatesInRangeStateRef = useRef({});
+  const showGateSelectionModalRef = useRef(false);
+  const pendingGateSelectionRef = useRef(false);
 
   const toggleAutoOpen = (gateId) => {
     const newSettings = {
@@ -1293,7 +1298,8 @@ const GateDashboard = ({ user, token }) => {
           }
           
           // Check if user just entered range (was not in range before, but is now)
-          const wasInRange = gatesInRangeState[gateId];
+          // Use ref to get current value without causing re-render
+          const wasInRange = gatesInRangeStateRef.current[gateId];
           const justEnteredRange = isNear && !wasInRange;
           
           // Check for auto-open - only if user just entered range and gate hasn't been opened in this session
@@ -1318,14 +1324,18 @@ const GateDashboard = ({ user, token }) => {
         }
       }
 
-      // Update gates in range state
+      // Update gates in range state (both state and ref)
       setGatesInRangeState(newGatesInRangeState);
+      gatesInRangeStateRef.current = newGatesInRangeState;
 
       // If multiple gates in range, show selection modal (only if not already showing)
-      if (gatesInRange.length > 1 && !showGateSelectionModal && !pendingGateSelection) {
+      // Use ref to check current value without causing re-render
+      if (gatesInRange.length > 1 && !showGateSelectionModalRef.current && !pendingGateSelectionRef.current) {
         setNearbyGates(gatesInRange);
         setShowGateSelectionModal(true);
         setPendingGateSelection(true);
+        showGateSelectionModalRef.current = true;
+        pendingGateSelectionRef.current = true;
       } 
       // If only one gate in range, open it automatically
       else if (gatesInRange.length === 1) {
@@ -1344,11 +1354,25 @@ const GateDashboard = ({ user, token }) => {
       // Reset pending flag if no gates in range
       if (gatesInRange.length === 0) {
         setPendingGateSelection(false);
+        pendingGateSelectionRef.current = false;
       }
     };
 
     checkAutoOpen();
-  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, gatesInRangeState, cooldowns, handleOpenGate, showGateSelectionModal, pendingGateSelection]);
+  }, [userLocation, gates, autoOpenSettings, autoOpenedGates, cooldowns, handleOpenGate]);
+
+  // Sync refs with state when state changes externally
+  useEffect(() => {
+    gatesInRangeStateRef.current = gatesInRangeState;
+  }, [gatesInRangeState]);
+
+  useEffect(() => {
+    showGateSelectionModalRef.current = showGateSelectionModal;
+  }, [showGateSelectionModal]);
+
+  useEffect(() => {
+    pendingGateSelectionRef.current = pendingGateSelection;
+  }, [pendingGateSelection]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
