@@ -97,6 +97,8 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
   const [initialFitDone, setInitialFitDone] = useState(false);
   const [selectedGateForRoute, setSelectedGateForRoute] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const fetchingRouteRef = useRef(false);
+  const fetchTimeoutRef = useRef(null);
   const gatesWithLocation = gates.filter(g => g.location && g.location.latitude && g.location.longitude);
   const defaultCenter = { lat: 32.0853, lng: 34.7818 }; // Tel Aviv center as default
   
@@ -111,33 +113,82 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
       return;
     }
 
-    const fetchRoute = async () => {
-      try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.longitude},${userLocation.latitude};${selectedGateForRoute.location.longitude},${selectedGateForRoute.location.latitude}?overview=full&geometries=geojson`;
-        const response = await fetch(url);
-        const data = await response.json();
+    // Clear any pending timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Debounce the fetch to avoid rapid re-fetching
+    fetchTimeoutRef.current = setTimeout(() => {
+      // Prevent concurrent requests
+      if (fetchingRouteRef.current) {
+        return;
+      }
+
+      const fetchRoute = async () => {
+        fetchingRouteRef.current = true;
         
-        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-          const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert [lng, lat] to [lat, lng]
-          setRouteCoordinates(coordinates);
-        } else {
-          // Fallback to straight line if route fails
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.longitude},${userLocation.latitude};${selectedGateForRoute.location.longitude},${selectedGateForRoute.location.latitude}?overview=full&geometries=geojson`;
+          
+          // Create a fetch with timeout (5 seconds)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          
+          try {
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+              const coordinates = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert [lng, lat] to [lat, lng]
+              setRouteCoordinates(coordinates);
+            } else {
+              // Fallback to straight line if route fails
+              setRouteCoordinates([
+                [userLocation.latitude, userLocation.longitude],
+                [selectedGateForRoute.location.latitude, selectedGateForRoute.location.longitude]
+              ]);
+            }
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            
+            // Only log non-abort errors (timeouts are expected when service is unavailable)
+            if (fetchError.name !== 'AbortError') {
+              // Silently fallback - user will see straight line route
+            }
+            
+            // Fallback to straight line on error (timeout, network error, etc.)
+            setRouteCoordinates([
+              [userLocation.latitude, userLocation.longitude],
+              [selectedGateForRoute.location.latitude, selectedGateForRoute.location.longitude]
+            ]);
+          }
+        } catch (error) {
+          // Fallback to straight line on any other error
           setRouteCoordinates([
             [userLocation.latitude, userLocation.longitude],
             [selectedGateForRoute.location.latitude, selectedGateForRoute.location.longitude]
           ]);
+        } finally {
+          fetchingRouteRef.current = false;
         }
-      } catch (error) {
-        console.error('Error fetching route:', error);
-        // Fallback to straight line on error
-        setRouteCoordinates([
-          [userLocation.latitude, userLocation.longitude],
-          [selectedGateForRoute.location.latitude, selectedGateForRoute.location.longitude]
-        ]);
+      };
+
+      fetchRoute();
+    }, 300); // 300ms debounce
+
+    // Cleanup function
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
       }
     };
-
-    fetchRoute();
   }, [selectedGateForRoute, userLocation]);
 
   return (
