@@ -2,7 +2,7 @@
 // This ensures all data is always fresh and up-to-date
 // Exception: offline.html is cached to show when there's no internet
 
-const SW_VERSION = 'v1.0.0'; // Update this when you deploy changes
+const SW_VERSION = 'v1.0.2'; // Update this when you deploy changes
 const OFFLINE_CACHE = 'offline-page-v1';
 const OFFLINE_URL = '/offline.html';
 
@@ -10,7 +10,6 @@ const OFFLINE_URL = '/offline.html';
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(OFFLINE_CACHE).then((cache) => {
-      console.log('Caching offline page and logo');
       return cache.addAll([OFFLINE_URL, '/logo.png']);
     })
   );
