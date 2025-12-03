@@ -109,20 +109,37 @@ const initializeServer = async () => {
     app.use('/api/auth', userAuthRoutes);
 
     // Serve static files from React build (in both development and production)
+    // BUT exclude API routes - they should be handled by API middleware above
     const buildPath = path.join(__dirname, '../public');
     const indexPath = path.join(buildPath, 'index.html');
 
     // Check if build files exist
     if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
-      app.use(express.static(buildPath));
+      // Only serve static files for non-API routes
+      app.use((req, res, next) => {
+        // Skip static file serving for API routes
+        if (req.path.startsWith('/api/')) {
+          return next();
+        }
+        // Serve static files for all other routes
+        express.static(buildPath)(req, res, next);
+      });
 
-      // Serve React app for any non-API routes
+      // Serve React app for any non-API GET routes
       app.get('*', (req, res) => {
+        // Don't serve React app for API routes
+        if (req.path.startsWith('/api/')) {
+          return res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
+        }
         res.sendFile(indexPath);
       });
     } else {
       // Fallback for missing build files
       app.get('*', (req, res) => {
+        // Don't serve fallback for API routes
+        if (req.path.startsWith('/api/')) {
+          return res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
+        }
         res.status(404).json({ 
           error: 'אפליקציית React לא נבנתה. אנא בנה את הלקוח תחילה.',
           path: buildPath,
@@ -130,6 +147,11 @@ const initializeServer = async () => {
         });
       });
     }
+
+    // Handle 404 for API routes - must be before error handler
+    app.use('/api/*', (req, res) => {
+      res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
+    });
 
     // Error handling middleware - must be last
     app.use((err, req, res, next) => {
@@ -160,11 +182,6 @@ const initializeServer = async () => {
       }
       
       res.status(statusCode).json(errorResponse);
-    });
-    
-    // Handle 404 for API routes
-    app.use('/api/*', (req, res) => {
-      res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
     });
 
     // Start the server

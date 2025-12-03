@@ -788,6 +788,7 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
       return transformed;
     });
 
+    // Send response immediately to user
     res.json({
       history: transformedHistory,
       count: transformedHistory.length,
@@ -799,6 +800,58 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
       hasPrevPage: pageNum > 1,
       timestamp: new Date().toISOString()
     });
+
+    // Update missing costs in background (don't await - run asynchronously)
+    // Find records in current page that have callSid but no cost
+    const recordsWithoutCost = history.filter(record => 
+      record.callSid && 
+      (record.cost === null || record.cost === undefined) &&
+      record.success === true // Only update successful calls
+    );
+
+    if (recordsWithoutCost.length > 0) {
+      // Run in background without blocking
+      (async () => {
+        try {
+          console.log(`מחפש עלויות חסרות עבור ${recordsWithoutCost.length} רשומות...`);
+          const client = getTwilioClient();
+          
+          for (const record of recordsWithoutCost) {
+            try {
+              if (!record.callSid) continue;
+              
+              // Fetch call data from Twilio API
+              const call = await client.calls(record.callSid).fetch();
+              
+              // Twilio returns price as a string like "-0.01" (negative means charged)
+              const apiPrice = call.price || call.priceUnit;
+              if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
+                const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
+                const parsedPrice = parseFloat(cleanedPrice);
+                if (!isNaN(parsedPrice)) {
+                  const cost = Math.abs(parsedPrice);
+                  
+                  // Update the record
+                  await GateHistory.updateOne(
+                    { _id: record._id },
+                    { $set: { cost: cost } }
+                  );
+                  
+                  console.log(`✓ עודכן עלות עבור callSid ${record.callSid}: $${cost.toFixed(4)}`);
+                }
+              }
+            } catch (updateError) {
+              // Log error but continue with other records
+              console.error(`שגיאה בעדכון עלות עבור callSid ${record.callSid}:`, updateError.message);
+            }
+          }
+          
+          console.log(`סיום עדכון עלויות חסרות`);
+        } catch (error) {
+          console.error('שגיאה כללית בעדכון עלויות חסרות:', error);
+        }
+      })();
+    }
   } catch (error) {
     console.error('שגיאה בטעינת היסטוריית שערים:', error);
     console.error('Error stack:', error.stack);
