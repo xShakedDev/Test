@@ -61,6 +61,7 @@ gateHistorySchema.index({ gateId: 1, timestamp: -1 });
 gateHistorySchema.index({ username: 1, timestamp: -1 });
 gateHistorySchema.index({ timestamp: -1 });
 gateHistorySchema.index({ success: 1 });
+gateHistorySchema.index({ callSid: 1 }); // Index for callSid to improve cost update queries
 
 // Static method to find history by gate
 gateHistorySchema.statics.findByGate = function(gateId, limit = 100) {

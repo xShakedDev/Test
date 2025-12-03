@@ -174,6 +174,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         await new GateHistory({
           userId: req.user._id,
           gateId: gate.id,
+          gateName: gate.name,
           username: req.user.username,
           success: false,
           errorMessage: 'אין הרשאה לפתוח שער זה'
@@ -197,6 +198,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         await new GateHistory({
           userId: req.user._id,
           gateId: gate.id,
+          gateName: gate.name,
           username: req.user.username,
           success: false,
           errorMessage: `אנא המתן ${remainingTime} שניות לפני פתיחת השער שוב!`
@@ -227,6 +229,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         await new GateHistory({
           userId: req.user._id,
           gateId: gate.id,
+          gateName: gate.name,
           username: req.user.username,
           success: false,
           errorMessage: `חריגה ממספר הניסיונות המותר (${adminSettings.maxRetries})`
@@ -248,6 +251,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
         await new GateHistory({
           userId: req.user._id,
           gateId: gate.id,
+          gateName: gate.name,
           username: req.user.username,
           success: false,
           errorMessage: 'סיסמה שגויה'
@@ -261,12 +265,17 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 
     const client = getTwilioClient();
     // Build full URL for voice.xml file
-    const voiceXmlUrl = `${req.protocol}://${req.get('host')}/voice.xml`;
+    // In localhost/development, use external URL; otherwise use local URL
+    const host = req.get('host');
+    const isLocalhost = host && (host.includes('localhost') || host.includes('127.0.0.1') || host.includes('::1'));
+    const voiceXmlUrl = isLocalhost 
+      ? 'https://gates.linkpc.net/voice.xml'
+      : `${req.protocol}://${host}/voice.xml`;
     const call = await client.calls.create({
       url: voiceXmlUrl,
       to: gate.phoneNumber,
       from: gate.authorizedNumber,
-      statusCallback: `${req.protocol}://${req.get('host')}/api/gates/${id}/call-status`,
+      statusCallback: `${req.protocol}://${host}/api/gates/${id}/call-status`,
       statusCallbackEvent: ['completed'],
       statusCallbackMethod: 'POST'
     });
@@ -278,6 +287,7 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
     await new GateHistory({
       userId: req.user._id,
       gateId: gate.id,
+      gateName: gate.name,
       username: req.user.username,
       success: true,
       callSid: call.sid,
@@ -359,12 +369,37 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
     const { id } = req.params;
-    // Twilio sends Price (not CallPrice) in status callback
-    const { CallStatus, CallDuration, CallSid, Price, CallPrice } = req.body;
+    
+    // Log all incoming data from Twilio for debugging
+    console.log('=== Twilio Call Status Callback ===');
+    console.log('Gate ID:', id);
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Full request body:', JSON.stringify(req.body, null, 2));
+    
+    // Twilio sends data in form-urlencoded format
+    // Check all possible price field names that Twilio might use
+    const CallStatus = req.body.CallStatus || req.body.Status;
+    const CallDuration = req.body.CallDuration || req.body.Duration;
+    const CallSid = req.body.CallSid || req.body.Sid;
+    
+    // Twilio can send price in different fields: Price, CallPrice, or PriceUnit
+    const Price = req.body.Price || req.body.price;
+    const CallPrice = req.body.CallPrice || req.body.callPrice;
+    const PriceUnit = req.body.PriceUnit || req.body.priceUnit;
+    
+    console.log('Extracted values:', {
+      CallStatus,
+      CallDuration,
+      CallSid,
+      Price,
+      CallPrice,
+      PriceUnit
+    });
 
     // Validate and parse the ID
     const gateId = parseInt(id, 10);
     if (isNaN(gateId)) {
+      console.error('Invalid gate ID:', id);
       return res.status(400).json({ error: 'מזהה השער לא תקין' });
     }
 
@@ -375,54 +410,124 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
     }
 
     // Update call cost in history if CallSid is provided
-    // Twilio sends Price (or sometimes CallPrice) in the callback, but sometimes it's missing
-    // If price is not in callback, fetch it from Twilio API
     if (CallSid) {
       try {
+        console.log(`Processing cost update for CallSid: ${CallSid}`);
+        
         let cost = null;
-        const priceValue = Price || CallPrice;
+        // Try all possible price fields
+        const priceValue = Price || CallPrice || PriceUnit;
+        
+        console.log('Price value from callback:', priceValue);
         
         // First try to get price from callback
         if (priceValue !== undefined && priceValue !== null && priceValue !== '') {
-          cost = Math.abs(parseFloat(priceValue)) || null;
+          // Handle string values like "-0.01" or "$0.01" or "0.01" or "-0.0100"
+          const cleanedPrice = String(priceValue).replace(/[^0-9.-]/g, '');
+          const parsedPrice = parseFloat(cleanedPrice);
+          if (!isNaN(parsedPrice)) {
+            cost = Math.abs(parsedPrice);
+            console.log(`Parsed cost from callback: $${cost.toFixed(4)}`);
+          }
         }
         
         // If no price in callback and call is completed, fetch from Twilio API
         if ((cost === null || isNaN(cost)) && CallStatus === 'completed') {
+          console.log('No price in callback, fetching from Twilio API...');
           try {
             const client = getTwilioClient();
             const call = await client.calls(CallSid).fetch();
-            if (call.price) {
-              cost = Math.abs(parseFloat(call.price)) || null;
+            console.log('Twilio API call data:', {
+              sid: call.sid,
+              status: call.status,
+              price: call.price,
+              priceUnit: call.priceUnit
+            });
+            
+            // Twilio returns price as a string like "-0.01" (negative means charged)
+            // Also check priceUnit field
+            const apiPrice = call.price || call.priceUnit;
+            if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
+              const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
+              const parsedPrice = parseFloat(cleanedPrice);
+              if (!isNaN(parsedPrice)) {
+                cost = Math.abs(parsedPrice);
+                console.log(`Parsed cost from Twilio API: $${cost.toFixed(4)}`);
+              }
             }
           } catch (apiError) {
             console.error(`Error fetching call price from Twilio API for ${CallSid}:`, apiError.message);
           }
         }
         
-        // Update history if we have a cost
-        if (cost !== null && !isNaN(cost) && cost > 0) {
-          const updateResult = await GateHistory.updateOne(
+        // Update history if we have a cost (including 0 cost calls)
+        if (cost !== null && !isNaN(cost)) {
+          // First try to find and update by callSid
+          let updateResult = await GateHistory.updateOne(
             { callSid: CallSid },
-            { cost: cost }
+            { $set: { cost: cost } }
           );
+          
+          console.log('Update result (by callSid):', {
+            matchedCount: updateResult.matchedCount,
+            modifiedCount: updateResult.modifiedCount,
+            cost: cost
+          });
+          
+          // If not found by callSid, try to find by gateId and recent timestamp
           if (updateResult.matchedCount === 0) {
-            console.warn(`No history record found for callSid: ${CallSid}`);
+            console.warn(`No history record found for callSid: ${CallSid}, trying fallback...`);
+            const recentHistory = await GateHistory.findOne({
+              gateId: gateId,
+              timestamp: { $gte: new Date(Date.now() - 10 * 60 * 1000) } // Last 10 minutes (increased window)
+            }).sort({ timestamp: -1 });
+            
+            if (recentHistory) {
+              // Update the record with both callSid and cost
+              updateResult = await GateHistory.updateOne(
+                { _id: recentHistory._id },
+                { $set: { cost: cost, callSid: CallSid } }
+              );
+              console.log('Fallback update result:', {
+                matchedCount: updateResult.matchedCount,
+                modifiedCount: updateResult.modifiedCount,
+                cost: cost,
+                callSid: CallSid
+              });
+              
+              if (updateResult.modifiedCount > 0) {
+                console.log(`✓ Successfully updated cost via fallback for gate ${gateId}: $${cost.toFixed(4)}`);
+              }
+            } else {
+              console.warn(`No recent history record found for gate ${gateId} to associate with callSid ${CallSid}`);
+            }
+          } else if (updateResult.modifiedCount > 0) {
+            console.log(`✓ Successfully updated cost for callSid ${CallSid}: $${cost.toFixed(4)}`);
           } else {
-            console.log(`Updated cost for callSid ${CallSid}: $${cost}`);
+            console.log(`Cost already set to $${cost.toFixed(4)} for callSid ${CallSid}`);
           }
         } else if (CallStatus === 'completed') {
           // Log if call completed but no cost found
-          console.warn(`Call ${CallSid} completed but no cost available. Price from callback: ${priceValue}`);
+          console.warn(`⚠ Call ${CallSid} completed but no cost available.`, {
+            Price,
+            CallPrice,
+            PriceUnit,
+            CallStatus
+          });
         }
       } catch (updateError) {
         console.error('שגיאה בעדכון עלות שיחה:', updateError);
+        console.error('Error stack:', updateError.stack);
       }
+    } else {
+      console.warn('No CallSid provided in callback');
     }
 
+    console.log('=== End Call Status Callback ===\n');
     res.sendStatus(200);
   } catch (error) {
     console.error('שגיאה בעדכון סטטוס שיחה:', error);
+    console.error('Error stack:', error.stack);
     res.sendStatus(200); // Still return 200 to Twilio to avoid retries
   }
 });
