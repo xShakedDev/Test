@@ -415,48 +415,55 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
         console.log(`Processing cost update for CallSid: ${CallSid}`);
         
         let cost = null;
-        // Try all possible price fields
-        const priceValue = Price || CallPrice || PriceUnit;
         
-        console.log('Price value from callback:', priceValue);
-        
-        // First try to get price from callback
-        if (priceValue !== undefined && priceValue !== null && priceValue !== '') {
-          // Handle string values like "-0.01" or "$0.01" or "0.01" or "-0.0100"
-          const cleanedPrice = String(priceValue).replace(/[^0-9.-]/g, '');
-          const parsedPrice = parseFloat(cleanedPrice);
-          if (!isNaN(parsedPrice)) {
-            cost = Math.abs(parsedPrice);
-            console.log(`Parsed cost from callback: $${cost.toFixed(4)}`);
-          }
-        }
-        
-        // If no price in callback and call is completed, fetch from Twilio API
-        if ((cost === null || isNaN(cost)) && CallStatus === 'completed') {
-          console.log('No price in callback, fetching from Twilio API...');
-          try {
-            const client = getTwilioClient();
-            const call = await client.calls(CallSid).fetch();
-            console.log('Twilio API call data:', {
-              sid: call.sid,
-              status: call.status,
-              price: call.price,
-              priceUnit: call.priceUnit
-            });
-            
-            // Twilio returns price as a string like "-0.01" (negative means charged)
-            // Also check priceUnit field
-            const apiPrice = call.price || call.priceUnit;
-            if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
-              const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
-              const parsedPrice = parseFloat(cleanedPrice);
-              if (!isNaN(parsedPrice)) {
-                cost = Math.abs(parsedPrice);
-                console.log(`Parsed cost from Twilio API: $${cost.toFixed(4)}`);
-              }
+        // If call status is busy, set cost to 0
+        if (CallStatus === 'busy') {
+          cost = 0;
+          console.log(`Call status is busy, setting cost to 0`);
+        } else {
+          // Try all possible price fields
+          const priceValue = Price || CallPrice || PriceUnit;
+          
+          console.log('Price value from callback:', priceValue);
+          
+          // First try to get price from callback
+          if (priceValue !== undefined && priceValue !== null && priceValue !== '') {
+            // Handle string values like "-0.01" or "$0.01" or "0.01" or "-0.0100"
+            const cleanedPrice = String(priceValue).replace(/[^0-9.-]/g, '');
+            const parsedPrice = parseFloat(cleanedPrice);
+            if (!isNaN(parsedPrice)) {
+              cost = Math.abs(parsedPrice);
+              console.log(`Parsed cost from callback: $${cost.toFixed(4)}`);
             }
-          } catch (apiError) {
-            console.error(`Error fetching call price from Twilio API for ${CallSid}:`, apiError.message);
+          }
+          
+          // If no price in callback and call is completed, fetch from Twilio API
+          if ((cost === null || isNaN(cost)) && CallStatus === 'completed') {
+            console.log('No price in callback, fetching from Twilio API...');
+            try {
+              const client = getTwilioClient();
+              const call = await client.calls(CallSid).fetch();
+              console.log('Twilio API call data:', {
+                sid: call.sid,
+                status: call.status,
+                price: call.price,
+                priceUnit: call.priceUnit
+              });
+              
+              // Twilio returns price as a string like "-0.01" (negative means charged)
+              // Also check priceUnit field
+              const apiPrice = call.price || call.priceUnit;
+              if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
+                const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
+                const parsedPrice = parseFloat(cleanedPrice);
+                if (!isNaN(parsedPrice)) {
+                  cost = Math.abs(parsedPrice);
+                  console.log(`Parsed cost from Twilio API: $${cost.toFixed(4)}`);
+                }
+              }
+            } catch (apiError) {
+              console.error(`Error fetching call price from Twilio API for ${CallSid}:`, apiError.message);
+            }
           }
         }
         
@@ -823,22 +830,32 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
               // Fetch call data from Twilio API
               const call = await client.calls(record.callSid).fetch();
               
-              // Twilio returns price as a string like "-0.01" (negative means charged)
-              const apiPrice = call.price || call.priceUnit;
-              if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
-                const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
-                const parsedPrice = parseFloat(cleanedPrice);
-                if (!isNaN(parsedPrice)) {
-                  const cost = Math.abs(parsedPrice);
-                  
-                  // Update the record
-                  await GateHistory.updateOne(
-                    { _id: record._id },
-                    { $set: { cost: cost } }
-                  );
-                  
-                  console.log(`✓ עודכן עלות עבור callSid ${record.callSid}: $${cost.toFixed(4)}`);
+              let cost = null;
+              
+              // If call status is busy, set cost to 0
+              if (call.status === 'busy') {
+                cost = 0;
+                console.log(`Call status is busy for callSid ${record.callSid}, setting cost to 0`);
+              } else {
+                // Twilio returns price as a string like "-0.01" (negative means charged)
+                const apiPrice = call.price || call.priceUnit;
+                if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
+                  const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
+                  const parsedPrice = parseFloat(cleanedPrice);
+                  if (!isNaN(parsedPrice)) {
+                    cost = Math.abs(parsedPrice);
+                  }
                 }
+              }
+              
+              // Update the record if we have a cost (including 0 for busy calls)
+              if (cost !== null && !isNaN(cost)) {
+                await GateHistory.updateOne(
+                  { _id: record._id },
+                  { $set: { cost: cost } }
+                );
+                
+                console.log(`✓ עודכן עלות עבור callSid ${record.callSid}: $${cost.toFixed(4)} (status: ${call.status})`);
               }
             } catch (updateError) {
               // Log error but continue with other records
