@@ -104,6 +104,23 @@ const initializeServer = async () => {
     }
 
     console.log('Using MongoDB for data storage');
+    
+    // Debug middleware to log all API requests
+    app.use('/api', (req, res, next) => {
+      console.log(`[API Request] ${req.method} ${req.path}`, {
+        query: req.query,
+        params: req.params,
+        bodyKeys: Object.keys(req.body || {}),
+        url: req.url,
+        originalUrl: req.originalUrl
+      });
+      // Special logging for call-status routes
+      if (req.path.includes('call-status')) {
+        console.log(`[CALL-STATUS] Request detected: ${req.method} ${req.path}`);
+      }
+      next();
+    });
+    
     app.use('/api', mongoRoutes);
     // Add user authentication routes (only available with MongoDB)
     app.use('/api/auth', userAuthRoutes);
@@ -148,9 +165,15 @@ const initializeServer = async () => {
       });
     }
 
-    // Handle 404 for API routes - must be before error handler
-    app.use('/api/*', (req, res) => {
-      res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
+    // Handle 404 for API routes - only catch requests that weren't handled by any route
+    // This must be after all routes are defined but before error handler
+    app.use('/api/*', (req, res, next) => {
+      // Only respond if no response has been sent yet
+      if (!res.headersSent) {
+        res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
+      } else {
+        next();
+      }
     });
 
     // Error handling middleware - must be last

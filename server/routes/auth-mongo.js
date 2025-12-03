@@ -368,11 +368,15 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 
 router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
+    console.log('=== CALL-STATUS ROUTE HIT ===');
     const { id } = req.params;
     
     // Log all incoming data from Twilio for debugging
     console.log('=== Twilio Call Status Callback ===');
     console.log('Gate ID:', id);
+    console.log('Request method:', req.method);
+    console.log('Request path:', req.path);
+    console.log('Request url:', req.url);
     console.log('Request body keys:', Object.keys(req.body));
     console.log('Full request body:', JSON.stringify(req.body, null, 2));
     
