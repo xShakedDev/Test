@@ -1,86 +1,48 @@
-// Service Worker - NO CACHING - Always fetch from network
-// This ensures all data is always fresh and up-to-date
-// Exception: offline.html is cached to show when there's no internet
-
-const SW_VERSION = 'v1.0.3'; // Update this when you deploy changes
+const SW_VERSION = 'v1.0.6';
 const OFFLINE_CACHE = 'offline-page-v1';
 const OFFLINE_URL = '/offline.html';
 
-// Install event - cache offline page and logo
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(OFFLINE_CACHE).then((cache) => {
       return cache.addAll([OFFLINE_URL, '/logo.png']);
     })
   );
-  // Force the waiting service worker to become the active service worker
   self.skipWaiting();
 });
 
-// Fetch event - Network first, fallback to offline page for navigation requests
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
+  const request = event.request;
   const url = new URL(request.url);
-  
-  // Skip API requests - let them go directly to network without service worker intervention
-  if (url.pathname.startsWith('/api/')) {
-    return; // Don't intercept API calls
-  }
-  
-  // Skip external requests (different origin) - let them go directly to network
-  // This prevents service worker from intercepting third-party APIs like OSRM routing
-  if (url.origin !== self.location.origin) {
-    return; // Don't intercept external requests
-  }
-  
-  // Handle navigation requests (page loads) - show offline page if network fails
+
+  // Ignore API and external
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Navigation requests — network first, fallback cache
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Network request succeeded, return the response
-          return response;
-        })
-        .catch(() => {
-          // Network request failed, return offline page
-          return caches.match(OFFLINE_URL);
-        })
+      fetch(request).catch(() => caches.match(OFFLINE_URL))
     );
-  } 
-  // Handle logo requests - try cache if network fails
-  else if (url.pathname === '/logo.png') {
+    return;
+  }
+
+  // Static assets: try network, fallback cache
+  if (/\.(js|css|png|jpg|jpeg|svg|ico|woff2?)$/.test(url.pathname)) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          return response;
-        })
-        .catch(() => {
-          return caches.match('/logo.png');
-        })
+      fetch(request).catch(() => caches.match(request))
     );
-  } 
-  // For all other requests (other assets, etc.), always go to network - no caching
-  else {
-    event.respondWith(fetch(request));
+    return;
   }
 });
 
-// Activate event - delete old caches but keep offline cache
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      // Delete all caches except the offline cache
-      return Promise.all(
-        cacheNames
-          .filter((cacheName) => cacheName !== OFFLINE_CACHE)
-          .map((cacheName) => {
-            console.log('Deleting cache:', cacheName);
-            return caches.delete(cacheName);
-          })
-      );
-    })
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((k) => k !== OFFLINE_CACHE).map((k) => caches.delete(k))
+      )
+    )
   );
-  // Take control of all pages immediately
-  return self.clients.claim();
+  self.clients.claim();
 });
-

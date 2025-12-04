@@ -366,9 +366,10 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
   }
 });
 
+// Handle call-status callbacks from Twilio (POST) and URL verification (GET)
 router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
-    console.log('=== CALL-STATUS ROUTE HIT ===');
+    console.log('=== CALL-STATUS ROUTE HIT (POST) ===');
     const { id } = req.params;
     
     // Log all incoming data from Twilio for debugging
@@ -540,6 +541,27 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
     console.error('שגיאה בעדכון סטטוס שיחה:', error);
     console.error('Error stack:', error.stack);
     res.sendStatus(200); // Still return 200 to Twilio to avoid retries
+  }
+});
+
+// GET endpoint for call-status (for URL verification/testing - Twilio uses POST)
+router.get('/gates/:id/call-status', requireMongoDB, async (req, res) => {
+  try {
+    console.log('=== CALL-STATUS GET REQUEST (URL verification/test) ===');
+    const { id } = req.params;
+    console.log('Gate ID:', id);
+    console.log('This is a GET request - Twilio callbacks use POST');
+    
+    // Return a simple response for GET requests (URL verification)
+    res.status(200).json({
+      status: 'ok',
+      message: 'Call-status endpoint is available. Twilio callbacks use POST method.',
+      gateId: id,
+      method: 'GET'
+    });
+  } catch (error) {
+    console.error('שגיאה ב-GET call-status:', error);
+    res.status(200).json({ status: 'ok', error: error.message });
   }
 });
 
