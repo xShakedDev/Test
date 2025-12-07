@@ -7,6 +7,9 @@ const fs = require('fs');
 // Load environment variables from .env
 require('dotenv').config({ path: '.env' });
 
+// Initialize server logs capture (must be before any console calls)
+require('./utils/serverLogs');
+
 // MongoDB integration
 const { connectDB, isConnected, getConnectionStatus } = require('./config/database');
 
@@ -107,16 +110,19 @@ const initializeServer = async () => {
     
     // Debug middleware to log all API requests
     app.use('/api', (req, res, next) => {
-      console.log(`[API Request] ${req.method} ${req.path}`, {
-        query: req.query,
-        params: req.params,
-        bodyKeys: Object.keys(req.body || {}),
-        url: req.url,
-        originalUrl: req.originalUrl
-      });
-      // Special logging for call-status routes
-      if (req.path.includes('call-status')) {
-        console.log(`[CALL-STATUS] Request detected: ${req.method} ${req.path}`);
+      // Don't log requests to logs endpoint to avoid infinite loop
+      if (!req.path.includes('/admin/logs')) {
+        console.log(`[API Request] ${req.method} ${req.path}`, {
+          query: req.query,
+          params: req.params,
+          bodyKeys: Object.keys(req.body || {}),
+          url: req.url,
+          originalUrl: req.originalUrl
+        });
+        // Special logging for call-status routes
+        if (req.path.includes('call-status')) {
+          console.log(`[CALL-STATUS] Request detected: ${req.method} ${req.path}`);
+        }
       }
       next();
     });
@@ -130,6 +136,11 @@ const initializeServer = async () => {
     const buildPath = path.join(__dirname, '../public');
     const indexPath = path.join(buildPath, 'index.html');
 
+    // Set Content Security Policy for static files
+    // Note: unsafe-eval is included as some libraries (like dnd-kit, Leaflet) may require it
+    // In production, you can try removing 'unsafe-eval' if the app works without it
+    const cspDirective = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.openstreetmap.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.openstreetmap.org https://router.project-osrm.org; frame-src 'self';";
+
     // Check if build files exist
     if (fs.existsSync(buildPath) && fs.existsSync(indexPath)) {
       // Only serve static files for non-API routes
@@ -138,6 +149,8 @@ const initializeServer = async () => {
         if (req.path.startsWith('/api/')) {
           return next();
         }
+        // Set CSP header for static files
+        res.setHeader('Content-Security-Policy', cspDirective);
         // Serve static files for all other routes
         express.static(buildPath)(req, res, next);
       });
@@ -148,6 +161,8 @@ const initializeServer = async () => {
         if (req.path.startsWith('/api/')) {
           return res.status(404).json({ error: 'נקודת קצה לא נמצאה' });
         }
+        // Set CSP header for HTML
+        res.setHeader('Content-Security-Policy', cspDirective);
         res.sendFile(indexPath);
       });
     } else {

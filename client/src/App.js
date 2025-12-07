@@ -6,6 +6,7 @@ import UserManagement from './components/UserManagement';
 import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
 import GateStatistics from './components/GateStatistics';
+import ServerConsole from './components/ServerConsole';
 import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback, refreshAccessToken } from './utils/auth';
 import './styles/design-system.css';
 import './styles/LocationPicker.css'; // Import LocationPicker styles
@@ -318,6 +319,8 @@ function App() {
           />
         ) : currentView === 'statistics' ? (
           <GateStatistics user={user} />
+        ) : currentView === 'console' && user.role === 'admin' ? (
+          <ServerConsole token={token} />
         ) : (
           // Fallback to gates if invalid view
           <GateDashboard

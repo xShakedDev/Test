@@ -1695,4 +1695,44 @@ router.get('/exchange-rate', async (req, res) => {
   }
 });
 
+// Server Console Logs Routes (Admin only)
+router.get('/gates/admin/logs', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 500;
+    const level = req.query.level; // Optional filter by level
+    
+    const { getServerLogs } = require('../utils/serverLogs');
+    let logs = getServerLogs(limit);
+    
+    // Filter by level if provided
+    if (level) {
+      logs = logs.filter(log => log.level === level);
+    }
+    
+    res.json({
+      logs,
+      total: logs.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('שגיאה בקבלת לוגים:', error);
+    res.status(500).json({ error: 'נכשל בקבלת לוגים' });
+  }
+});
+
+router.delete('/gates/admin/logs', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { clearServerLogs } = require('../utils/serverLogs');
+    clearServerLogs();
+    
+    res.json({ 
+      message: 'לוגים נמחקו בהצלחה',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('שגיאה במחיקת לוגים:', error);
+    res.status(500).json({ error: 'נכשל במחיקת לוגים' });
+  }
+});
+
 module.exports = router;

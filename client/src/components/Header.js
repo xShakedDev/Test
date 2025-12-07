@@ -255,6 +255,12 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
                   >
                     הגדרות מנהל
                   </button>
+                  <button
+                    onClick={() => onViewChange('console')}
+                    className={`nav-button ${currentView === 'console' ? 'nav-button-active' : ''}`}
+                  >
+                    קונסול
+                  </button>
                 </>
               )}
             </nav>
@@ -492,12 +498,20 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
             </button>
 
             {user?.role === 'admin' && (
-              <button
-                onClick={() => handleMobileNavClick('settings')}
-                className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
-              >
-                הגדרות מנהל
-              </button>
+              <>
+                <button
+                  onClick={() => handleMobileNavClick('settings')}
+                  className={`mobile-nav-button ${currentView === 'settings' ? 'mobile-nav-button-active' : ''}`}
+                >
+                  הגדרות מנהל
+                </button>
+                <button
+                  onClick={() => handleMobileNavClick('console')}
+                  className={`mobile-nav-button ${currentView === 'console' ? 'mobile-nav-button-active' : ''}`}
+                >
+                  קונסול
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -12,6 +12,9 @@
     <meta name="theme-color" content="#001A4D" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="description" content="פתיחת שערים חכמה" />
+    <!-- Content Security Policy - Note: unsafe-eval may be needed for some libraries -->
+    <!-- In production, try removing 'unsafe-eval' if possible -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.openstreetmap.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://*.openstreetmap.org https://router.project-osrm.org; frame-src 'self';" />
     <title>אפליקציית בקרת שערים</title>
   </head>
   <body>

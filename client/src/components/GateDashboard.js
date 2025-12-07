@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -821,6 +821,35 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                 </div>
               </div>
 
+              {/* Gate Location Map - Desktop */}
+              {gate.location && gate.location.latitude && gate.location.longitude && (
+                <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: '600', color: '#374151', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    מיקום השער
+                  </h4>
+                  <div style={{ height: '200px', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                    <MapContainer
+                      center={[gate.location.latitude, gate.location.longitude]}
+                      zoom={15}
+                      scrollWheelZoom={false}
+                      style={{ height: '100%', width: '100%' }}
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[gate.location.latitude, gate.location.longitude]} icon={createGateIcon()}>
+                        <Popup>{gate.name}</Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
+                </div>
+              )}
+
               <div className="gate-actions">
                 <div className="gate-open-section">
                   {/* Cooldown indicator */}
@@ -1020,6 +1049,7 @@ const GateDashboard = ({ user, token }) => {
   const [settings, setSettings] = useState(null);
   const [userLocation, setUserLocation] = useState(null); // Add userLocation state
   const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
+  const locationWatchIdRef = useRef(null); // Track watchPosition ID for cleanup
   
   // Auto-open settings and state
   const [autoOpenSettings, setAutoOpenSettings] = useState({});
@@ -1121,8 +1151,13 @@ const GateDashboard = ({ user, token }) => {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
-    // Also start watching
-    const watchId = navigator.geolocation.watchPosition(
+    // Also start watching for continuous updates
+    // Clear any existing watch first
+    if (locationWatchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+    }
+    
+    locationWatchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         setUserLocation({
           latitude: position.coords.latitude,
@@ -1135,61 +1170,180 @@ const GateDashboard = ({ user, token }) => {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-
-    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // Get user location on mount - try automatically
+  // Try to get location automatically if permission already granted
   useEffect(() => {
-    if (navigator.geolocation && !locationPermissionRequested) {
-      setLocationPermissionRequested(true);
-      // Try to get location automatically (without error popup)
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          });
-        },
-        (error) => {
-          // Silent fail - don't show banner if permission was denied before
-          console.log('Auto location request failed:', error.message);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
+    if (!navigator.geolocation || locationPermissionRequested) return;
+
+    // Check if geolocation permission is already granted
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted') {
+          // Permission already granted, get location automatically
+          setLocationPermissionRequested(true);
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setUserLocation({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy
+              });
+              
+              // Start watching for continuous updates
+              if (locationWatchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(locationWatchIdRef.current);
+              }
+              
+              locationWatchIdRef.current = navigator.geolocation.watchPosition(
+                (position) => {
+                  setUserLocation({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                  });
+                },
+                (error) => {
+                  console.error('Error watching user location:', error);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+              );
+            },
+            (error) => {
+              // Silent fail - permission might have been revoked
+              console.log('Auto location request failed:', error.message);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          );
+        } else if (result.state === 'prompt') {
+          // Permission not yet requested, but we can try (some browsers allow this)
+          // Only try if it's a secure context
+          if (window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            setLocationPermissionRequested(true);
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                setUserLocation({
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy
+                });
+                
+                // Start watching for continuous updates
+                if (locationWatchIdRef.current !== null) {
+                  navigator.geolocation.clearWatch(locationWatchIdRef.current);
+                }
+                
+                locationWatchIdRef.current = navigator.geolocation.watchPosition(
+                  (position) => {
+                    setUserLocation({
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                      accuracy: position.coords.accuracy
+                    });
+                  },
+                  (error) => {
+                    console.error('Error watching user location:', error);
+                  },
+                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+              },
+              (error) => {
+                // Silent fail - user might deny or it might not be available
+                console.log('Auto location request failed:', error.message);
+              },
+              { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+          }
+        }
+        // If state is 'denied', do nothing - wait for user action
+      }).catch(() => {
+        // Permissions API not supported, try anyway in secure context
+        if (window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          setLocationPermissionRequested(true);
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setUserLocation({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy
+              });
+              
+              // Start watching for continuous updates
+              if (locationWatchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(locationWatchIdRef.current);
+              }
+              
+              locationWatchIdRef.current = navigator.geolocation.watchPosition(
+                (position) => {
+                  setUserLocation({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                  });
+                },
+                (error) => {
+                  console.error('Error watching user location:', error);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+              );
+            },
+            (error) => {
+              // Silent fail
+              console.log('Auto location request failed:', error.message);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          );
+        }
+      });
+    } else {
+      // Permissions API not supported, try anyway in secure context
+      if (window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        setLocationPermissionRequested(true);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
+            
+            // Start watching for continuous updates
+            if (locationWatchIdRef.current !== null) {
+              navigator.geolocation.clearWatch(locationWatchIdRef.current);
+            }
+            
+            locationWatchIdRef.current = navigator.geolocation.watchPosition(
+              (position) => {
+                setUserLocation({
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy
+                });
+              },
+              (error) => {
+                console.error('Error watching user location:', error);
+              },
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+          },
+          (error) => {
+            // Silent fail
+            console.log('Auto location request failed:', error.message);
+          },
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+      }
     }
   }, [locationPermissionRequested]);
 
-  // Watch position for continuous updates once we have permission
+  // Cleanup watchPosition on unmount
   useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    let watchId = null;
-    
-    // Start watching if we have location or if permission was requested
-    if (userLocation || locationPermissionRequested) {
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          });
-        },
-        (error) => {
-          console.error('Error watching user location:', error);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    }
-
     return () => {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
+      if (locationWatchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(locationWatchIdRef.current);
       }
     };
-  }, [userLocation, locationPermissionRequested]);
+  }, []);
 
   // Drag and drop sensors - use TouchSensor for mobile, PointerSensor for desktop
   const sensors = useSensors(
@@ -1714,6 +1868,32 @@ const GateDashboard = ({ user, token }) => {
   useEffect(() => {
     autoOpenedGatesRef.current = { ...autoOpenedGates };
   }, [autoOpenedGates]);
+
+  // Calculate the closest gate to user location
+  const closestGate = useMemo(() => {
+    if (!userLocation || !gates.length) return null;
+    
+    let closest = null;
+    let minDistance = Infinity;
+    
+    for (const gate of gates) {
+      if (!gate.location || !gate.location.latitude || !gate.location.longitude) continue;
+      
+      const distance = calculateDistance(
+        userLocation.latitude,
+        userLocation.longitude,
+        gate.location.latitude,
+        gate.location.longitude
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = { gate, distance };
+      }
+    }
+    
+    return closest;
+  }, [userLocation, gates]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -2462,6 +2642,35 @@ const GateDashboard = ({ user, token }) => {
                 </div>
               </div>
 
+              {/* Gate Location Map - Mobile Selected Gate */}
+              {selectedGate.location && selectedGate.location.latitude && selectedGate.location.longitude && (
+                <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: '600', color: '#374151', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                    מיקום השער
+                  </h4>
+                  <div style={{ height: '200px', width: '100%', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                    <MapContainer
+                      center={[selectedGate.location.latitude, selectedGate.location.longitude]}
+                      zoom={15}
+                      scrollWheelZoom={false}
+                      style={{ height: '100%', width: '100%' }}
+                      zoomControl={false}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <Marker position={[selectedGate.location.latitude, selectedGate.location.longitude]} icon={createGateIcon()}>
+                        <Popup>{selectedGate.name}</Popup>
+                      </Marker>
+                    </MapContainer>
+                  </div>
+                </div>
+              )}
+
               <div className="gate-actions">
                 <div className="gate-open-section">
                   {/* Cooldown indicator */}
@@ -2689,6 +2898,79 @@ const GateDashboard = ({ user, token }) => {
             isSubmitting={isSubmitting}
             autoOpenedGates={autoOpenedGates}
           />
+        </div>
+      )}
+
+
+      {/* Closest Gate - Display at the top */}
+      {activeTab === 'gates' && !showAddGate && !selectedGate && !showCallerIdValidation && closestGate && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem',
+          backgroundColor: '#f0f9ff',
+          borderRadius: '12px',
+          border: '2px solid #2563eb',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '0.5rem'
+          }}>
+            <h3 style={{
+              margin: 0,
+              fontSize: '1rem',
+              fontWeight: '600',
+              color: '#1e40af',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              השער הקרוב
+            </h3>
+            <span style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#2563eb',
+              backgroundColor: 'white',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '12px'
+            }}>
+              {formatDistance(closestGate.distance)}
+            </span>
+          </div>
+          <SortableContext items={[String(closestGate.gate.id)]} strategy={rectSortingStrategy}>
+            <SortableGateCard
+              gate={closestGate.gate}
+              user={user}
+              isMobile={isMobile}
+              editingGate={editingGate}
+              newGateData={newGateData}
+              handleInputChange={handleInputChange}
+              handleLocationSelect={handleLocationSelect}
+              handleSubmit={handleSubmit}
+              handleCancel={handleCancel}
+              isSubmitting={isSubmitting}
+              verifiedCallers={verifiedCallers}
+              cooldowns={cooldowns}
+              handleOpenGateClick={handleOpenGateClick}
+              handleEdit={handleEdit}
+              handleDelete={handleDelete}
+              handleGateSelect={handleGateSelect}
+              isEditMode={false}
+              userLocation={userLocation}
+              toggleAutoOpen={toggleAutoOpen}
+              autoOpenSettings={autoOpenSettings}
+              autoOpenedGates={autoOpenedGates}
+              handleUpdateAutoOpenRadius={handleUpdateAutoOpenRadius}
+              autoOpenRadius={autoOpenRadius}
+            />
+          </SortableContext>
         </div>
       )}
 
