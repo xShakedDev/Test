@@ -369,7 +369,8 @@ router.post('/gates/:id/open', requireMongoDB, authenticateToken, async (req, re
 // Handle call-status callbacks from Twilio (POST) and URL verification (GET)
 router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
-    console.log('=== CALL-STATUS ROUTE HIT (POST) ===');
+    console.log('\n=== CALL-STATUS ROUTE HIT (POST) ===');
+    console.log('Timestamp:', new Date().toISOString());
     const { id } = req.params;
     
     // Log all incoming data from Twilio for debugging
@@ -378,6 +379,8 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
     console.log('Request method:', req.method);
     console.log('Request path:', req.path);
     console.log('Request url:', req.url);
+    console.log('User-Agent:', req.get('user-agent'));
+    console.log('Content-Type:', req.get('content-type'));
     console.log('Request body keys:', Object.keys(req.body));
     console.log('Full request body:', JSON.stringify(req.body, null, 2));
     
@@ -535,33 +538,132 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
       console.warn('No CallSid provided in callback');
     }
 
-    console.log('=== End Call Status Callback ===\n');
+    console.log('=== End Call Status Callback ===');
+    console.log('✓ Successfully processed POST callback from Twilio\n');
     res.sendStatus(200);
   } catch (error) {
     console.error('שגיאה בעדכון סטטוס שיחה:', error);
     console.error('Error stack:', error.stack);
+    console.error('⚠ Error in POST callback, but returning 200 to prevent Twilio retries\n');
     res.sendStatus(200); // Still return 200 to Twilio to avoid retries
   }
 });
 
-// GET endpoint for call-status (for URL verification/testing - Twilio uses POST)
+// GET endpoint for call-status (handles busy calls and URL verification)
+// Twilio sometimes sends busy/failed callbacks via GET with query parameters
 router.get('/gates/:id/call-status', requireMongoDB, async (req, res) => {
   try {
-    console.log('=== CALL-STATUS GET REQUEST (URL verification/test) ===');
+    console.log('\n=== CALL-STATUS GET REQUEST ===');
+    console.log('Timestamp:', new Date().toISOString());
     const { id } = req.params;
     console.log('Gate ID:', id);
-    console.log('This is a GET request - Twilio callbacks use POST');
+    console.log('Request query:', req.query);
+    console.log('User-Agent:', req.get('user-agent'));
     
-    // Return a simple response for GET requests (URL verification)
+    // Check if this is a Twilio callback with status information (busy calls often come via GET)
+    const CallStatus = req.query.CallStatus || req.query.Status;
+    const CallSid = req.query.CallSid || req.query.Sid;
+    const CallDuration = req.query.CallDuration || req.query.Duration;
+    
+    // If we have call status info, treat it as a callback (common for busy/failed calls)
+    if (CallStatus || CallSid) {
+      console.log('⚠ Twilio callback detected in GET request (likely busy/failed call)');
+      console.log('CallStatus:', CallStatus);
+      console.log('CallSid:', CallSid);
+      console.log('CallDuration:', CallDuration);
+      
+      // Validate and parse the ID
+      const gateId = parseInt(id, 10);
+      if (isNaN(gateId)) {
+        console.error('Invalid gate ID:', id);
+        return res.status(200).send('OK'); // Return 200 to Twilio even on error
+      }
+
+      const gate = await Gate.findOne({ id: gateId });
+      if (gate) {
+        await gate.updateCallStatus(CallStatus, CallDuration);
+      }
+
+      // Update call cost in history if CallSid is provided
+      if (CallSid) {
+        try {
+          console.log(`Processing cost update for CallSid: ${CallSid} (via GET)`);
+          
+          let cost = null;
+          
+          // If call status is busy, set cost to 0
+          if (CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed' || CallStatus === 'canceled') {
+            cost = 0;
+            console.log(`Call status is ${CallStatus}, setting cost to 0`);
+          } else {
+            // Try to get price from query parameters
+            const Price = req.query.Price || req.query.price;
+            const CallPrice = req.query.CallPrice || req.query.callPrice;
+            const PriceUnit = req.query.PriceUnit || req.query.priceUnit;
+            const priceValue = Price || CallPrice || PriceUnit;
+            
+            if (priceValue !== undefined && priceValue !== null && priceValue !== '') {
+              const cleanedPrice = String(priceValue).replace(/[^0-9.-]/g, '');
+              const parsedPrice = parseFloat(cleanedPrice);
+              if (!isNaN(parsedPrice)) {
+                cost = Math.abs(parsedPrice);
+                console.log(`Parsed cost from GET callback: $${cost.toFixed(4)}`);
+              }
+            }
+          }
+          
+          // Update history if we have a cost (including 0 cost calls)
+          if (cost !== null && !isNaN(cost)) {
+            let updateResult = await GateHistory.updateOne(
+              { callSid: CallSid },
+              { $set: { cost: cost } }
+            );
+            
+            if (updateResult.matchedCount === 0) {
+              // Try to find by gateId and recent timestamp
+              const recentHistory = await GateHistory.findOne({
+                gateId: gateId,
+                timestamp: { $gte: new Date(Date.now() - 10 * 60 * 1000) }
+              }).sort({ timestamp: -1 });
+              
+              if (recentHistory) {
+                updateResult = await GateHistory.updateOne(
+                  { _id: recentHistory._id },
+                  { $set: { cost: cost, callSid: CallSid } }
+                );
+              }
+            }
+            
+            if (updateResult.modifiedCount > 0) {
+              console.log(`✓ Successfully updated cost via GET callback for callSid ${CallSid}: $${cost.toFixed(4)}`);
+            }
+          }
+        } catch (updateError) {
+          console.error('שגיאה בעדכון עלות שיחה (GET):', updateError);
+        }
+      }
+      
+      console.log('✓ Successfully processed GET callback from Twilio\n');
+      return res.status(200).send('OK'); // Return simple OK for Twilio
+    }
+    
+    // Otherwise, this is just URL verification/test
+    console.log('This appears to be a URL verification/test request');
+    console.log('NOTE: Twilio callbacks typically use POST, but busy calls may use GET with query params');
+    
     res.status(200).json({
       status: 'ok',
-      message: 'Call-status endpoint is available. Twilio callbacks use POST method.',
+      message: 'Call-status endpoint is available. Twilio callbacks use POST method, but busy calls may use GET.',
       gateId: id,
-      method: 'GET'
+      method: 'GET',
+      timestamp: new Date().toISOString(),
+      note: 'This endpoint accepts both POST and GET requests for call status updates from Twilio'
     });
   } catch (error) {
     console.error('שגיאה ב-GET call-status:', error);
-    res.status(200).json({ status: 'ok', error: error.message });
+    console.error('Error stack:', error.stack);
+    // Always return 200 to Twilio to avoid retries
+    res.status(200).send('OK');
   }
 });
 
