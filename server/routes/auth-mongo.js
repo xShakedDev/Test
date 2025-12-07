@@ -424,10 +424,11 @@ router.post('/gates/:id/call-status', requireMongoDB, async (req, res) => {
         
         let cost = null;
         
-        // If call status is busy, set cost to 0
-        if (CallStatus === 'busy') {
+        // If call status indicates a failed call, set cost to 0
+        // This includes busy, no-answer, failed, and canceled calls
+        if (CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed' || CallStatus === 'canceled') {
           cost = 0;
-          console.log(`Call status is busy, setting cost to 0`);
+          console.log(`Call status is ${CallStatus}, setting cost to 0`);
         } else {
           // Try all possible price fields
           const priceValue = Price || CallPrice || PriceUnit;
@@ -608,6 +609,35 @@ router.get('/gates/:id/call-status', requireMongoDB, async (req, res) => {
               if (!isNaN(parsedPrice)) {
                 cost = Math.abs(parsedPrice);
                 console.log(`Parsed cost from GET callback: $${cost.toFixed(4)}`);
+              }
+            }
+            
+            // If no price in callback and call is completed, fetch from Twilio API
+            if ((cost === null || isNaN(cost)) && CallStatus === 'completed') {
+              console.log('No price in GET callback, fetching from Twilio API...');
+              try {
+                const client = getTwilioClient();
+                const call = await client.calls(CallSid).fetch();
+                console.log('Twilio API call data:', {
+                  sid: call.sid,
+                  status: call.status,
+                  price: call.price,
+                  priceUnit: call.priceUnit
+                });
+                
+                // Twilio returns price as a string like "-0.01" (negative means charged)
+                // Also check priceUnit field
+                const apiPrice = call.price || call.priceUnit;
+                if (apiPrice !== null && apiPrice !== undefined && apiPrice !== '') {
+                  const cleanedPrice = String(apiPrice).replace(/[^0-9.-]/g, '');
+                  const parsedPrice = parseFloat(cleanedPrice);
+                  if (!isNaN(parsedPrice)) {
+                    cost = Math.abs(parsedPrice);
+                    console.log(`Parsed cost from Twilio API (GET): $${cost.toFixed(4)}`);
+                  }
+                }
+              } catch (apiError) {
+                console.error(`Error fetching call price from Twilio API for ${CallSid} (GET):`, apiError.message);
               }
             }
           }

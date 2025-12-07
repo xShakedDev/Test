@@ -1039,6 +1039,7 @@ const GateDashboard = ({ user, token }) => {
   const gatesInRangeStateRef = useRef({});
   const showGateSelectionModalRef = useRef(false);
   const pendingGateSelectionRef = useRef(false);
+  const autoOpenedGatesRef = useRef({}); // Track opened gates synchronously to prevent duplicate opens
 
   const toggleAutoOpen = async (gateId) => {
     const newSettings = {
@@ -1626,7 +1627,8 @@ const GateDashboard = ({ user, token }) => {
           const justEnteredRange = isNear && !wasInRange;
           
           // Check for auto-open - only if user just entered range and gate hasn't been opened in this session
-          if (justEnteredRange && !autoOpenedGates[gateId] && !cooldowns[gateId]) {
+          // Use ref to check synchronously and prevent duplicate opens
+          if (justEnteredRange && !autoOpenedGatesRef.current[gateId] && !autoOpenedGates[gateId] && !cooldowns[gateId]) {
             gatesInRange.push({ gate, distance, gateId });
           }
           
@@ -1634,12 +1636,14 @@ const GateDashboard = ({ user, token }) => {
           const resetDistance = 150; // Fixed 150 meters
           if (distance > resetDistance) {
             // User moved away - reset state for this gate
-            if (autoOpenedGates[gateId]) {
+            if (autoOpenedGates[gateId] || autoOpenedGatesRef.current[gateId]) {
               setAutoOpenedGates(prev => {
                 const newState = { ...prev };
                 delete newState[gateId];
                 return newState;
               });
+              // Also reset ref
+              delete autoOpenedGatesRef.current[gateId];
             }
             // Remove from in-range state
             delete newGatesInRangeState[gateId];
@@ -1663,10 +1667,19 @@ const GateDashboard = ({ user, token }) => {
       // If only one gate in range, open it automatically
       else if (gatesInRange.length === 1) {
         const { gate, distance, gateId } = gatesInRange[0];
+        
+        // Double-check that gate hasn't been opened already (prevent duplicate opens)
+        if (autoOpenedGatesRef.current[gateId] || autoOpenedGates[gateId]) {
+          return; // Gate already opened, skip
+        }
+        
+        // Mark as opened immediately in ref to prevent duplicate opens
+        autoOpenedGatesRef.current[gateId] = true;
+        
         console.log(`Auto-opening gate ${gate.name} (Distance: ${distance}m)`);
         handleOpenGate(gate, gate.password || '', true);
         
-        // Mark as opened
+        // Mark as opened in state (for UI display)
         setAutoOpenedGates(prev => ({ ...prev, [gateId]: true }));
         
         // Show auto-open notification
@@ -1696,6 +1709,11 @@ const GateDashboard = ({ user, token }) => {
   useEffect(() => {
     pendingGateSelectionRef.current = pendingGateSelection;
   }, [pendingGateSelection]);
+
+  // Sync autoOpenedGatesRef with state when state changes externally
+  useEffect(() => {
+    autoOpenedGatesRef.current = { ...autoOpenedGates };
+  }, [autoOpenedGates]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -2785,10 +2803,13 @@ const GateDashboard = ({ user, token }) => {
                   <button
                     key={gateId}
                     onClick={() => {
+                      // Mark as opened immediately in ref to prevent duplicate opens
+                      autoOpenedGatesRef.current[gateId] = true;
+                      
                       console.log(`Opening gate ${gate.name} (Distance: ${distance}m)`);
                       handleOpenGate(gate, gate.password || '', true);
                       
-                      // Mark as opened
+                      // Mark as opened in state (for UI display)
                       setAutoOpenedGates(prev => ({ ...prev, [gateId]: true }));
                       
                       // Show auto-open notification
