@@ -2,8 +2,33 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Gate = require('../models/Gate');
+const AuditLog = require('../models/AuditLog');
 
 const router = express.Router();
+
+// Helper function to create audit log
+const createAuditLog = async (req, action, resourceType, resourceId = null, resourceName = null, details = null, success = true, errorMessage = null) => {
+  try {
+    if (!req.user) return; // Skip if no user (shouldn't happen but safety check)
+    
+    await AuditLog.createLog({
+      userId: req.user._id,
+      username: req.user.username,
+      action,
+      resourceType,
+      resourceId: resourceId ? String(resourceId) : null,
+      resourceName,
+      details,
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('user-agent'),
+      success,
+      errorMessage
+    });
+  } catch (error) {
+    console.error('Error creating audit log:', error);
+    // Don't throw - audit logging should not break the main flow
+  }
+};
 
 // JWT secret key
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-jwt-key-change-in-production';
@@ -214,6 +239,17 @@ router.post('/login', async (req, res) => {
     const tokens = generateTokenPair(user);
     
     console.log(`Login successful for user: ${normalizedUsername} (${user.role})`);
+    
+    // Create audit log for login
+    await createAuditLog(
+      req,
+      'login',
+      'auth',
+      user._id.toString(),
+      user.username,
+      `User logged in: ${user.name} (${user.username})`,
+      true
+    );
     
     res.json({
       message: 'התחברות הצליחה',
@@ -433,6 +469,17 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
       userObj.authorizedGates = [];
     }
 
+    // Create audit log
+    await createAuditLog(
+      req,
+      'user_created',
+      'user',
+      newUser._id.toString(),
+      newUser.username,
+      `Created user: ${newUser.name} (${newUser.username}) with role: ${newUser.role}`,
+      true
+    );
+
     res.status(201).json({
       message: 'משתמש נוצר בהצלחה',
       user: userObj
@@ -440,6 +487,19 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
 
   } catch (error) {
     console.error('Create user error:', error);
+    
+    // Log failed attempt
+    await createAuditLog(
+      req,
+      'user_created',
+      'user',
+      null,
+      req.body.username,
+      `Failed to create user: ${req.body.username}`,
+      false,
+      error.message
+    );
+    
     res.status(500).json({ error: 'שגיאה ביצירת משתמש' });
   }
 });
@@ -516,6 +576,36 @@ router.put('/users/:userId', authenticateToken, requireAdmin, async (req, res) =
       userObj.authorizedGates = [];
     }
 
+    // Create audit log
+    const changes = [];
+    if (username && username !== user.username) changes.push(`username: ${user.username} → ${username}`);
+    if (name && name !== user.name) changes.push(`name: ${user.name} → ${name}`);
+    if (role && role !== user.role) changes.push(`role: ${user.role} → ${role}`);
+    if (typeof isActive === 'boolean' && isActive !== user.isActive) {
+      changes.push(`isActive: ${user.isActive} → ${isActive}`);
+      await createAuditLog(
+        req,
+        isActive ? 'user_activated' : 'user_deactivated',
+        'user',
+        user._id.toString(),
+        user.username,
+        `${isActive ? 'Activated' : 'Deactivated'} user: ${user.name} (${user.username})`,
+        true
+      );
+    }
+    
+    if (changes.length > 0) {
+      await createAuditLog(
+        req,
+        'user_updated',
+        'user',
+        user._id.toString(),
+        user.username,
+        `Updated user: ${user.name} (${user.username}) - ${changes.join(', ')}`,
+        true
+      );
+    }
+
     res.json({
       message: 'משתמש עודכן בהצלחה',
       user: userObj
@@ -523,6 +613,19 @@ router.put('/users/:userId', authenticateToken, requireAdmin, async (req, res) =
 
   } catch (error) {
     console.error('Update user error:', error);
+    
+    // Log failed attempt
+    await createAuditLog(
+      req,
+      'user_updated',
+      'user',
+      req.params.userId,
+      null,
+      `Failed to update user`,
+      false,
+      error.message
+    );
+    
     res.status(500).json({ error: 'שגיאה בעדכון משתמש' });
   }
 });
@@ -542,7 +645,21 @@ router.delete('/users/:userId', authenticateToken, requireAdmin, async (req, res
       return res.status(404).json({ error: 'משתמש לא נמצא' });
     }
 
+    const deletedUsername = user.username;
+    const deletedName = user.name;
+    
     await User.findByIdAndDelete(userId);
+
+    // Create audit log
+    await createAuditLog(
+      req,
+      'user_deleted',
+      'user',
+      userId,
+      deletedUsername,
+      `Deleted user: ${deletedName} (${deletedUsername})`,
+      true
+    );
 
     res.json({ message: 'משתמש נמחק בהצלחה' });
 

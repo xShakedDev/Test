@@ -16,7 +16,8 @@ const UserManagement = ({ user, token }) => {
     password: '',
     name: '',
     role: 'user',
-    authorizedGates: []
+    authorizedGates: [],
+    isActive: true
   });
 
   // Search state for gates
@@ -241,7 +242,8 @@ const UserManagement = ({ user, token }) => {
       password: '',
       name: '',
       role: 'user',
-      authorizedGates: []
+      authorizedGates: [],
+      isActive: true
     });
     setEditingUser(null);
     setShowCreateForm(false);
@@ -332,7 +334,8 @@ const UserManagement = ({ user, token }) => {
       role: userItem.role,
       authorizedGates: userItem.authorizedGates ? userItem.authorizedGates.map(gate => 
         typeof gate === 'object' && gate.id ? gate.id.toString() : gate.toString()
-      ) : []
+      ) : [],
+      isActive: userItem.isActive !== undefined ? userItem.isActive : true
     });
     setGateSearchInput('');
   };
@@ -492,6 +495,22 @@ const UserManagement = ({ user, token }) => {
                   <option value="admin">מנהל</option>
                 </select>
                 <small>תפקיד המשתמש במערכת</small>
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    checked={formData.isActive}
+                    onChange={handleInputChange}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>משתמש פעיל</span>
+                </label>
+                <small style={{ display: 'block', marginTop: '0.25rem', color: '#6b7280' }}>
+                  משתמש מושבת לא יוכל להתחבר למערכת
+                </small>
               </div>
             </div>
 
@@ -691,6 +710,22 @@ const UserManagement = ({ user, token }) => {
                 </select>
                 <small>תפקיד המשתמש במערכת</small>
               </div>
+
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="isActive"
+                    checked={formData.isActive}
+                    onChange={handleInputChange}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>משתמש פעיל</span>
+                </label>
+                <small style={{ display: 'block', marginTop: '0.25rem', color: '#6b7280' }}>
+                  משתמש מושבת לא יוכל להתחבר למערכת
+                </small>
+              </div>
             </div>
 
             <div className="form-group gates-form-group">
@@ -835,6 +870,7 @@ const UserManagement = ({ user, token }) => {
                 <th>שם משתמש</th>
                 <th>שם מלא</th>
                 <th>תפקיד</th>
+                <th>סטטוס</th>
                 <th>שערים מורשים</th>
                 <th>תאריך יצירה</th>
                 <th>פעולות</th>
@@ -854,6 +890,29 @@ const UserManagement = ({ user, token }) => {
                     <span className={`role-badge role-${userItem.role}`}>
                       {userItem.role === 'admin' ? 'מנהל' : 'משתמש'}
                     </span>
+                  </td>
+                  <td className="user-status">
+                    {userItem.isActive !== false ? (
+                      <span style={{ 
+                        color: '#22c55e', 
+                        fontWeight: '600',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        <span>●</span> פעיל
+                      </span>
+                    ) : (
+                      <span style={{ 
+                        color: '#ef4444', 
+                        fontWeight: '600',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        <span>●</span> מושבת
+                      </span>
+                    )}
                   </td>
                   <td className="user-gates">
                     {userItem.role === 'admin' ? (
@@ -883,12 +942,64 @@ const UserManagement = ({ user, token }) => {
                   </td>
                   <td className="user-actions">
                     {userItem.id !== user.id && (
-                      <div className="user-action-buttons">
+                      <div className="user-action-buttons" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleEdit(userItem)}
                           className="btn btn-primary btn-small"
                         >
                           ערוך
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const newStatus = !(userItem.isActive !== false);
+                            const action = newStatus ? 'הפעלה' : 'השבתה';
+                            if (!window.confirm(`האם אתה בטוח שברצונך ${action === 'הפעלה' ? 'להפעיל' : 'להשבית'} את המשתמש "${userItem.username}"?`)) {
+                              return;
+                            }
+                            
+                            try {
+                              const response = await authenticatedFetch(`/api/auth/users/${userItem.id}`, {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                  ...userItem,
+                                  isActive: newStatus
+                                })
+                              });
+
+                              if (response.ok) {
+                                const msg = `משתמש ${action === 'הפעלה' ? 'הופעל' : 'הושבת'} בהצלחה!`;
+                                setSuccessMessage(msg);
+                                if (window.showSystemNotification) {
+                                  window.showSystemNotification(msg, 'success');
+                                }
+                                await fetchUsers();
+                              } else {
+                                const data = await response.json();
+                                const msg = data.error || `שגיאה ב-${action} משתמש`;
+                                setError(msg);
+                                if (window.showSystemNotification) {
+                                  window.showSystemNotification(msg, 'error');
+                                }
+                              }
+                            } catch (error) {
+                              const msg = 'שגיאת רשת';
+                              setError(msg);
+                              if (window.showSystemNotification) {
+                                window.showSystemNotification(msg, 'error');
+                              }
+                            }
+                          }}
+                          className="btn btn-small"
+                          style={{
+                            backgroundColor: userItem.isActive !== false ? '#f59e0b' : '#22c55e',
+                            color: 'white',
+                            border: 'none'
+                          }}
+                        >
+                          {userItem.isActive !== false ? 'השבת' : 'הפעל'}
                         </button>
                         <button
                           onClick={() => handleDelete(userItem.id, userItem.username)}

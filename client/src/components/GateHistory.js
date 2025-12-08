@@ -8,9 +8,10 @@ const GateHistory = ({ user, token }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [filter, setFilter] = useState('all'); // all, gate, user, date
-  const [filterValue, setFilterValue] = useState('');
+  const [gateFilter, setGateFilter] = useState(''); // Gate name filter
+  const [userFilter, setUserFilter] = useState(''); // User filter (username or name)
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const [statusFilters, setStatusFilters] = useState([]); // Array of selected statuses: 'opened', 'failed', 'autoOpened'
   const [selectedLogs, setSelectedLogs] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [exchangeRate, setExchangeRate] = useState(3.7); // Default rate
@@ -92,18 +93,28 @@ const GateHistory = ({ user, token }) => {
       const currentPage = paginationRef.current.page;
       
       let url = `/api/gates/history?limit=${currentLimit}&page=${currentPage}`;
-      if (filter === 'gate' && filterValue) {
+      
+      // Combine filters - allow multiple filters at once
+      if (gateFilter) {
         // Send gateName to server, which will look up the gate and filter by gateId
-        url += `&gateName=${encodeURIComponent(filterValue)}`;
-      } else if (filter === 'user' && filterValue) {
-        url += `&username=${encodeURIComponent(filterValue)}`;
-      } else if (filter === 'date' && (dateFilter.start || dateFilter.end)) {
+        url += `&gateName=${encodeURIComponent(gateFilter)}`;
+      }
+      if (userFilter) {
+        url += `&username=${encodeURIComponent(userFilter)}`;
+      }
+      if (dateFilter.start || dateFilter.end) {
         if (dateFilter.start) {
           url += `&startDate=${dateFilter.start}`;
         }
         if (dateFilter.end) {
           url += `&endDate=${dateFilter.end}`;
         }
+      }
+      // Add status filters
+      if (statusFilters.length > 0) {
+        statusFilters.forEach(status => {
+          url += `&status=${encodeURIComponent(status)}`;
+        });
       }
 
       const response = await authenticatedFetch(url);
@@ -151,7 +162,7 @@ const GateHistory = ({ user, token }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [filter, filterValue, dateFilter, scrollToMessage]);
+  }, [gateFilter, userFilter, dateFilter, statusFilters, scrollToMessage]);
 
   // Fetch exchange rate
   useEffect(() => {
@@ -175,11 +186,9 @@ const GateHistory = ({ user, token }) => {
   useEffect(() => {
     fetchHistory();
     fetchGates(); // Always fetch gates to get current names
-    if (filter === 'user') {
-      fetchUsers();
-    }
+    fetchUsers(); // Always fetch users for the filter
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, filterValue, dateFilter, token, pagination.page, pagination.limit]);
+  }, [gateFilter, userFilter, dateFilter, statusFilters, token, pagination.page, pagination.limit]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'לא ידוע';
@@ -296,11 +305,15 @@ const GateHistory = ({ user, token }) => {
   };
 
   const handleGateSearch = (searchTerm) => {
-    setFilterValue(searchTerm);
+    setGateFilter(searchTerm);
+    // Reset to page 1 when filter changes
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const handleUserSearch = (searchTerm) => {
-    setFilterValue(searchTerm);
+    setUserFilter(searchTerm);
+    // Reset to page 1 when filter changes
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const handlePageChange = (newPage) => {
@@ -311,7 +324,14 @@ const GateHistory = ({ user, token }) => {
     setPagination(prev => ({ ...prev, limit: parseInt(newLimit), page: 1 }));
   };
 
-  const handleFilterChange = () => {
+  const handleStatusFilterToggle = (status) => {
+    setStatusFilters(prev => {
+      if (prev.includes(status)) {
+        return prev.filter(s => s !== status);
+      } else {
+        return [...prev, status];
+      }
+    });
     // Reset to page 1 when filter changes
     setPagination(prev => ({ ...prev, page: 1 }));
   };
@@ -343,115 +363,155 @@ const GateHistory = ({ user, token }) => {
 
         {/* Filters */}
         <div className="history-filters">
-          {/* Active Filter Display */}
-          {filter !== 'all' && (
+          {/* Active Filters Display */}
+          {(gateFilter || userFilter || dateFilter.start || dateFilter.end || statusFilters.length > 0) && (
             <div className="active-filter-info">
               <span className="filter-label">
-                סינון פעיל: 
-                {filter === 'gate' && ` שער: ${filterValue}`}
-                {filter === 'user' && ` משתמש: ${filterValue}`}
-                {filter === 'date' && ` תאריך: ${dateFilter.start ? `מתאריך ${dateFilter.start}` : ''}${dateFilter.start && dateFilter.end ? ' ' : ''}${dateFilter.end ? `עד תאריך ${dateFilter.end}` : ''}`}
+                סננים פעילים: 
+                {gateFilter && ` שער: ${gateFilter}`}
+                {userFilter && ` משתמש: ${userFilter}`}
+                {(dateFilter.start || dateFilter.end) && ` תאריך: ${dateFilter.start ? `מתאריך ${dateFilter.start}` : ''}${dateFilter.start && dateFilter.end ? ' ' : ''}${dateFilter.end ? `עד תאריך ${dateFilter.end}` : ''}`}
+                {statusFilters.length > 0 && ` סטטוס: ${statusFilters.map(s => {
+                  if (s === 'opened') return 'נפתח';
+                  if (s === 'failed') return 'לא נפתח';
+                  if (s === 'autoOpened') return 'נפתח אוטומטי';
+                  return s;
+                }).join(', ')}`}
               </span>
               <button 
                 onClick={() => {
-                  setFilter('all');
-                  setFilterValue('');
+                  setGateFilter('');
+                  setUserFilter('');
                   setDateFilter({ start: '', end: '' });
-                  handleFilterChange();
+                  setStatusFilters([]);
+                  setPagination(prev => ({ ...prev, page: 1 }));
                 }}
                 className="btn btn-primary btn-sm"
               >
-                נקה סינון
+                נקה כל הסננים
               </button>
             </div>
           )}
-          <select
-            value={filter}
-            onChange={(e) => {
-              setFilter(e.target.value);
-              setFilterValue('');
-              setDateFilter({ start: '', end: '' });
-              handleFilterChange();
-            }}
-            className="form-input"
-          >
-            <option value="all">כל ההיסטוריה</option>
-            <option value="gate">לפי שער</option>
-            <option value="user">לפי משתמש</option>
-            <option value="date">לפי תאריך</option>
-          </select>
 
-          {filter === 'gate' && (
-            <div className="gate-search-container">
-              <input
-                type="text"
-                value={filterValue}
-                onChange={(e) => handleGateSearch(e.target.value)}
-                placeholder="התחל להקליד שם שער..."
-                className="form-input"
-                list="gates-list"
-              />
-              <datalist id="gates-list">
-                {gates.map(gate => (
-                  <option key={gate.id} value={gate.name} />
-                ))}
-              </datalist>
+          {/* All Filters - Always Available */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Status Filters */}
+            <div className="status-filters">
+              <label style={{ fontWeight: '600', marginBottom: '0.5rem', display: 'block' }}>סטטוס:</label>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={statusFilters.includes('opened')}
+                    onChange={() => handleStatusFilterToggle('opened')}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>נפתח</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={statusFilters.includes('failed')}
+                    onChange={() => handleStatusFilterToggle('failed')}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>לא נפתח</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={statusFilters.includes('autoOpened')}
+                    onChange={() => handleStatusFilterToggle('autoOpened')}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>נפתח אוטומטי</span>
+                </label>
+              </div>
             </div>
-          )}
 
-          {filter === 'user' && (
-            <div className="user-search-container">
-              <input
-                type="text"
-                value={filterValue}
-                onChange={(e) => handleUserSearch(e.target.value)}
-                placeholder="התחל להקליד שם משתמש..."
-                className="form-input"
-                list="users-list"
-              />
-              <datalist id="users-list">
-                {users.map(user => (
-                  <option key={user.id} value={user.username} />
-                ))}
-              </datalist>
+            {/* Gate and User Filters */}
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="gate-search-container" style={{ flex: 1, minWidth: '200px' }}>
+                <label htmlFor="gate-filter" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>שער:</label>
+                <input
+                  id="gate-filter"
+                  type="text"
+                  value={gateFilter}
+                  onChange={(e) => handleGateSearch(e.target.value)}
+                  placeholder="התחל להקליד שם שער..."
+                  className="form-input"
+                  list="gates-list"
+                />
+                <datalist id="gates-list">
+                  {gates.map(gate => (
+                    <option key={gate.id} value={gate.name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="user-search-container" style={{ flex: 1, minWidth: '200px' }}>
+                <label htmlFor="user-filter" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>משתמש:</label>
+                <input
+                  id="user-filter"
+                  type="text"
+                  value={userFilter}
+                  onChange={(e) => handleUserSearch(e.target.value)}
+                  placeholder="התחל להקליד שם משתמש או שם מלא..."
+                  className="form-input"
+                  list="users-list"
+                />
+                <datalist id="users-list">
+                  {users.map(user => (
+                    <option key={user.id} value={user.username} />
+                  ))}
+                </datalist>
+              </div>
             </div>
-          )}
 
-          {filter === 'date' && (
-            <div className="date-filters">
+            {/* Date Filters */}
+            <div className="date-filters" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <div className="date-input-group">
-                <label htmlFor="start-date">מתאריך:</label>
+                <label htmlFor="start-date" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>מתאריך:</label>
                 <input
                   id="start-date"
                   type="date"
                   value={dateFilter.start}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  onChange={(e) => {
+                    setDateFilter(prev => ({ ...prev, start: e.target.value }));
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                  }}
                   className="form-input"
                 />
               </div>
               <div className="date-input-group">
-                <label htmlFor="end-date">עד תאריך:</label>
+                <label htmlFor="end-date" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>עד תאריך:</label>
                 <input
                   id="end-date"
                   type="date"
                   value={dateFilter.end}
-                  onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  onChange={(e) => {
+                    setDateFilter(prev => ({ ...prev, end: e.target.value }));
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                  }}
                   className="form-input"
                 />
               </div>
             </div>
-          )}
 
-          <button
-            onClick={() => {
-              handleFilterChange();
-              fetchHistory();
-            }}
-            className="btn btn-primary"
-            disabled={isLoading}
-          >
-            {isLoading ? 'טוען...' : 'סנן'}
-          </button>
+            {/* Filter Button - Optional, filters apply automatically */}
+            <div>
+              <button
+                onClick={() => {
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  fetchHistory();
+                }}
+                className="btn btn-primary"
+                disabled={isLoading}
+              >
+                {isLoading ? 'טוען...' : 'רענן'}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Pagination Controls */}

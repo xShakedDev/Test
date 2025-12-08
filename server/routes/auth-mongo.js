@@ -3,6 +3,8 @@ const twilio = require('twilio');
 const mongoose = require('mongoose');
 const Gate = require('../models/Gate');
 const GateHistory = require('../models/GateHistory');
+const AuditLog = require('../models/AuditLog');
+const User = require('../models/User');
 const AdminSettings = require('../models/AdminSettings');
 const { isConnected } = require('../config/database');
 const { authenticateToken, requireAdmin } = require('./auth-users');
@@ -862,15 +864,16 @@ router.get('/gates/stats', requireMongoDB, authenticateToken, async (req, res) =
 // Gate history endpoint - admin sees all, regular users see only their own
 router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res) => {
   try {
-    const { limit = 50, page = 1, gateId, gateName, userId, username, startDate, endDate } = req.query;
+    const { limit = 50, page = 1, gateId, gateName, userId, username, startDate, endDate, status } = req.query;
     const limitNum = Math.min(parseInt(limit), 500); // Max 500 records per page
     const pageNum = Math.max(parseInt(page), 1); // Minimum page is 1
     const skip = (pageNum - 1) * limitNum;
 
     let query = {};
-
+    const isAdmin = req.user.role === 'admin';
+    
     // For regular users, only show their own gate history
-    if (req.user.role !== 'admin') {
+    if (!isAdmin) {
       query.userId = req.user._id;
     }
 
@@ -888,31 +891,176 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
       }
     }
 
-    // Build query based on filters
+    // Build query based on filters - allow combining multiple filters
     if (gateName) {
-      // If gateName is provided, find the gate by name first, then filter by gateId
-      const gate = await Gate.findOne({ name: gateName });
-      if (gate) {
-        query.gateId = gate.id;
+      // Use regex for partial match on gate name (case-insensitive)
+      const gates = await Gate.find({ 
+        name: { $regex: gateName, $options: 'i' } // Case-insensitive partial match
+      });
+      if (gates.length > 0) {
+        // Filter by multiple gate IDs if multiple gates match
+        query.gateId = { $in: gates.map(g => g.id) };
       } else {
-        // If gate not found, return empty result
+        // If no gates found, return empty result
         query.gateId = -1; // Non-existent gate ID
       }
-    } else if (gateId) {
+    }
+    if (gateId) {
       const numericGateId = parseInt(gateId, 10);
       if (!isNaN(numericGateId)) {
-        query.gateId = numericGateId;
+        // If gateName was also provided, combine with $in
+        if (query.gateId && query.gateId.$in) {
+          if (!query.gateId.$in.includes(numericGateId)) {
+            query.gateId.$in.push(numericGateId);
+          }
+        } else {
+          query.gateId = numericGateId;
+        }
       }
-    } else if (username) {
-      // Filter by username
-      query.username = username;
-    } else if (userId) {
-      // Check if userId is a valid ObjectId or if it's actually a username
+    }
+    if (username) {
+      // Search by username or name (partial match, case-insensitive)
+      // First, find users that match the search term
+      const matchingUsers = await User.find({
+        $or: [
+          { username: { $regex: username, $options: 'i' } },
+          { name: { $regex: username, $options: 'i' } }
+        ]
+      }).select('_id');
+      
+      if (matchingUsers.length > 0) {
+        // Filter by matching user IDs
+        const userIds = matchingUsers.map(u => u._id);
+        if (query.userId && !isAdmin) {
+          // For non-admin users, check if their userId is in the matching list
+          if (userIds.some(id => id.toString() === query.userId.toString())) {
+            // User's own ID matches, keep it
+          } else {
+            // User searched for someone else, return empty (non-admin can only see their own)
+            query.userId = new mongoose.Types.ObjectId(); // Non-existent ID
+          }
+        } else if (query.userId && query.userId.$in) {
+          // If userId filter already exists with $in, intersect with matching users
+          query.userId.$in = query.userId.$in.filter(id => 
+            userIds.some(uid => uid.toString() === id.toString())
+          );
+          if (query.userId.$in.length === 0) {
+            query.userId = new mongoose.Types.ObjectId(); // Non-existent ID
+          }
+        } else {
+          // No existing userId filter, set to matching users
+          query.userId = { $in: userIds };
+        }
+      } else {
+        // No users found, return empty result
+        query.userId = new mongoose.Types.ObjectId(); // Non-existent ID
+      }
+    }
+    if (userId) {
+      // Check if userId is a valid ObjectId or if it's actually a username/name
       if (mongoose.Types.ObjectId.isValid(userId)) {
         query.userId = userId;
       } else {
-        // If userId is not a valid ObjectId, treat it as username
-        query.username = userId;
+        // Treat as username/name search (partial match, case-insensitive)
+        const matchingUsers = await User.find({
+          $or: [
+            { username: { $regex: userId, $options: 'i' } },
+            { name: { $regex: userId, $options: 'i' } }
+          ]
+        }).select('_id');
+        
+        if (matchingUsers.length > 0) {
+          const userIds = matchingUsers.map(u => u._id);
+          if (query.userId && !isAdmin) {
+            // For non-admin users, check if their userId is in the matching list
+            if (userIds.some(id => id.toString() === query.userId.toString())) {
+              // User's own ID matches, keep it
+            } else {
+              // User searched for someone else, return empty (non-admin can only see their own)
+              query.userId = new mongoose.Types.ObjectId(); // Non-existent ID
+            }
+          } else if (query.userId && query.userId.$in) {
+            // Intersect with existing userId filter
+            query.userId.$in = query.userId.$in.filter(id => 
+              userIds.some(uid => uid.toString() === id.toString())
+            );
+            if (query.userId.$in.length === 0) {
+              query.userId = new mongoose.Types.ObjectId(); // Non-existent ID
+            }
+          } else {
+            query.userId = { $in: userIds };
+          }
+        } else {
+          query.userId = new mongoose.Types.ObjectId(); // Non-existent ID
+        }
+      }
+    }
+
+    // Handle status filtering - support multiple status values
+    if (status) {
+      // status can be a single value or array (when multiple status=... in query string)
+      const statusArray = Array.isArray(status) ? status : [status];
+      const statusConditions = [];
+      
+      statusArray.forEach(statusValue => {
+        if (statusValue === 'opened') {
+          // success === true && autoOpened !== true (or doesn't exist)
+          statusConditions.push({
+            $and: [
+              { success: true },
+              {
+                $or: [
+                  { autoOpened: { $exists: false } },
+                  { autoOpened: false },
+                  { autoOpened: { $ne: true } }
+                ]
+              }
+            ]
+          });
+        } else if (statusValue === 'autoOpened') {
+          // success === true && autoOpened === true
+          statusConditions.push({
+            success: true,
+            autoOpened: true
+          });
+        } else if (statusValue === 'failed') {
+          // success === false
+          statusConditions.push({
+            success: false
+          });
+        }
+      });
+      
+      // If we have status conditions, combine them
+      if (statusConditions.length > 0) {
+        // Check if we have other filters that need to be combined
+        const hasOtherFilters = Object.keys(query).some(key => 
+          key !== 'userId' && key !== 'timestamp' && key !== '$and' && key !== '$or'
+        );
+        
+        if (statusConditions.length === 1) {
+          // Single status condition
+          const condition = statusConditions[0];
+          if (hasOtherFilters) {
+            // Combine with existing filters using $and
+            query.$and = (query.$and || []).concat([condition]);
+          } else {
+            // No other filters, merge directly
+            if (condition.$and) {
+              query.$and = (query.$and || []).concat(condition.$and);
+            } else {
+              Object.assign(query, condition);
+            }
+          }
+        } else {
+          // Multiple status conditions - use $or
+          if (hasOtherFilters) {
+            // Combine with existing filters using $and
+            query.$and = (query.$and || []).concat([{ $or: statusConditions }]);
+          } else {
+            query.$or = statusConditions;
+          }
+        }
       }
     }
 
@@ -1038,6 +1186,28 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
   }
 });
 
+// Helper function to create audit log
+const createAuditLog = async (req, action, resourceType, resourceId = null, resourceName = null, details = null, success = true, errorMessage = null) => {
+  try {
+    if (!req.user) return;
+    await AuditLog.createLog({
+      userId: req.user._id,
+      username: req.user.username,
+      action,
+      resourceType,
+      resourceId: resourceId ? String(resourceId) : null,
+      resourceName,
+      details,
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('user-agent'),
+      success,
+      errorMessage
+    });
+  } catch (error) {
+    console.error('Error creating audit log:', error);
+  }
+};
+
 // Bulk delete history records (admin only)
 router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -1079,6 +1249,17 @@ router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, r
 
     console.log('Delete result:', result);
 
+    // Create audit log
+    await createAuditLog(
+      req,
+      'bulk_delete_history',
+      'history',
+      null,
+      null,
+      `Bulk deleted ${result.deletedCount} history records (requested: ${logIds.length})`,
+      true
+    );
+
     res.json({
       success: true,
       message: `${result.deletedCount} רשומות נמחקו בהצלחה`,
@@ -1102,6 +1283,17 @@ router.delete('/gates/history/bulk-delete', requireMongoDB, authenticateToken, r
 router.delete('/gates/history/delete-all', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const result = await GateHistory.deleteMany({});
+
+    // Create audit log
+    await createAuditLog(
+      req,
+      'delete_all_history',
+      'history',
+      null,
+      null,
+      `Deleted all history records (${result.deletedCount} records)`,
+      true
+    );
 
     res.json({
       success: true,
@@ -1725,6 +1917,17 @@ router.delete('/gates/admin/logs', requireMongoDB, authenticateToken, requireAdm
     const { clearServerLogs } = require('../utils/serverLogs');
     clearServerLogs();
     
+    // Create audit log
+    await createAuditLog(
+      req,
+      'clear_logs',
+      'logs',
+      null,
+      null,
+      'Cleared all server console logs',
+      true
+    );
+    
     res.json({ 
       message: 'לוגים נמחקו בהצלחה',
       timestamp: new Date().toISOString()
@@ -1732,6 +1935,98 @@ router.delete('/gates/admin/logs', requireMongoDB, authenticateToken, requireAdm
   } catch (error) {
     console.error('שגיאה במחיקת לוגים:', error);
     res.status(500).json({ error: 'נכשל במחיקת לוגים' });
+  }
+});
+
+// Audit Logs Routes (Admin only)
+router.get('/gates/admin/audit-logs', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const skip = (page - 1) * limit;
+    const action = req.query.action; // Optional filter by action
+    const resourceType = req.query.resourceType; // Optional filter by resource type
+    const username = req.query.username; // Optional filter by username
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    
+    let query = {};
+    
+    // Build filters
+    if (action) {
+      query.action = action;
+    }
+    if (resourceType) {
+      query.resourceType = resourceType;
+    }
+    if (username) {
+      query.username = { $regex: username, $options: 'i' };
+    }
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) {
+        query.timestamp.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        query.timestamp.$lte = endDateTime;
+      }
+    }
+    
+    // Get total count
+    const totalCount = await AuditLog.countDocuments(query);
+    
+    // Get paginated logs
+    const logs = await AuditLog.find(query)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('userId', 'username name')
+      .lean();
+    
+    const totalPages = Math.ceil(totalCount / limit);
+    
+    res.json({
+      logs,
+      total: logs.length,
+      totalCount,
+      page,
+      limit,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('שגיאה בקבלת audit logs:', error);
+    res.status(500).json({ error: 'נכשל בקבלת audit logs' });
+  }
+});
+
+router.delete('/gates/admin/audit-logs', requireMongoDB, authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await AuditLog.deleteMany({});
+    
+    // Log the deletion
+    await AuditLog.createLog({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'clear_logs',
+      resourceType: 'logs',
+      details: 'All audit logs cleared',
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('user-agent'),
+      success: true
+    });
+    
+    res.json({ 
+      message: 'Audit logs נמחקו בהצלחה',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('שגיאה במחיקת audit logs:', error);
+    res.status(500).json({ error: 'נכשל במחיקת audit logs' });
   }
 });
 

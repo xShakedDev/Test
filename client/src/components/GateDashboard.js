@@ -47,15 +47,20 @@ function formatDistance(meters) {
 }
 
 // Gate Icon for Map - using site logo
-const createGateIcon = () => {
-  // Use absolute URL to ensure logo loads correctly on all platforms
-  const logoUrl = `${window.location.origin}/logo.png`;
-  return L.divIcon({
-    className: 'gate-map-icon',
-    html: `<div style="background-color: white; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; overflow: hidden; cursor: pointer; pointer-events: auto;"><img src="${logoUrl}" alt="Gate" style="width: 28px; height: 28px; object-fit: contain; display: block; pointer-events: none;" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#2563eb';" /></div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-  });
+// Create icon once and reuse to prevent constant updates
+let gateIconInstance = null;
+const getGateIcon = () => {
+  if (!gateIconInstance) {
+    // Use absolute URL to ensure logo loads correctly on all platforms
+    const logoUrl = `${window.location.origin}/logo.png`;
+    gateIconInstance = L.divIcon({
+      className: 'gate-map-icon',
+      html: `<div style="background-color: white; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #000000; display: flex; align-items: center; justify-content: center; padding: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); position: relative; overflow: hidden; cursor: pointer; pointer-events: auto;"><img src="${logoUrl}" alt="Gate" style="width: 28px; height: 28px; object-fit: contain; display: block; pointer-events: none;" onerror="this.style.display='none'; this.parentElement.style.backgroundColor='#2563eb';" /></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+  }
+  return gateIconInstance;
 };
 
 // Map Controller to fit bounds - only once on initial load
@@ -247,7 +252,7 @@ const GatesMapView = ({ gates, userLocation, onGateClick, handleOpenGateClick, c
             <Marker
               key={gate.id}
               position={[gate.location.latitude, gate.location.longitude]}
-              icon={createGateIcon()}
+              icon={getGateIcon()}
               eventHandlers={{
                 click: (e) => {
                   // Prevent event bubbling and default behavior using Leaflet's method
@@ -842,7 +847,7 @@ const SortableGateCard = ({ gate, user, isMobile, editingGate, newGateData, hand
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                      <Marker position={[gate.location.latitude, gate.location.longitude]} icon={createGateIcon()}>
+                      <Marker position={[gate.location.latitude, gate.location.longitude]} icon={getGateIcon()}>
                         <Popup>{gate.name}</Popup>
                       </Marker>
                     </MapContainer>
@@ -2663,7 +2668,7 @@ const GateDashboard = ({ user, token }) => {
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                      <Marker position={[selectedGate.location.latitude, selectedGate.location.longitude]} icon={createGateIcon()}>
+                      <Marker position={[selectedGate.location.latitude, selectedGate.location.longitude]} icon={getGateIcon()}>
                         <Popup>{selectedGate.name}</Popup>
                       </Marker>
                     </MapContainer>

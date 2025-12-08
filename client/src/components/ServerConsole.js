@@ -1,17 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authenticatedFetch } from '../utils/auth';
+import AuditLogs from './AuditLogs';
 
 const ServerConsole = ({ token }) => {
+  const [activeTab, setActiveTab] = useState('console'); // 'console' or 'audit'
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [filterLevel, setFilterLevel] = useState('all');
   const [limit, setLimit] = useState(500);
+  const [isMobile, setIsMobile] = useState(false);
   const logsEndRef = useRef(null);
   const logsContainerRef = useRef(null);
   const intervalRef = useRef(null);
   const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const scrollToBottom = () => {
     if (logsContainerRef.current && shouldAutoScrollRef.current) {
@@ -130,17 +143,64 @@ const ServerConsole = ({ token }) => {
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '100%' }}>
+      {/* Tabs Navigation */}
       <div style={{ 
         display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
+        gap: '0.5rem', 
         marginBottom: '1.5rem',
-        flexWrap: 'wrap',
-        gap: '1rem'
+        borderBottom: '2px solid #e5e7eb'
       }}>
-        <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600' }}>
-          קונסול שרת
-        </h2>
+        <button
+          onClick={() => setActiveTab('console')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: activeTab === 'console' ? '#2563eb' : 'transparent',
+            color: activeTab === 'console' ? 'white' : '#6b7280',
+            border: 'none',
+            borderBottom: activeTab === 'console' ? '2px solid #2563eb' : '2px solid transparent',
+            borderRadius: '8px 8px 0 0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'console' ? '600' : '400',
+            transition: 'all 0.2s',
+            marginBottom: '-2px'
+          }}
+        >
+          לוגי שרת
+        </button>
+        <button
+          onClick={() => setActiveTab('audit')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: activeTab === 'audit' ? '#2563eb' : 'transparent',
+            color: activeTab === 'audit' ? 'white' : '#6b7280',
+            border: 'none',
+            borderBottom: activeTab === 'audit' ? '2px solid #2563eb' : '2px solid transparent',
+            borderRadius: '8px 8px 0 0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'audit' ? '600' : '400',
+            transition: 'all 0.2s',
+            marginBottom: '-2px'
+          }}
+        >
+          Audit Logs
+        </button>
+      </div>
+
+      {activeTab === 'audit' ? (
+        <AuditLogs token={token} />
+      ) : (
+        <>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '1.5rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '600' }}>
+              קונסול שרת
+            </h2>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -264,26 +324,88 @@ const ServerConsole = ({ token }) => {
                 backgroundColor: index % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
               }}
             >
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <span style={{ color: '#94a3b8', minWidth: '180px' }}>
-                  {formatTimestamp(log.timestamp)}
-                </span>
-                <span style={{ 
-                  color: getLevelColor(log.level),
-                  fontWeight: '600',
-                  minWidth: '60px'
+              {isMobile ? (
+                // Mobile layout - vertical stack
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '0.5rem', 
+                    alignItems: 'center',
+                    flexWrap: 'nowrap'
+                  }}>
+                    <span style={{ 
+                      color: '#94a3b8', 
+                      fontSize: '0.75rem',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}>
+                      {formatTimestamp(log.timestamp)}
+                    </span>
+                    <span style={{ 
+                      color: getLevelColor(log.level),
+                      fontWeight: '600',
+                      fontSize: '0.75rem',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0
+                    }}>
+                      [{log.level.toUpperCase()}]
+                    </span>
+                  </div>
+                  <div style={{ 
+                    color: '#e2e8f0', 
+                    fontSize: '0.8rem',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: '1.4'
+                  }}>
+                    {log.message}
+                  </div>
+                </div>
+              ) : (
+                // Desktop layout - horizontal
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '1rem', 
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-start'
                 }}>
-                  [{log.level.toUpperCase()}]
-                </span>
-                <span style={{ color: '#e2e8f0', flex: 1, wordBreak: 'break-word' }}>
-                  {log.message}
-                </span>
-              </div>
+                  <span style={{ 
+                    color: '#94a3b8', 
+                    minWidth: '180px',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {formatTimestamp(log.timestamp)}
+                  </span>
+                  <span style={{ 
+                    color: getLevelColor(log.level),
+                    fontWeight: '600',
+                    minWidth: '60px',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    [{log.level.toUpperCase()}]
+                  </span>
+                  <span style={{ 
+                    color: '#e2e8f0', 
+                    flex: 1, 
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    minWidth: 0,
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {log.message}
+                  </span>
+                </div>
+              )}
             </div>
           ))
         )}
         <div ref={logsEndRef} />
       </div>
+        </>
+      )}
     </div>
   );
 };
