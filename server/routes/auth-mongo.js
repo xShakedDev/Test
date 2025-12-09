@@ -1189,22 +1189,43 @@ router.get('/gates/history', requireMongoDB, authenticateToken, async (req, res)
 // Helper function to create audit log
 const createAuditLog = async (req, action, resourceType, resourceId = null, resourceName = null, details = null, success = true, errorMessage = null) => {
   try {
-    if (!req.user) return;
-    await AuditLog.createLog({
+    if (!req || !req.user) {
+      console.warn('Audit log skipped: no user in request', { action, resourceType });
+      return; // Skip if no user (shouldn't happen but safety check)
+    }
+    
+    if (!req.user._id || !req.user.username) {
+      console.warn('Audit log skipped: invalid user data', { 
+        action, 
+        resourceType,
+        hasUserId: !!req.user._id,
+        hasUsername: !!req.user.username
+      });
+      return;
+    }
+    
+    const logData = {
       userId: req.user._id,
       username: req.user.username,
       action,
       resourceType,
       resourceId: resourceId ? String(resourceId) : null,
       resourceName,
-      details,
-      ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.get('user-agent'),
+      details: details ? String(details) : null,
+      ipAddress: req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null,
+      userAgent: req.get('user-agent') || null,
       success,
-      errorMessage
-    });
+      errorMessage: errorMessage ? String(errorMessage) : null
+    };
+    
+    const savedLog = await AuditLog.createLog(logData);
+    if (!savedLog) {
+      console.warn('Audit log creation returned null', { action, resourceType });
+    }
   } catch (error) {
     console.error('Error creating audit log:', error);
+    console.error('Error stack:', error.stack);
+    // Don't throw - audit logging should not break the main flow
   }
 };
 
@@ -1371,6 +1392,17 @@ router.post('/gates', requireMongoDB, authenticateToken, requireAdmin, async (re
 
     const savedGate = await newGate.save();
 
+    // Create audit log
+    await createAuditLog(
+      req,
+      'gate_created',
+      'gate',
+      savedGate.id.toString(),
+      savedGate.name,
+      `Created gate: ${savedGate.name} (ID: ${savedGate.id})`,
+      true
+    );
+
     res.status(201).json({
       success: true,
       gate: savedGate.toJSON(),
@@ -1514,6 +1546,23 @@ router.put('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, async 
 
     const updatedGate = await gate.save();
 
+    // Create audit log
+    const changes = [];
+    if (name && name !== gate.name) changes.push(`name: ${gate.name} → ${name}`);
+    if (phoneNumber && phoneNumber !== gate.phoneNumber) changes.push(`phoneNumber: ${gate.phoneNumber} → ${phoneNumber}`);
+    if (authorizedNumber && authorizedNumber !== gate.authorizedNumber) changes.push(`authorizedNumber: ${gate.authorizedNumber} → ${authorizedNumber}`);
+    if (password !== undefined) changes.push(`password: ${gate.password ? '***' : 'null'} → ${password ? '***' : 'null'}`);
+    
+    await createAuditLog(
+      req,
+      'gate_updated',
+      'gate',
+      updatedGate.id.toString(),
+      updatedGate.name,
+      changes.length > 0 ? `Updated gate: ${updatedGate.name} (ID: ${updatedGate.id}) - ${changes.join(', ')}` : `Updated gate: ${updatedGate.name} (ID: ${updatedGate.id})`,
+      true
+    );
+
     res.json({
       success: true,
       gate: updatedGate.toJSON(),
@@ -1550,15 +1599,28 @@ router.delete('/gates/:id', requireMongoDB, authenticateToken, requireAdmin, asy
     }
 
     // Soft delete - mark as inactive instead of removing
+    const gateName = gate.name;
+    const gateIdValue = gate.id;
     gate.isActive = false;
     await gate.save();
 
     // Delete all history records for this gate
-    await GateHistory.deleteMany({ gateId: gate.id });
+    const deletedHistoryCount = await GateHistory.deleteMany({ gateId: gate.id });
+
+    // Create audit log
+    await createAuditLog(
+      req,
+      'gate_deleted',
+      'gate',
+      gateIdValue.toString(),
+      gateName,
+      `Deleted gate: ${gateName} (ID: ${gateIdValue}), also deleted ${deletedHistoryCount.deletedCount} history records`,
+      true
+    );
 
     res.json({
       success: true,
-      message: `השער "${gate.name}" נמחק בהצלחה`,
+      message: `השער "${gateName}" נמחק בהצלחה`,
       gate: gate.toJSON()
     });
 
@@ -1803,6 +1865,26 @@ router.put('/admin/settings', authenticateToken, requireAdmin, async (req, res) 
       blockIfLowTwilioBalance: !!blockIfLowTwilioBalance,
       twilioBalanceThreshold: twilioBalanceThreshold !== undefined ? Number(twilioBalanceThreshold) : undefined
     }, req.user._id);
+
+    // Create audit log
+    const settingsChanges = [];
+    if (gateCooldownSeconds !== undefined) settingsChanges.push(`gateCooldownSeconds: ${gateCooldownSeconds}`);
+    if (maxRetries !== undefined) settingsChanges.push(`maxRetries: ${maxRetries}`);
+    if (enableNotifications !== undefined) settingsChanges.push(`enableNotifications: ${enableNotifications}`);
+    if (autoRefreshInterval !== undefined) settingsChanges.push(`autoRefreshInterval: ${autoRefreshInterval}`);
+    if (systemMaintenance !== undefined) settingsChanges.push(`systemMaintenance: ${systemMaintenance}`);
+    if (blockIfLowTwilioBalance !== undefined) settingsChanges.push(`blockIfLowTwilioBalance: ${blockIfLowTwilioBalance}`);
+    if (twilioBalanceThreshold !== undefined) settingsChanges.push(`twilioBalanceThreshold: ${twilioBalanceThreshold}`);
+
+    await createAuditLog(
+      req,
+      'settings_updated',
+      'settings',
+      null,
+      null,
+      `Updated admin settings: ${settingsChanges.join(', ')}`,
+      true
+    );
 
     res.json({
       message: 'ההגדרות נשמרו בהצלחה',

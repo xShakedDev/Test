@@ -357,35 +357,13 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
         </div>
       </div>
 
-      {/* Mobile Navigation - Collapsible */}
-      <div className="mobile-navigation">
-        <button
-          className="mobile-menu-toggle"
-          onClick={toggleMobileMenu}
-          aria-label="Toggle mobile menu"
-          ref={mobileMenuToggleRef}
-        >
-          <svg
-            className={`hamburger-icon ${isMobileMenuOpen ? 'open' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      {/* Mobile Navigation - iOS Style Sidebar */}
+      {isMobile && (
+        <div className={`mobile-navigation ${isMobileMenuOpen ? 'open' : ''}`}>
+          <div
+            className={`mobile-nav-content ${isMobileMenuOpen ? 'open' : ''}`}
+            ref={mobileNavContentRef}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={isMobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
-            />
-          </svg>
-          <span>תפריט ניווט</span>
-        </button>
-
-        <div
-          className={`mobile-nav-content ${isMobileMenuOpen ? 'open' : ''}`}
-          ref={mobileNavContentRef}
-          style={isMobileMenuOpen ? { maxHeight: mobileNavMaxHeight } : undefined}
-        >
           {/* Mobile User Info Section */}
           <div className="mobile-user-info">
             <div className={`mobile-admin-badge ${user?.role === 'admin' ? 'admin-badge-admin' : 'admin-badge-user'}`}>
@@ -514,8 +492,9 @@ const Header = ({ user, currentView, onViewChange, onLogout }) => {
               </>
             )}
           </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Change Password Modal */}
       <ChangePasswordModal

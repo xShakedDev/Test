@@ -89,6 +89,15 @@ body::before {
   box-shadow: var(--shadow-sm);
 }
 
+/* Mobile override - will be overridden by ios-mobile.css */
+@media (max-width: 768px) {
+  .app-header {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
 .app-header.header-visible {
   transform: translateY(0);
 }
@@ -1738,6 +1747,7 @@ body::before {
 /* Mobile landscape */
 @media (max-width: 768px) {
   .app-header {
+    /* Background overridden by ios-mobile.css */
     padding: 0.1rem 0;
   }
 
@@ -2948,6 +2958,14 @@ body::before {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
+}
+
+.user-action-buttons .btn,
+.user-action-buttons .btn-small {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  min-height: 2rem;
+  border-radius: 6px;
 }
 
 .gates-checkbox-grid {

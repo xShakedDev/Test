@@ -2222,14 +2222,54 @@ const GateDashboard = ({ user, token }) => {
       {/* Dashboard Header */}
       <div className="dashboard-header">
         <div>
-          <h1>שערים</h1>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            width: '100%',
+            marginBottom: '2rem',
+            padding: '1rem',
+            perspective: '1000px'
+          }}>
+            <div style={{
+              position: 'relative',
+              transformStyle: 'preserve-3d',
+              transition: 'transform 0.3s ease'
+            }}>
+              <div style={{
+                width: '150px',
+                height: '150px',
+                borderRadius: '50%',
+                border: '5px solid #000000',
+                padding: '12px',
+                boxSizing: 'border-box',
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                boxShadow: '0 12px 24px rgba(0, 0, 0, 0.2), 0 6px 12px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(255, 255, 255, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: 'translateZ(20px)'
+              }}>
+                <img 
+                  src={`${process.env.PUBLIC_URL || ''}/logo.png`} 
+                  alt="שערים" 
+                  style={{ 
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    borderRadius: '50%'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
           <p>
             {user?.role === 'admin'
               ? 'ניהול שערים במערכת - הוסף, ערוך ומחק שערים'
               : isEditMode
                 ? 'גרור את השערים כדי לשנות את הסדר שלהם'
                 : 'לשינוי סדר השערים לחץ על כפתור "עריכה"'
-            }
+          }
           </p>
           
           {/* Tabs Navigation */}

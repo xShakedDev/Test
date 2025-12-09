@@ -99,7 +99,7 @@ const GateHistory = ({ user, token }) => {
         // Send gateName to server, which will look up the gate and filter by gateId
         url += `&gateName=${encodeURIComponent(gateFilter)}`;
       }
-      if (userFilter) {
+      if (user?.role === 'admin' && userFilter) {
         url += `&username=${encodeURIComponent(userFilter)}`;
       }
       if (dateFilter.start || dateFilter.end) {
@@ -186,9 +186,11 @@ const GateHistory = ({ user, token }) => {
   useEffect(() => {
     fetchHistory();
     fetchGates(); // Always fetch gates to get current names
-    fetchUsers(); // Always fetch users for the filter
+    if (user?.role === 'admin') {
+      fetchUsers(); // Only fetch users for admin filter
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gateFilter, userFilter, dateFilter, statusFilters, token, pagination.page, pagination.limit]);
+  }, [gateFilter, userFilter, dateFilter, statusFilters, token, pagination.page, pagination.limit, user?.role]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'לא ידוע';
@@ -364,12 +366,12 @@ const GateHistory = ({ user, token }) => {
         {/* Filters */}
         <div className="history-filters">
           {/* Active Filters Display */}
-          {(gateFilter || userFilter || dateFilter.start || dateFilter.end || statusFilters.length > 0) && (
+          {(gateFilter || (user?.role === 'admin' && userFilter) || dateFilter.start || dateFilter.end || statusFilters.length > 0) && (
             <div className="active-filter-info">
               <span className="filter-label">
                 סננים פעילים: 
                 {gateFilter && ` שער: ${gateFilter}`}
-                {userFilter && ` משתמש: ${userFilter}`}
+                {user?.role === 'admin' && userFilter && ` משתמש: ${userFilter}`}
                 {(dateFilter.start || dateFilter.end) && ` תאריך: ${dateFilter.start ? `מתאריך ${dateFilter.start}` : ''}${dateFilter.start && dateFilter.end ? ' ' : ''}${dateFilter.end ? `עד תאריך ${dateFilter.end}` : ''}`}
                 {statusFilters.length > 0 && ` סטטוס: ${statusFilters.map(s => {
                   if (s === 'opened') return 'נפתח';
@@ -381,7 +383,9 @@ const GateHistory = ({ user, token }) => {
               <button 
                 onClick={() => {
                   setGateFilter('');
-                  setUserFilter('');
+                  if (user?.role === 'admin') {
+                    setUserFilter('');
+                  }
                   setDateFilter({ start: '', end: '' });
                   setStatusFilters([]);
                   setPagination(prev => ({ ...prev, page: 1 }));
@@ -449,23 +453,25 @@ const GateHistory = ({ user, token }) => {
                 </datalist>
               </div>
 
-              <div className="user-search-container" style={{ flex: 1, minWidth: '200px' }}>
-                <label htmlFor="user-filter" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>משתמש:</label>
-                <input
-                  id="user-filter"
-                  type="text"
-                  value={userFilter}
-                  onChange={(e) => handleUserSearch(e.target.value)}
-                  placeholder="התחל להקליד שם משתמש או שם מלא..."
-                  className="form-input"
-                  list="users-list"
-                />
-                <datalist id="users-list">
-                  {users.map(user => (
-                    <option key={user.id} value={user.username} />
-                  ))}
-                </datalist>
-              </div>
+              {user?.role === 'admin' && (
+                <div className="user-search-container" style={{ flex: 1, minWidth: '200px' }}>
+                  <label htmlFor="user-filter" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}>משתמש:</label>
+                  <input
+                    id="user-filter"
+                    type="text"
+                    value={userFilter}
+                    onChange={(e) => handleUserSearch(e.target.value)}
+                    placeholder="התחל להקליד שם משתמש או שם מלא..."
+                    className="form-input"
+                    list="users-list"
+                  />
+                  <datalist id="users-list">
+                    {users.map(user => (
+                      <option key={user.id} value={user.username} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
             </div>
 
             {/* Date Filters */}
@@ -621,7 +627,7 @@ const GateHistory = ({ user, token }) => {
                         onChange={handleSelectAll}
                       />
                     </th>
-                    <th>משתמש</th>
+                    {user?.role === 'admin' && <th>משתמש</th>}
                     <th>שער</th>
                     <th>סטטוס</th>
                     <th>תאריך</th>
@@ -640,7 +646,9 @@ const GateHistory = ({ user, token }) => {
                             onChange={() => handleSelectLog(log.id)}
                           />
                         </td>
-                        <td className="history-user">{log.userName || log.username || (log.userId && (log.userId.name || log.userId.username)) || 'לא ידוע'}</td>
+                        {user?.role === 'admin' && (
+                          <td className="history-user">{log.userName || log.username || (log.userId && (log.userId.name || log.userId.username)) || 'לא ידוע'}</td>
+                        )}
                         <td className="history-gate">
                           {(() => {
                             // Try to find current gate name by gateId

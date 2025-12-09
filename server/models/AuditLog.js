@@ -93,6 +93,24 @@ auditLogSchema.index({ username: 1, timestamp: -1 });
 // Static method to create audit log
 auditLogSchema.statics.createLog = async function(data) {
   try {
+    // Validate required fields
+    if (!data.userId) {
+      console.error('Audit log error: userId is required', data);
+      return null;
+    }
+    if (!data.username) {
+      console.error('Audit log error: username is required', data);
+      return null;
+    }
+    if (!data.action) {
+      console.error('Audit log error: action is required', data);
+      return null;
+    }
+    if (!data.resourceType) {
+      console.error('Audit log error: resourceType is required', data);
+      return null;
+    }
+
     const log = new this({
       userId: data.userId,
       username: data.username,
@@ -107,9 +125,18 @@ auditLogSchema.statics.createLog = async function(data) {
       errorMessage: data.errorMessage || null,
       timestamp: data.timestamp || new Date()
     });
-    return await log.save();
+    
+    const savedLog = await log.save();
+    console.log('Audit log saved successfully:', savedLog._id, savedLog.action);
+    return savedLog;
   } catch (error) {
     console.error('Error creating audit log:', error);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+      data: data
+    });
     // Don't throw - audit logging should not break the main flow
     return null;
   }

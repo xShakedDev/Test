@@ -7,25 +7,60 @@ const AuditLog = require('../models/AuditLog');
 const router = express.Router();
 
 // Helper function to create audit log
-const createAuditLog = async (req, action, resourceType, resourceId = null, resourceName = null, details = null, success = true, errorMessage = null) => {
+// Can accept either req (with req.user) or user object directly with optional req for IP/userAgent
+const createAuditLog = async (reqOrUser, action, resourceType, resourceId = null, resourceName = null, details = null, success = true, errorMessage = null, reqForMetadata = null) => {
   try {
-    if (!req.user) return; // Skip if no user (shouldn't happen but safety check)
+    let userId, username, ipAddress, userAgent;
+    const req = reqForMetadata || reqOrUser;
     
-    await AuditLog.createLog({
-      userId: req.user._id,
-      username: req.user.username,
+    // Check if first parameter is a user object (for login) or req object
+    if (reqOrUser && reqOrUser._id && reqOrUser.username && !reqOrUser.user) {
+      // It's a user object (direct user - for login route)
+      userId = reqOrUser._id;
+      username = reqOrUser.username;
+      ipAddress = req ? (req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || null) : null;
+      userAgent = req ? (req.get('user-agent') || null) : null;
+    } else if (reqOrUser && reqOrUser.user) {
+      // It's a req object with req.user
+      if (!reqOrUser.user._id || !reqOrUser.user.username) {
+        console.warn('Audit log skipped: invalid user data', { 
+          action, 
+          resourceType,
+          hasUserId: !!reqOrUser.user._id,
+          hasUsername: !!reqOrUser.user.username
+        });
+        return;
+      }
+      userId = reqOrUser.user._id;
+      username = reqOrUser.user.username;
+      ipAddress = reqOrUser.ip || reqOrUser.connection?.remoteAddress || reqOrUser.socket?.remoteAddress || null;
+      userAgent = reqOrUser.get('user-agent') || null;
+    } else {
+      console.warn('Audit log skipped: no user in request', { action, resourceType });
+      return;
+    }
+    
+    const logData = {
+      userId,
+      username,
       action,
       resourceType,
       resourceId: resourceId ? String(resourceId) : null,
       resourceName,
-      details,
-      ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.get('user-agent'),
+      details: details ? String(details) : null,
+      ipAddress,
+      userAgent,
       success,
-      errorMessage
-    });
+      errorMessage: errorMessage ? String(errorMessage) : null
+    };
+    
+    const savedLog = await AuditLog.createLog(logData);
+    if (!savedLog) {
+      console.warn('Audit log creation returned null', { action, resourceType });
+    }
   } catch (error) {
     console.error('Error creating audit log:', error);
+    console.error('Error stack:', error.stack);
     // Don't throw - audit logging should not break the main flow
   }
 };
@@ -240,15 +275,17 @@ router.post('/login', async (req, res) => {
     
     console.log(`Login successful for user: ${normalizedUsername} (${user.role})`);
     
-    // Create audit log for login
+    // Create audit log for login - pass user directly and req for IP/userAgent
     await createAuditLog(
-      req,
+      user,
       'login',
       'auth',
       user._id.toString(),
       user.username,
       `User logged in: ${user.name} (${user.username})`,
-      true
+      true,
+      null,
+      req
     );
     
     res.json({
@@ -302,13 +339,46 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // Logout route
-router.post('/logout', (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  // JWT logout is client-side, no server-side session to invalidate here
-  // For simplicity, we'll just return a success message
-  res.json({ message: 'התנתקות הצליחה' });
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    // Try to decode token to get user info for audit log
+    let user = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        user = await User.findById(decoded.userId);
+      } catch (error) {
+        // Token invalid or expired - that's okay for logout
+        console.log('Logout with invalid/expired token');
+      }
+    }
+    
+    // Create audit log for logout if we have user info
+    if (user) {
+      await createAuditLog(
+        user,
+        'logout',
+        'auth',
+        user._id.toString(),
+        user.username,
+        `User logged out: ${user.name} (${user.username})`,
+        true,
+        null,
+        req
+      );
+    }
+    
+    // JWT logout is client-side, no server-side session to invalidate here
+    // For simplicity, we'll just return a success message
+    res.json({ message: 'התנתקות הצליחה' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still return success even if audit log fails
+    res.json({ message: 'התנתקות הצליחה' });
+  }
 });
 
 // Refresh token route
@@ -691,6 +761,17 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     // Update password
     req.user.password = newPassword;
     await req.user.save();
+
+    // Create audit log
+    await createAuditLog(
+      req,
+      'password_changed',
+      'auth',
+      req.user._id.toString(),
+      req.user.username,
+      'User changed password',
+      true
+    );
 
     res.json({ message: 'סיסמה שונתה בהצלחה' });
 

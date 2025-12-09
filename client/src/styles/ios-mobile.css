@@ -1,0 +1,999 @@
+/* ========================================
+   iOS MODERN MOBILE DESIGN SYSTEM
+   ======================================== */
+
+/* iOS Design Tokens */
+:root {
+  /* iOS Colors */
+  --ios-blue: #007AFF;
+  --ios-blue-dark: #0051D5;
+  --ios-gray-1: #F2F2F7;
+  --ios-gray-2: #E5E5EA;
+  --ios-gray-3: #D1D1D6;
+  --ios-gray-4: #C7C7CC;
+  --ios-gray-5: #AEAEB2;
+  --ios-gray-6: #8E8E93;
+  --ios-label: #000000;
+  --ios-label-secondary: rgba(60, 60, 67, 0.6);
+  --ios-label-tertiary: rgba(60, 60, 67, 0.3);
+  --ios-separator: rgba(60, 60, 67, 0.29);
+  --ios-fill: rgba(120, 120, 128, 0.16);
+  --ios-fill-secondary: rgba(120, 120, 128, 0.12);
+  --ios-fill-tertiary: rgba(120, 120, 128, 0.08);
+  
+  /* iOS Spacing */
+  --ios-space-xs: 4px;
+  --ios-space-sm: 8px;
+  --ios-space-md: 16px;
+  --ios-space-lg: 24px;
+  --ios-space-xl: 32px;
+  
+  /* iOS Border Radius */
+  --ios-radius-sm: 8px;
+  --ios-radius-md: 12px;
+  --ios-radius-lg: 16px;
+  --ios-radius-xl: 20px;
+  --ios-radius-full: 9999px;
+  
+  /* iOS Shadows */
+  --ios-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --ios-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --ios-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
+  
+  /* iOS Typography */
+  --ios-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --ios-font-size-large-title: 34px;
+  --ios-font-size-title-1: 28px;
+  --ios-font-size-title-2: 22px;
+  --ios-font-size-title-3: 20px;
+  --ios-font-size-headline: 17px;
+  --ios-font-size-body: 17px;
+  --ios-font-size-callout: 16px;
+  --ios-font-size-subhead: 15px;
+  --ios-font-size-footnote: 13px;
+  --ios-font-size-caption-1: 12px;
+  --ios-font-size-caption-2: 11px;
+  
+  /* iOS Transitions */
+  --ios-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ios-transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ios-transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ios-spring: cubic-bezier(0.36, 0.66, 0.04, 1);
+}
+
+/* iOS Mobile Styles - Apply only on mobile devices */
+@media (max-width: 768px) {
+  /* Base iOS Styles */
+  body {
+    font-family: var(--ios-font-family);
+    background: var(--ios-gray-1);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* iOS Safe Area Support */
+  .App {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* ========================================
+     iOS HEADER / NAVIGATION BAR
+     ======================================== */
+  
+  .app-header {
+    display: none !important;
+  }
+
+  .header-content {
+    max-width: 100%;
+    padding: 0;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--ios-space-md);
+  }
+
+  .header-left {
+    flex: 1;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ios-space-md);
+    min-width: 0;
+  }
+
+  .header-left .app-title {
+    font-size: var(--ios-font-size-title-3);
+    font-weight: 600;
+    color: var(--ios-label);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--ios-space-sm);
+    overflow: hidden;
+  }
+
+  .header-logo-img {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--ios-radius-sm);
+  }
+
+  .desktop-navigation {
+    display: none;
+  }
+
+  .header-right {
+    display: none;
+  }
+
+  /* iOS Mobile Menu Toggle */
+  .mobile-menu-toggle {
+    background: transparent;
+    border: none;
+    padding: var(--ios-space-sm);
+    color: var(--ios-label);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ios-space-xs);
+    font-size: var(--ios-font-size-body);
+    font-weight: 500;
+    border-radius: var(--ios-radius-md);
+    transition: background var(--ios-transition-fast);
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .mobile-menu-toggle:active {
+    background: var(--ios-fill);
+  }
+
+  .hamburger-icon {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2;
+    transition: transform var(--ios-transition-normal) var(--ios-spring);
+  }
+
+  /* iOS Mobile Navigation Menu */
+  .mobile-navigation {
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--ios-transition-normal);
+  }
+
+  .mobile-navigation.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .mobile-nav-content {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    background: var(--ios-gray-1);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+    transition: transform var(--ios-transition-normal) var(--ios-spring);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--ios-space-lg));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--ios-space-lg));
+    padding-right: var(--ios-space-md);
+    padding-left: var(--ios-space-md);
+  }
+
+  .mobile-navigation.open .mobile-nav-content {
+    transform: translateX(0);
+  }
+
+  .mobile-user-info {
+    padding: var(--ios-space-lg);
+    border-bottom: 0.5px solid var(--ios-separator);
+    background: rgba(255, 255, 255, 0.6);
+  }
+
+  .mobile-admin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ios-space-xs);
+    padding: var(--ios-space-xs) var(--ios-space-md);
+    background: var(--ios-blue);
+    color: white;
+    border-radius: var(--ios-radius-full);
+    font-size: var(--ios-font-size-subhead);
+    font-weight: 500;
+    margin-bottom: var(--ios-space-md);
+  }
+
+  .mobile-nav-buttons {
+    padding: var(--ios-space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ios-space-xs);
+  }
+
+  .mobile-nav-button {
+    width: 100%;
+    padding: var(--ios-space-md);
+    background: transparent;
+    border: none;
+    border-radius: var(--ios-radius-md);
+    color: var(--ios-label);
+    font-size: var(--ios-font-size-body);
+    font-weight: 400;
+    text-align: right;
+    cursor: pointer;
+    transition: background var(--ios-transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--ios-space-sm);
+  }
+
+  .mobile-nav-button:active {
+    background: var(--ios-fill);
+  }
+
+  .mobile-nav-button-active {
+    background: var(--ios-fill-secondary);
+    font-weight: 500;
+    color: var(--ios-blue);
+  }
+
+  /* iOS Bottom Tab Bar */
+  .ios-tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-top: 0.5px solid var(--ios-separator);
+    padding: var(--ios-space-sm) 0;
+    padding-bottom: calc(var(--ios-space-sm) + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .ios-tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--ios-space-xs);
+    padding: var(--ios-space-xs);
+    background: transparent;
+    border: none;
+    color: var(--ios-label-secondary);
+    font-size: var(--ios-font-size-caption-1);
+    font-weight: 500;
+    cursor: pointer;
+    transition: color var(--ios-transition-fast);
+    min-width: 0;
+  }
+
+  .ios-tab-item:active {
+    opacity: 0.6;
+  }
+
+  .ios-tab-item.active {
+    color: var(--ios-blue);
+  }
+
+  .ios-tab-icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 2px;
+  }
+
+  /* ========================================
+     iOS MAIN CONTENT
+     ======================================== */
+  
+  .App main {
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--ios-space-sm));
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    background: var(--ios-gray-1);
+  }
+
+  /* ========================================
+     iOS CARDS
+     ======================================== */
+  
+  .gate-card,
+  .card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: var(--ios-radius-lg);
+    border: none;
+    box-shadow: var(--ios-shadow-sm);
+    padding: var(--ios-space-lg);
+    margin-bottom: var(--ios-space-md);
+    transition: transform var(--ios-transition-fast), box-shadow var(--ios-transition-fast);
+  }
+
+  .gate-card:active,
+  .card:active {
+    transform: scale(0.98);
+    box-shadow: var(--ios-shadow-md);
+  }
+
+  /* ========================================
+     iOS BUTTONS
+     ======================================== */
+  
+  .btn {
+    font-family: var(--ios-font-family);
+    font-size: var(--ios-font-size-body);
+    font-weight: 500;
+    padding: var(--ios-space-md) var(--ios-space-xl);
+    border-radius: var(--ios-radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all var(--ios-transition-fast);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ios-space-sm);
+    min-height: 44px; /* iOS minimum touch target */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn-primary {
+    background: var(--ios-blue);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+  }
+
+  .btn-primary:active {
+    background: var(--ios-blue-dark);
+    transform: scale(0.97);
+    box-shadow: 0 1px 4px rgba(0, 122, 255, 0.2);
+  }
+
+  .btn-secondary {
+    background: var(--ios-fill);
+    color: var(--ios-label);
+  }
+
+  .btn-secondary:active {
+    background: var(--ios-fill-secondary);
+    transform: scale(0.97);
+  }
+
+  .btn-full {
+    width: 100%;
+  }
+
+  /* ========================================
+     iOS FORMS
+     ======================================== */
+  
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-family: var(--ios-font-family);
+    font-size: var(--ios-font-size-body);
+    padding: var(--ios-space-md);
+    background: rgba(255, 255, 255, 0.9);
+    border: 0.5px solid var(--ios-separator);
+    border-radius: var(--ios-radius-md);
+    color: var(--ios-label);
+    width: 100%;
+    min-height: 44px; /* iOS minimum touch target */
+    transition: border-color var(--ios-transition-fast), background var(--ios-transition-fast);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .form-input:focus,
+  .form-select:focus,
+  .form-textarea:focus {
+    outline: none;
+    border-color: var(--ios-blue);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  }
+
+  .form-label {
+    font-size: var(--ios-font-size-subhead);
+    font-weight: 500;
+    color: var(--ios-label);
+    margin-bottom: var(--ios-space-xs);
+    display: block;
+  }
+
+  /* ========================================
+     iOS MODALS
+     ======================================== */
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: var(--ios-space-lg);
+    padding-bottom: calc(var(--ios-space-lg) + env(safe-area-inset-bottom, 0px));
+    animation: fadeIn var(--ios-transition-normal);
+  }
+
+  .modal-content {
+    background: var(--ios-gray-1);
+    border-radius: var(--ios-radius-xl) var(--ios-radius-xl) 0 0;
+    background: white;
+    width: 100%;
+    max-width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: slideUp var(--ios-transition-normal) var(--ios-spring);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Mobile User Menu */
+  .mobile-user-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: fadeIn var(--ios-transition-normal);
+  }
+
+  .mobile-user-menu-content {
+    background: white;
+    border-radius: var(--ios-radius-xl) var(--ios-radius-xl) 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: slideUp var(--ios-transition-normal) var(--ios-spring);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .mobile-user-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--ios-space-lg);
+    border-bottom: 0.5px solid var(--ios-separator);
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
+  }
+
+  .mobile-user-menu-header h3 {
+    font-size: var(--ios-font-size-title-2);
+    font-weight: 600;
+    color: var(--ios-label);
+    margin: 0;
+  }
+
+  .mobile-user-menu-close {
+    background: transparent;
+    border: none;
+    padding: var(--ios-space-xs);
+    color: var(--ios-label);
+    cursor: pointer;
+    border-radius: var(--ios-radius-md);
+    transition: background var(--ios-transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .mobile-user-menu-close:active {
+    background: var(--ios-fill);
+  }
+
+  .mobile-user-menu-body {
+    padding: var(--ios-space-lg);
+  }
+
+  .mobile-user-menu-section {
+    margin-bottom: var(--ios-space-lg);
+  }
+
+  .mobile-user-menu-actions {
+    margin-top: var(--ios-space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ios-space-sm);
+  }
+
+  .mobile-user-menu-nav-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ios-space-xs);
+  }
+
+  .mobile-user-menu-nav-button {
+    display: flex;
+    align-items: center;
+    gap: var(--ios-space-md);
+    padding: var(--ios-space-md);
+    background: rgba(10, 92, 255, 0.05);
+    border: 0.5px solid rgba(10, 92, 255, 0.1);
+    border-radius: var(--ios-radius-md);
+    color: var(--ios-label);
+    font-size: var(--ios-font-size-body);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--ios-transition-fast);
+    text-align: right;
+    width: 100%;
+  }
+
+  .mobile-user-menu-nav-button:active {
+    background: rgba(10, 92, 255, 0.1);
+    transform: scale(0.98);
+  }
+
+  .mobile-user-menu-nav-button svg {
+    color: var(--ios-blue);
+    flex-shrink: 0;
+  }
+
+  .mobile-balance-card {
+    display: flex;
+    align-items: center;
+    gap: var(--ios-space-md);
+    padding: var(--ios-space-md);
+    background: rgba(10, 92, 255, 0.08);
+    border-radius: var(--ios-radius-md);
+    border: 0.5px solid rgba(10, 92, 255, 0.2);
+  }
+
+  .mobile-balance-icon {
+    width: 32px;
+    height: 32px;
+    color: var(--ios-blue);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-balance-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .mobile-balance-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ios-space-xs);
+    flex: 1;
+  }
+
+  .mobile-balance-label {
+    font-size: var(--ios-font-size-caption-1);
+    color: var(--ios-label-secondary);
+    font-weight: 500;
+  }
+
+  .mobile-balance-amount {
+    font-size: var(--ios-font-size-title-3);
+    font-weight: 700;
+    color: var(--ios-blue);
+  }
+
+  .mobile-refresh-btn {
+    padding: var(--ios-space-xs);
+    min-width: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* ========================================
+     iOS DASHBOARD
+     ======================================== */
+  
+  .dashboard-container {
+    padding: var(--ios-space-md);
+  }
+
+  .dashboard-header {
+    padding: var(--ios-space-lg);
+    margin-bottom: var(--ios-space-lg);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    text-align: center;
+  }
+  
+  .dashboard-header > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dashboard-header h1 {
+    font-size: var(--ios-font-size-large-title);
+    font-weight: 700;
+    color: var(--ios-label);
+    margin-bottom: var(--ios-space-sm);
+  }
+
+  .dashboard-header p {
+    font-size: var(--ios-font-size-body);
+    color: var(--ios-label-secondary);
+    margin-bottom: var(--ios-space-md);
+  }
+
+  .gates-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--ios-space-md);
+  }
+
+  .gate-card {
+    padding: var(--ios-space-lg);
+  }
+
+  .gate-name-with-icon h3 {
+    font-size: var(--ios-font-size-title-3);
+    font-weight: 600;
+    color: var(--ios-label);
+  }
+
+  /* ========================================
+     iOS LIST ITEMS
+     ======================================== */
+  
+  .gate-item,
+  .list-item {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: var(--ios-radius-md);
+    padding: var(--ios-space-md);
+    margin-bottom: var(--ios-space-sm);
+    border: none;
+    box-shadow: var(--ios-shadow-sm);
+    transition: transform var(--ios-transition-fast), box-shadow var(--ios-transition-fast);
+  }
+
+  .gate-item:active,
+  .list-item:active {
+    transform: scale(0.98);
+    box-shadow: var(--ios-shadow-md);
+  }
+
+  /* ========================================
+     iOS SWITCHES / TOGGLES
+     ======================================== */
+  
+  .form-checkbox,
+  input[type="checkbox"] {
+    width: 51px;
+    height: 31px;
+    border-radius: var(--ios-radius-full);
+    background: var(--ios-gray-4);
+    border: none;
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    cursor: pointer;
+    transition: background var(--ios-transition-fast);
+    flex-shrink: 0;
+  }
+
+  .form-checkbox:checked,
+  input[type="checkbox"]:checked {
+    background: var(--ios-blue);
+  }
+
+  .form-checkbox::before,
+  input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    right: 2px;
+    transition: transform var(--ios-transition-fast) var(--ios-spring);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .form-checkbox:checked::before,
+  input[type="checkbox"]:checked::before {
+    transform: translateX(-20px);
+  }
+
+  /* Regular checkboxes for history table - override iOS style */
+  .history-table input[type="checkbox"],
+  .history-table-container input[type="checkbox"],
+  .history-table-container table input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 4px !important;
+    background: white !important;
+    border: 2px solid var(--ios-gray-4) !important;
+    appearance: checkbox !important;
+    -webkit-appearance: checkbox !important;
+    position: static !important;
+    cursor: pointer;
+    transition: border-color var(--ios-transition-fast);
+    flex-shrink: 0;
+  }
+
+  .history-table input[type="checkbox"]::before,
+  .history-table-container input[type="checkbox"]::before,
+  .history-table-container table input[type="checkbox"]::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  .history-table input[type="checkbox"]:checked,
+  .history-table-container input[type="checkbox"]:checked,
+  .history-table-container table input[type="checkbox"]:checked {
+    background: var(--ios-blue) !important;
+    border-color: var(--ios-blue) !important;
+  }
+
+  .history-table input[type="checkbox"]:checked::after,
+  .history-table-container input[type="checkbox"]:checked::after,
+  .history-table-container table input[type="checkbox"]:checked::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  /* ========================================
+     iOS LOADING
+     ======================================== */
+  
+  .loading {
+    background: var(--ios-gray-1);
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--ios-gray-3);
+    border-top-color: var(--ios-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ========================================
+     iOS MESSAGES / ALERTS
+     ======================================== */
+  
+  .error-message,
+  .success-message {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--ios-radius-lg);
+    padding: var(--ios-space-md);
+    margin-bottom: var(--ios-space-md);
+    border: 0.5px solid var(--ios-separator);
+    box-shadow: var(--ios-shadow-md);
+  }
+
+  .error-message {
+    background: rgba(255, 59, 48, 0.1);
+    border-color: rgba(255, 59, 48, 0.3);
+    color: #FF3B30;
+  }
+
+  .success-message {
+    background: rgba(52, 199, 89, 0.1);
+    border-color: rgba(52, 199, 89, 0.3);
+    color: #34C759;
+  }
+
+  /* ========================================
+     iOS FOOTER
+     ======================================== */
+  
+  .app-footer {
+    display: none; /* Hide on mobile, use tab bar instead */
+  }
+
+  /* ========================================
+     iOS UTILITIES
+     ======================================== */
+  
+  /* Remove tap highlight */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* iOS-style scrollbars */
+  ::-webkit-scrollbar {
+    width: 0;
+    background: transparent;
+  }
+}
+
+  /* User Management - Smaller buttons */
+  .user-action-buttons .btn {
+    padding: var(--ios-space-xs) var(--ios-space-sm) !important;
+    font-size: var(--ios-font-size-caption-1) !important;
+    min-height: 32px !important;
+    border-radius: var(--ios-radius-sm) !important;
+  }
+
+  .user-action-buttons .btn-small {
+    padding: var(--ios-space-xs) var(--ios-space-sm) !important;
+    font-size: var(--ios-font-size-caption-1) !important;
+    min-height: 32px !important;
+  }
+
+  /* Small mobile devices */
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: var(--ios-space-sm);
+  }
+
+  .gate-card {
+    padding: var(--ios-space-md);
+  }
+
+  .btn {
+    padding: var(--ios-space-md) var(--ios-space-lg);
+    font-size: var(--ios-font-size-callout);
+  }
+}
+
+/* ========================================
+   LOGIN FORM MOBILE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+  /* Fix input icon spacing - ensure text doesn't overlap icon */
+  .input-container .form-input {
+    padding-right: 3.5rem !important;
+  }
+
+  /* iOS-style remember me checkbox - override all default styles */
+  .remember-me-checkbox {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    border-radius: 4px !important;
+    border: 1.5px solid var(--ios-gray-4) !important;
+    background: white !important;
+    background-image: none !important;
+    cursor: pointer !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    position: relative !important;
+    flex-shrink: 0 !important;
+    transition: all 0.2s ease !important;
+    accent-color: transparent !important;
+    color: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+  }
+
+  /* Remove any default browser checkbox styling */
+  .remember-me-checkbox::before {
+    display: none !important;
+    content: none !important;
+  }
+
+  .remember-me-checkbox:not(:checked)::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .remember-me-checkbox:checked {
+    background: var(--ios-blue) !important;
+    border-color: var(--ios-blue) !important;
+  }
+
+  .remember-me-checkbox:checked::after {
+    content: '' !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) rotate(45deg) !important;
+    width: 4px !important;
+    height: 8px !important;
+    border: solid white !important;
+    border-width: 0 2px 2px 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .remember-me-checkbox:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  }
+
+  /* Fix remember me text spacing */
+  .remember-me-label {
+    gap: 0 !important;
+    align-items: center !important;
+  }
+
+  .remember-me-text {
+    padding-left: 0.875rem !important;
+  }
+
+  .remember-me-text {
+    font-size: var(--ios-font-size-body) !important;
+    line-height: 1.4 !important;
+  }
+}
+

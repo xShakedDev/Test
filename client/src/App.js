@@ -7,10 +7,13 @@ import GateHistory from './components/GateHistory';
 import AdminSettings from './components/AdminSettings';
 import GateStatistics from './components/GateStatistics';
 import ServerConsole from './components/ServerConsole';
+import IOSTabBar from './components/IOSTabBar';
 import { isSessionExpired, authenticatedFetch, setTokenUpdateCallback, refreshAccessToken } from './utils/auth';
 import './styles/design-system.css';
 import './styles/LocationPicker.css'; // Import LocationPicker styles
 import './App.css';
+import './styles/ios-mobile.css'; // iOS mobile design (after App.css to override)
+import './styles/ios-desktop.css'; // iOS desktop design (after App.css to override)
 
 function App() {
   const [user, setUser] = useState(null);
@@ -329,6 +332,12 @@ function App() {
           />
         )}
       </main>
+      <IOSTabBar 
+        currentView={currentView} 
+        onViewChange={handleViewChange}
+        user={user}
+        onLogout={handleLogout}
+      />
       <footer className="app-footer">
         <p>כל הזכויות שמורות לשקד יוסף</p>
       </footer>
